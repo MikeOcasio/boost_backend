@@ -1,2 +1,7 @@
 
 .DS_Store
+/tmp/cache/bootsnap
+
+tmp/
+
+log/
