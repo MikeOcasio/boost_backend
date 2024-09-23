@@ -20,10 +20,10 @@ test:
 
 production:
   adapter: postgresql
-  database: <%= Rails.application.credentials.dig(:aws, :rds, :database) %>
-  username: <%= Rails.application.credentials.dig(:aws, :rds, :username) %>
-  password: <%= Rails.application.credentials.dig(:aws, :rds, :password) %>
-  host: <%= Rails.application.credentials.dig(:aws, :rds, :host) %>
+  database: <%= Rails.application.credentials.aws[:rds][:database] %>
+  username: <%= Rails.application.credentials.aws[:rds][:username] %>
+  password: <%= Rails.application.credentials.aws[:rds][:password] %>
+  host: <%= Rails.application.credentials.aws[:rds][:host] %>
   port: 5432
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   timeout: 5000
