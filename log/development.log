@@ -1,0 +1,12 @@
+DEPRECATION WARNING: Using legacy connection handling is deprecated. Please set
+`legacy_connection_handling` to `false` in your application.
+
+The new connection handling does not support `connection_handlers`
+getter and setter.
+
+Read more about how to migrate at: https://guides.rubyonrails.org/active_record_multiple_databases.html#migrate-to-the-new-connection-handling
+ (called from <main> at /Users/mocasio/Documents/Personal/Projects/boost_backend/app/models/application_record.rb:1)
+  [1m[36mUser Load (2.7ms)[0m  [1m[34mSELECT "users".* FROM "users"[0m
+  [1m[36mPreferredSkillMaster Pluck (2.4ms)[0m  [1m[34mSELECT "preferred_skill_masters"."id" FROM "preferred_skill_masters" WHERE "preferred_skill_masters"."user_id" = $1[0m  [["user_id", 1]]
+  [1m[36mPreferredSkillMaster Pluck (2.3ms)[0m  [1m[34mSELECT "preferred_skill_masters"."id" FROM "preferred_skill_masters" WHERE "preferred_skill_masters"."user_id" = $1[0m  [["user_id", 2]]
+  [1m[36mPreferredSkillMaster Pluck (1.9ms)[0m  [1m[34mSELECT "preferred_skill_masters"."id" FROM "preferred_skill_masters" WHERE "preferred_skill_masters"."user_id" = $1[0m  [["user_id", 3]]

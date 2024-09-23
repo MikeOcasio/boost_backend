@@ -1,0 +1,13 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  code: MyString
+  discount_percentage: 9.99
+  start_date: 2024-01-23 22:00:35
+  end_date: 2024-01-23 22:00:35
+
+two:
+  code: MyString
+  discount_percentage: 9.99
+  start_date: 2024-01-23 22:00:35
+  end_date: 2024-01-23 22:00:35
