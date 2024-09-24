@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     get '/users/skillmasters', to: 'users#skillmasters'
     post '/login', to: 'users#login'
     get '/current_user', to: 'users#show_current_user'
+    get '/csrf_token', to: 'application#csrf_token'
 
     resources :categories, only: [:index, :show, :create, :update, :destroy]
     resources :files, only: [:index, :create, :destroy]
