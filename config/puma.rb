@@ -8,6 +8,7 @@ threads min_threads_count, max_threads_count
 # Specifies the port Puma will listen on. In production, you might use a reverse proxy (like Nginx),
 # so the port might differ from development (e.g., 8080).
 port ENV.fetch("PORT") { 3000 }
+bind "tcp://0.0.0.0:3000"
 
 # Specifies the environment. Ensure this is set to `production` in a production environment.
 environment ENV.fetch("RAILS_ENV") { "production" }
