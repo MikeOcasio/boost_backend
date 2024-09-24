@@ -33,6 +33,7 @@ gem 'devise_token_auth'
 gem 'devise-two-factor'
 gem 'activerecord-session_store'
 gem 'devise-jwt'
+gem 'listen', '~> 3.2'
 
 # Use Active Storage variant
 # gem 'image_processing', '~> 1.2'
