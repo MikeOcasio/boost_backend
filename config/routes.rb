@@ -14,6 +14,7 @@ Rails.application.routes.draw do
     resources :files, only: [:index, :create, :destroy]
     resources :users
     resources :orders
+    resources :products
 
     get '/graveyard_orders', to: 'orders#graveyard_orders'
     patch '/orders/:id/pick_up_order', to: 'orders#pick_up_order'

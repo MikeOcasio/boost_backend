@@ -6,6 +6,7 @@ default: &default
   port: 5432
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   timeout: 5000
+  legacy_connection_handling: false
 
 development:
   <<: *default
@@ -27,3 +28,4 @@ production:
   port: 5432
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   timeout: 5000
+  legacy_connection_handling: false

@@ -19,11 +19,17 @@ class Product < ApplicationRecord
   belongs_to :category
   belongs_to :product_attribute_category
 
+  has_many :order_products
   has_many :orders, through: :order_products
+
   has_many :carts
+
+  has_many :product_promotions
   has_many :promotions, through: :product_promotions
 
   validates :platform, presence: true
+  validates :name, presence: true
+  validates :price, presence: true
 
   # Scope to find products by platform
   scope :by_platform, ->(platform) { where(platform: platform) }
