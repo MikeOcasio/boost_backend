@@ -10,7 +10,7 @@ Rails.application.routes.draw do
     post '/login', to: 'users#login'
     get '/current_user', to: 'users#show_current_user'
 
-
+    resources :product_attribute_categories
     resources :categories, only: [:index, :show, :create, :update, :destroy]
     resources :files, only: [:index, :create, :destroy]
     resources :users
@@ -23,7 +23,7 @@ Rails.application.routes.draw do
 
   get '/csrf_token', to: 'application#csrf_token'
 
-  
+
   get '/generate_symmetric_key', to: 'secure_data#generate_symmetric_key'
   get '/generate_asymmetric_key_pair', to: 'secure_data#generate_asymmetric_key_pair'
   post '/encrypt_data', to: 'secure_data#encrypt_data'
