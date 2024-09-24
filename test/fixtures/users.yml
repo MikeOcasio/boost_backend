@@ -2,14 +2,12 @@
 
 one:
   email: MyString
-  password: MyString
   first_name: MyString
   last_name: MyString
   role: MyString
 
 two:
   email: MyString
-  password: MyString
   first_name: MyString
   last_name: MyString
   role: MyString

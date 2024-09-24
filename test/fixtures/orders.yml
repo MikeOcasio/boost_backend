@@ -2,12 +2,11 @@
 
 one:
   user: one
-  product: one
   status: MyString
   total_price: 9.99
 
 two:
   user: two
-  product: two
   status: MyString
   total_price: 9.99
+
