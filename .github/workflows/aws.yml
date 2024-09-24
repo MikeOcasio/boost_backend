@@ -23,9 +23,11 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/github_actions_key -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            source $HOME/.bashrc 
             cd /home/ubuntu/boost_backend
             git pull origin main
             bundle install --without development test
             RAILS_ENV=production rails db:migrate
-            systemctl restart puma.service
+            sudo systemctl restart puma.service
           EOF
+
