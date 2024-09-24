@@ -83,9 +83,8 @@ module Api
 
     # Permit only the trusted parameters for creating or updating products
     def product_params
-      # Require the product parameter and permit specific attributes
-      params.require(:product).permit(:name, :description, :price, :image, :category_id, :product_attribute_category_id, :is_priority, :platform, :is_active)
+      params.require(:product).permit(:name, :description, :price, :image, :category_id, :product_attribute_category_id, :is_priority, :platform, :is_active, :most_popular, :tag_line, :bg_image, :primary_color, :secondary_color, features: [])
     end
+
   end
 end
-
