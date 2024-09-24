@@ -28,7 +28,6 @@ gem 'image_processing', '~> 1.2'
 gem 'bcrypt', '~> 3.1.7'
 
 gem 'rbnacl'
-gem 'openssl'
 gem 'aasm'
 gem 'devise'
 gem 'devise_token_auth'
