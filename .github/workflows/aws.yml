@@ -29,7 +29,7 @@ jobs:
             source $HOME/.bashrc 
             cd /home/ubuntu/boost_backend
             git pull origin main
-            bundle install --without development test
+            bundle config set --local without 'development test'
             RAILS_ENV=production rails db:migrate
             sudo systemctl restart puma.service
           EOF
