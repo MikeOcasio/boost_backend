@@ -23,6 +23,9 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/github_actions_key -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+
+            export PATH="$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH"
+            eval "$(rbenv init -)"
             source $HOME/.bashrc 
             cd /home/ubuntu/boost_backend
             git pull origin main
