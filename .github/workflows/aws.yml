@@ -29,12 +29,6 @@ jobs:
 
             # Optional: Source your shell profile to ensure any other environment variables are set
             source ~/.bashrc
-
-            # Debugging information
-            echo "Current PATH: $PATH"
-            echo "Ruby version: $(ruby -v)"
-            echo "Bundler version: $(bundler -v)"
-            echo "Rails version: $(rails -v)"
             
             cd /home/ubuntu/boost_backend
             git pull origin main
