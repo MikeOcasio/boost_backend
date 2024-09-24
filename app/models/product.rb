@@ -1,20 +1,26 @@
-  # == Schema Information
-  #
-  # Table name: products
-  #
-  #  id          :bigint           not null, primary key
-  #  name        :string
-  #  description :text
-  #  price       :decimal
-  #  image       :string
-  #  category_id :bigint
-  #  created_at  :datetime         not null
-  #  updated_at  :datetime         not null
-  #  Features    :string           default([]), is an Array
-  
-  # Relationships
-  # - belongs_to :category
-  # - has_many :orders
+# Table name: products
+#
+#  id                          :bigint           not null, primary key
+#  name                        :string
+#  description                 :text
+#  price                       :decimal
+#  image                       :string
+#  category_id                 :bigint
+#  product_attribute_category_id :bigint
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  order_id                    :bigint
+#  cart_id                     :bigint
+#  is_priority                 :boolean          default(false)
+#  tax                         :decimal
+#  platform                    :string
+#  is_active                   :boolean          default(false)
+#  most_popular                :boolean          default(false)
+#  tag_line                    :string
+#  bg_image                    :string
+#  primary_color               :string
+#  secondary_color             :string
+#  features                    :string           default([]), is an Array
 
 class Product < ApplicationRecord
   belongs_to :category
