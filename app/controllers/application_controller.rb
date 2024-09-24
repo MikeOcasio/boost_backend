@@ -6,7 +6,9 @@ class ApplicationController < ActionController::Base
   end
 
   def csrf_token
-    render json: { csrf_token: form_authenticity_token }
+    token = form_authenticity_token
+    Rails.logger.debug("CSRF Token: #{token}")
+    render json: { csrf_token: token }, status: :ok
   end
 
 end
