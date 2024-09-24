@@ -10,7 +10,8 @@
   #  category_id :bigint
   #  created_at  :datetime         not null
   #  updated_at  :datetime         not null
-  #
+  #  Features    :string           default([]), is an Array
+  
   # Relationships
   # - belongs_to :category
   # - has_many :orders
