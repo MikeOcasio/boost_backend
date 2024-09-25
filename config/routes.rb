@@ -13,16 +13,17 @@ Rails.application.routes.draw do
     resources :product_attribute_categories
     resources :categories, only: [:index, :show, :create, :update, :destroy]
     resources :files, only: [:index, :create, :destroy]
-    resources :users
-    resources :orders
+
+    resources :users 
     resources :products
+    resources :orders
+
 
     get '/graveyard_orders', to: 'orders#graveyard_orders'
     patch '/orders/:id/pick_up_order', to: 'orders#pick_up_order'
   end
 
   get '/csrf_token', to: 'application#csrf_token'
-
 
   get '/generate_symmetric_key', to: 'secure_data#generate_symmetric_key'
   get '/generate_asymmetric_key_pair', to: 'secure_data#generate_asymmetric_key_pair'

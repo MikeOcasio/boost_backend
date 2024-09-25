@@ -75,23 +75,32 @@ class Api::UsersController < ApplicationController
   def create
     @user = User.new(user_params)
 
+    # Handle image upload if provided
+    if params[:image].present?
+      upload_image_to_s3(@user, params[:image])
+    end
+
     if @user.save
-      # If successful, return the created user in JSON format
+      # Return the created user in JSON format with a created status
       render json: @user, status: :created
     else
-      # If there are validation errors, return the errors in JSON format
+      # Return validation errors if save fails
       render json: @user.errors, status: :unprocessable_entity
     end
   end
 
-  # PATCH/PUT /api/users/:id
-  # Update details of a specific user
+
+    # PATCH/PUT /api/users/:id
+    # Update details of a specific user
   def update
     if @user.update(user_params)
-      # If successful, return the updated user in JSON format
-      render json: @user
+      # Handle image upload if provided
+      if params[:image].present?
+        upload_image_to_s3(@user, params[:image])
+      end
+      render json: @user, status: :ok
     else
-      # If there are validation errors, return the errors in JSON format
+      # Return validation errors if update fails
       render json: @user.errors, status: :unprocessable_entity
     end
   end
@@ -160,6 +169,14 @@ class Api::UsersController < ApplicationController
 
   # Permit only the trusted parameters for creating or updating a user
   def user_params
-    params.require(:user).permit(:email, :password, :first_name, :last_name, :role)
+    params.require(:user).permit(:email, :password, :first_name, :last_name, :role, :image_url)
+  end
+
+      # Upload the image to S3 and update the user's image_url
+  def upload_image_to_s3(user, image)
+    s3_object = S3_BUCKET.object("user_images/#{user.id}/#{image.original_filename}")
+    s3_object.upload_file(image.tempfile)
+
+    user.update(image_url: s3_object.public_url)
   end
 end
