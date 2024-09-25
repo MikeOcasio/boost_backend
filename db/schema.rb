@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_09_24_190356) do
+ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -213,6 +213,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_24_190356) do
     t.integer "consumed_timestep"
     t.boolean "otp_required_for_login"
     t.string "platforms", default: [], array: true
+    t.string "image_url"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
   end
 

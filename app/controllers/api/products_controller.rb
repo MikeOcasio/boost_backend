@@ -1,7 +1,7 @@
 module Api
   class ProductsController < ApplicationController
     # Ensure the product is set before actions that require it
-    before_action :set_product, only: [:show, :edit, :update, :destroy]
+    before_action :set_product, only: [:show, :update, :destroy]
 
     # GET /products
     # List all products
@@ -19,19 +19,17 @@ module Api
       render json: @product
     end
 
-    # GET /products/new
-    # Initialize a new product object
-    def new
-      @product = Product.new
-      # This action is typically used to render a form for creating a new product
-      # You might render a form view or return a JSON response here
-    end
-
     # POST /products
     # Create a new product
     def create
+      # Upload images to S3 and get their URLs
+      uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
+      uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
+
       # Initialize a new product with the provided parameters
       @product = Product.new(product_params)
+      @product.image = uploaded_image if uploaded_image
+      @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
       # Attempt to save the new product to the database
       if @product.save
@@ -43,18 +41,19 @@ module Api
       end
     end
 
-    # GET /products/:id/edit
-    # Initialize an existing product for editing
-    def edit
-      # This action is typically used to render a form for editing an existing product
-      # You might render a form view or return a JSON response here
-    end
-
     # PATCH/PUT /products/:id
     # Update a specific product based on the provided ID
     def update
+      # Upload images to S3 and get their URLs if provided
+      uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
+      uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
+
       # Attempt to update the product with the provided parameters
       if @product.update(product_params)
+        @product.image = uploaded_image if uploaded_image
+        @product.bg_image = uploaded_bg_image if uploaded_bg_image
+        @product.save # Save changes to the product if images were uploaded
+
         # If successful, render the updated product in JSON format with an OK status
         render json: @product, status: :ok
       else
@@ -75,7 +74,6 @@ module Api
     private
 
     # Set the product instance variable for actions that require it
-    # This method is used before show, edit, update, and destroy actions
     def set_product
       # Find the product by ID
       @product = Product.find(params[:id])
@@ -83,8 +81,15 @@ module Api
 
     # Permit only the trusted parameters for creating or updating products
     def product_params
-      params.require(:product).permit(:name, :description, :price, :image, :category_id, :product_attribute_category_id, :is_priority, :platform, :is_active, :most_popular, :tag_line, :bg_image, :primary_color, :secondary_color, features: [])
+      params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :platform, :is_active, :most_popular, :tag_line, :primary_color, :secondary_color, features: [])
     end
 
+    # Upload a file to S3 and return the URL
+    def upload_to_s3(file)
+      obj = S3_BUCKET.object("products/#{file.original_filename}")
+      obj.upload_file(file.tempfile)
+      obj.public_url # Return the public URL of the uploaded file
+    end
   end
 end
+

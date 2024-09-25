@@ -34,6 +34,7 @@ gem 'devise-two-factor'
 gem 'activerecord-session_store'
 gem 'devise-jwt'
 gem 'listen', '~> 3.2'
+gem 'prawn'
 
 # Use Active Storage variant
 # gem 'image_processing', '~> 1.2'

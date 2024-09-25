@@ -136,11 +136,56 @@ module Api
       end
     end
 
+    # GET /orders/:id/download_invoice
+    # Download the invoice for a specific order
+    def download_invoice
+      pdf = Prawn::Document.new
+      pdf.text "Ravenboost Invoice ##{@order.internal_id}", size: 30, style: :bold
+      pdf.move_down 20
+
+      # Fetch user details
+      user = @order.user
+      pdf.text "Customer Name: #{user.first_name} #{user.last_name}"
+      pdf.text "Email: #{user.email}"
+      pdf.text "Order Date: #{@order.created_at.strftime('%B %d, %Y')}"
+      pdf.move_down 20
+
+      # Add line items and calculate totals
+      pdf.text "Order Details", size: 20, style: :bold
+      pdf.move_down 10
+
+      total_price = 0
+      total_tax = 0
+
+      # Iterate through products in the order
+      @order.products.each do |product|
+        # Assuming each product has a tax attribute
+        product_tax = product.tax || 0
+        product_total = product.price + product_tax
+
+        pdf.text "#{product.name} - Price: $#{'%.2f' % product.price} - Tax: $#{'%.2f' % product_tax} - Total: $#{'%.2f' % product_total}"
+
+        total_price += product.price
+        total_tax += product_tax
+      end
+
+      # Calculate final totals
+      final_total = total_price + total_tax
+
+      pdf.move_down 20
+      pdf.text "Total Price (Before Tax): $#{'%.2f' % total_price}"
+      pdf.text "Total Tax: $#{'%.2f' % total_tax}"
+      pdf.text "Final Total: $#{'%.2f' % final_total}", size: 16, style: :bold
+
+      # Send the PDF file as a response
+      send_data pdf.render, filename: "invoice_#{@order.internal_id}.pdf", type: 'application/pdf', disposition: 'attachment'
+    end
+
     private
 
     # Set the order for actions that require it
     def set_order
-      @order = Order.find(params[:id])
+      @order = Order.includes(:products, :user).find(params[:id])
     end
 
     # Strong parameters for order creation and update
@@ -149,4 +194,3 @@ module Api
     end
   end
 end
-
