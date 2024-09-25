@@ -11,6 +11,11 @@ module OperationBoost
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 6.0
 
+    # config/application.rb
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionController::RequestForgeryProtection
+
+
     config.action_controller.default_protect_from_forgery = true
     config.action_controller.allow_forgery_protection = true
 
