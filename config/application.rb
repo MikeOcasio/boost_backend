@@ -12,12 +12,18 @@ module OperationBoost
     config.load_defaults 6.0
 
     # config/application.rb
-    config.middleware.use ActionDispatch::Cookies
-    config.middleware.use ActionController::RequestForgeryProtection
-
 
     config.action_controller.default_protect_from_forgery = true
     config.action_controller.allow_forgery_protection = true
+
+    # Ensure SameSite attribute is set correctly
+    config.action_dispatch.cookies_same_site_protection = :none
+
+    # Ensure secure attribute is set correctly
+    config.session_store :cookie_store, key: '_operation_boost_session', secure: Rails.env.production?
+
+    # Ensure domain attribute is set correctly
+    config.session_store :cookie_store, key: '_operation_boost_session', domain: :all
 
     # Settings in config/environments/* take precedence over those specified here.
     # Application configuration can go into files in config/initializers
