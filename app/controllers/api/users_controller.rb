@@ -3,7 +3,7 @@ require 'jwt'
 class Api::UsersController < ApplicationController
   include ActionController::HttpAuthentication::Token::ControllerMethods
 
-  # Skip CSRF token verification for API requests
+  #! Remove this line once login is implemented
   skip_before_action :verify_authenticity_token
 
   # Set the user for actions that need it (show, update, destroy)

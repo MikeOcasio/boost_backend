@@ -2,6 +2,8 @@ module Api
   class FilesController < ApplicationController
     # Set up the S3 bucket before each action
     before_action :set_s3_bucket
+    #! Remove this line once login is implemented
+    skip_before_action :verify_authenticity_token
 
     # GET /api/files
     # List all files in the S3 bucket and return their public URLs.
@@ -58,4 +60,3 @@ module Api
     end
   end
 end
-

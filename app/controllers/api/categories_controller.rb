@@ -2,6 +2,8 @@ module Api
   class CategoriesController < ApplicationController
     # Set the category instance variable for actions that require it
     before_action :set_category, only: [:show, :update, :destroy]
+
+    #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
 
     # GET /categories
