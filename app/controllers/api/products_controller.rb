@@ -3,6 +3,9 @@ module Api
     # Ensure the product is set before actions that require it
     before_action :set_product, only: [:show, :update, :destroy]
 
+    #! Remove this line once login is implemented
+    skip_before_action :verify_authenticity_token
+
     # GET /products
     # List all products
     def index
@@ -92,4 +95,3 @@ module Api
     end
   end
 end
-

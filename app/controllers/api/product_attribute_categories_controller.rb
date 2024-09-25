@@ -2,6 +2,9 @@ module Api
   class ProductAttributeCategoriesController < ApplicationController
     before_action :set_product_attribute_category, only: [:show, :update, :destroy]
 
+    #! Remove this line once login is implemented
+    skip_before_action :verify_authenticity_token
+
     # GET /api/product_attribute_categories
     def index
       @product_attribute_categories = ProductAttributeCategory.all

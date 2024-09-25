@@ -36,6 +36,7 @@ class User < ApplicationRecord
 
   # :two_factor_backupable
 
+  has_many :bug_reports, dependent: :destroy
   has_many :orders
   has_many :carts
   has_many :notifications
@@ -88,31 +89,3 @@ class User < ApplicationRecord
 
 end
 
-
-
-
-# Here's a ranking of the Devise modules from least complex to most complex, based on the amount of setup required and the functionality they provide:
-
-# 1. `:database_authenticatable`: This is the simplest module. It handles password storage and user authentication during sign-in.
-
-# 2. `:validatable`: Provides basic validations for email and password. It's optional and can be customized, so you're able to define your own validations.
-
-# 3. `:registerable`: Handles user registration, as well as allowing users to edit and destroy their account. Requires additional routes and views for the registration process.
-
-# 4. `:rememberable`: Manages a token for remembering the user from a saved cookie. Requires a `remember_created_at` field in your `User` model.
-
-# 5. `:recoverable`: Adds the ability to reset the user's password and sends reset instructions. Requires additional routes and views, and also setup for sending emails.
-
-# 6. `:trackable`: Tracks sign in count, timestamps, and IP address. Requires additional fields in your `User` model.
-
-# 7. `:timeoutable`: Expires sessions that have no activity in a specified period of time. Requires a `timeout_in` method in your `User` model.
-
-# 8. `:confirmable`: Sends emails with confirmation instructions and verifies whether an account is already confirmed during sign in. Requires additional routes and views, and also setup for sending emails.
-
-# 9. `:lockable`: Locks an account after a specified number of failed sign-in attempts. Requires additional fields in your `User` model.
-
-# 10. `:two_factor_authenticatable`: Handles two-factor authentication with a secondary code. Requires additional setup for generating and verifying the secondary code.
-
-# 11. `:two_factor_backupable`: Handles backup codes for two-factor authentication. Requires additional setup for generating and verifying the backup codes.
-
-# Please note that the complexity can vary depending on your specific application requirements and the customizations you might need to make to each module.
