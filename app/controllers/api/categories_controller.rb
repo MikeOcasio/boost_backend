@@ -46,7 +46,7 @@ module Api
 
         # If the category's is_active attribute is set to false, update associated products
       if @category.is_active == false
-        @category.products.update_all(is_active: false)
+        Product.where(category_id: @category.id).update_all(is_active: false)
       end
         # Return the updated category in JSON format
         render json: @category
