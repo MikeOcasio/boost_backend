@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
+ActiveRecord::Schema[7.0].define(version: 2024_09_26_194829) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "bug_reports", force: :cascade do |t|
+    t.string "title"
+    t.text "description"
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_bug_reports_on_user_id"
   end
 
   create_table "carts", force: :cascade do |t|
@@ -115,6 +124,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.index ["user_id"], name: "index_platform_credentials_on_user_id"
   end
 
+  create_table "platforms", force: :cascade do |t|
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "preferred_skill_masters", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "preferred_skill_master_id", null: false
@@ -128,6 +143,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "product_platforms", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.bigint "platform_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["platform_id"], name: "index_product_platforms_on_platform_id"
+    t.index ["product_id"], name: "index_product_platforms_on_product_id"
   end
 
   create_table "product_promotions", force: :cascade do |t|
@@ -147,12 +171,9 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "order_id"
-    t.bigint "cart_id"
     t.bigint "product_attribute_category_id"
     t.boolean "is_priority", default: false
     t.decimal "tax"
-    t.string "platform"
     t.boolean "is_active"
     t.boolean "most_popular"
     t.string "tag_line"
@@ -160,9 +181,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
-    t.index ["cart_id"], name: "index_products_on_cart_id"
     t.index ["category_id"], name: "index_products_on_category_id"
-    t.index ["order_id"], name: "index_products_on_order_id"
     t.index ["product_attribute_category_id"], name: "index_products_on_product_attribute_category_id"
   end
 
@@ -182,6 +201,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
     t.datetime "updated_at", null: false
     t.index ["session_id"], name: "index_sessions_on_session_id", unique: true
     t.index ["updated_at"], name: "index_sessions_on_updated_at"
+  end
+
+  create_table "user_platforms", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "platform_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["platform_id"], name: "index_user_platforms_on_platform_id"
+    t.index ["user_id"], name: "index_user_platforms_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -219,6 +247,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
   add_foreign_key "notifications", "users"
@@ -230,10 +259,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_09_25_021054) do
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
+  add_foreign_key "product_platforms", "platforms"
+  add_foreign_key "product_platforms", "products"
   add_foreign_key "product_promotions", "products"
   add_foreign_key "product_promotions", "promotions"
-  add_foreign_key "products", "carts"
   add_foreign_key "products", "categories"
-  add_foreign_key "products", "orders"
   add_foreign_key "products", "product_attribute_categories"
+  add_foreign_key "user_platforms", "platforms"
+  add_foreign_key "user_platforms", "users"
 end

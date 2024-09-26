@@ -36,6 +36,8 @@ class User < ApplicationRecord
 
   # :two_factor_backupable
 
+  has_many :user_platforms, dependent: :destroy
+  has_many :platforms, through: :user_platforms
   has_many :bug_reports, dependent: :destroy
   has_many :orders
   has_many :carts
@@ -88,4 +90,3 @@ class User < ApplicationRecord
 
 
 end
-

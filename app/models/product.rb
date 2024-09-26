@@ -31,6 +31,9 @@ class Product < ApplicationRecord
 
   has_many :carts
 
+  has_many :product_platforms, dependent: :destroy
+  has_many :platforms, through: :product_platforms
+
   has_many :product_promotions
   has_many :promotions, through: :product_promotions
 
@@ -38,20 +41,7 @@ class Product < ApplicationRecord
   validates :name, presence: true
   validates :price, presence: true
 
-  platform_options = ['PC', 'PS4', 'Xbox', 'Switch', 'Mobile'].freeze
-
   # Scope to find products by platform
   scope :by_platform, ->(platform) { where(platform: platform) }
-
-  def to_s
-    "#{name} - $#{'%.2f' % price}"
-  end
-
-
-  def inspect
-    formatted_price = price ? '$' + format('%.2f', price) : 'N/A'
-    priority_status = is_priority ? 'Priority' : 'Not Priority'
-    "#<Product id: #{id}, name: #{name}, description: #{description}, price: #{formatted_price}, image: #{image}, category_id: #{category_id}, created_at: #{created_at}, updated_at: #{updated_at}, order_id: #{order_id}, cart_id: #{cart_id}, is_priority: #{priority_status}>"
-  end
 
 end
