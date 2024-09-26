@@ -38,8 +38,11 @@ module Api
 
     # DELETE /api/product_attribute_categories/:id
     def destroy
-      @product_attribute_category.destroy
-      head :no_content
+      if @product_attribute_category.destroy
+        render json: { message: 'Successfully deleted' }, status: :ok
+      else
+        render json: { message: 'Failed to delete' }, status: :unprocessable_entity
+      end
     end
 
     private
