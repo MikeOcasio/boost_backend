@@ -1,5 +1,5 @@
 module Api
-  class BugReportsController < ApplicationController
+  class BugReportController < ApplicationController
     before_action :authenticate_user!
     before_action :authorize_developer!, only: [:index, :show, :update, :destroy]
     before_action :set_bug_report, only: [:show, :update, :destroy]
