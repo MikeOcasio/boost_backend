@@ -89,9 +89,13 @@ module Api
 
     # Upload a file to S3 and return the URL
     def upload_to_s3(file)
-      obj = S3_BUCKET.object("products/#{file.original_filename}")
-      obj.upload_file(file.tempfile)
-      obj.public_url # Return the public URL of the uploaded file
+      if file.is_a?(ActionDispatch::Http::UploadedFile)
+        obj = S3_BUCKET.object("products/#{file.original_filename}")
+        obj.upload_file(file.tempfile)
+        obj.public_url # Return the public URL of the uploaded file
+      else
+        raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile, got #{file.class.name}"
+      end
     end
   end
 end
