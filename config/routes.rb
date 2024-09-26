@@ -15,7 +15,12 @@ Rails.application.routes.draw do
     resources :files, only: [:index, :create, :destroy]
 
     resources :users
-    resources :products
+    resources :products do
+      collection do
+        get :platform_options
+      end
+    end
+
     resources :orders
 
 
