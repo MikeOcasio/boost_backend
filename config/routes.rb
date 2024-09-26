@@ -14,7 +14,7 @@ Rails.application.routes.draw do
     resources :categories, only: [:index, :show, :create, :update, :destroy]
     resources :files, only: [:index, :create, :destroy]
 
-    resources :users 
+    resources :users
     resources :products
     resources :orders
 

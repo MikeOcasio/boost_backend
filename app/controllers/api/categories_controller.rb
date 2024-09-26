@@ -43,6 +43,11 @@ module Api
     def update
       # Attempt to update the category with the provided parameters
       if @category.update(category_params)
+
+        # If the category's is_active attribute is set to false, update associated products
+      if @category.is_active == false
+        @category.products.update_all(is_active: false)
+      end
         # Return the updated category in JSON format
         render json: @category
       else
@@ -71,7 +76,7 @@ module Api
     # Define strong parameters for creating and updating categories
     # Ensures only permitted attributes are used
     def category_params
-      params.require(:category).permit(:name)
+      params.require(:category).permit(:name, :description)
     end
   end
 end
