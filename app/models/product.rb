@@ -38,6 +38,8 @@ class Product < ApplicationRecord
   validates :name, presence: true
   validates :price, presence: true
 
+  platform_options = ['PC', 'PS4', 'Xbox', 'Switch', 'Mobile'].freeze
+
   # Scope to find products by platform
   scope :by_platform, ->(platform) { where(platform: platform) }
 

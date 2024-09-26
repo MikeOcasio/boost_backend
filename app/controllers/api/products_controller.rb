@@ -6,6 +6,11 @@ module Api
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
 
+    def platform_options
+      # Return the platform options defined in the Product model
+      render json: Product::platform_options, status: :ok
+    end
+
     # GET /products
     # List all products
     def index
