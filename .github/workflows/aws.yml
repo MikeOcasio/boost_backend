@@ -39,8 +39,6 @@ jobs:
             # Run database migrations
             RAILS_ENV=production rails db:migrate
 
-            # Restart the Puma service
-            sudo systemctl restart puma.service
           EOF
 
 
