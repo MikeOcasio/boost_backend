@@ -38,12 +38,21 @@ module Api
 
     # DELETE /api/product_attribute_categories/:id
     def destroy
-      if @product_attribute_category.destroy
-        render json: { message: 'Successfully deleted' }, status: :ok
-      else
-        render json: { message: 'Failed to delete' }, status: :unprocessable_entity
+      begin
+        if @product_attribute_category.destroy
+          render json: { message: 'Successfully deleted' }, status: :ok
+        else
+          render json: { message: 'Failed to delete due to validation errors' }, status: :unprocessable_entity
+        end
+      rescue => e
+        # Log the error message for debugging purposes
+        Rails.logger.error("Failed to delete product attribute category: #{e.message}")
+
+        # Send the error message back to the frontend
+        render json: { message: "Server error 500: #{e.message}" }, status: :internal_server_error
       end
     end
+
 
     private
 
