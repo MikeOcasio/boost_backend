@@ -5,20 +5,26 @@ module Api
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
 
-    def platform_options
-      platform_options = Product::PLATFORM_OPTIONS
-      render json: platform_options
-    end
-
     # GET /products
     def index
       @products = Product.all
       render json: @products
     end
 
+    def by_platform
+      platform_id = params[:platform_id]
+      @products = Product.joins(:platforms).where(platforms: { id: platform_id })
+
+      if @products.any?
+        render json: @products, status: :ok
+      else
+        render json: { message: "No products found for this platform" }, status: :not_found
+      end
+    end
+
     # GET /products/:id
     def show
-      render json: @product
+      render json: @product.as_json(include: { platforms: { only: :id } })
     end
 
     # POST /products
