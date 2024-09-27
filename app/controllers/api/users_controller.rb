@@ -152,10 +152,33 @@ class Api::UsersController < ApplicationController
     params.require(:user).permit(:email, :password, :first_name, :last_name, :role, :image_url)
   end
 
-  # Upload the image to S3 and update the user's image_url
-  def upload_image_to_s3(user, image)
-    s3_object = S3_BUCKET.object("user_images/#{user.id}/#{image.original_filename}")
-    s3_object.upload_file(image.tempfile)
-    user.update(image_url: s3_object.public_url)
+  def upload_image_to_s3(user, image_param)
+    if image_param.is_a?(ActionDispatch::Http::UploadedFile)
+      # Handle file upload
+      obj = S3_BUCKET.object("users/#{image_param.original_filename}")
+      obj.upload_file(image_param.tempfile)
+      user.image_url = obj.public_url  # Assuming `image_url` is an attribute of User model
+    elsif image_param.is_a?(String) && image_param.start_with?('data:image/')
+      # Handle base64 image upload
+      base64_data = image_param.split(',')[1]
+      decoded_data = Base64.decode64(base64_data)
+
+      # Generate a unique filename for the image
+      filename = "users/#{SecureRandom.uuid}.webp" # Change the extension as necessary
+
+      Tempfile.create(['user_image', '.webp']) do |temp_file|
+        temp_file.binmode
+        temp_file.write(decoded_data)
+        temp_file.rewind
+
+        # Upload to S3
+        obj = S3_BUCKET.object(filename)
+        obj.upload_file(temp_file)
+        user.image_url = obj.public_url  # Assuming `image_url` is an attribute of User model
+      end
+    else
+      raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
+    end
   end
+
 end
