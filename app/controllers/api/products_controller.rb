@@ -31,6 +31,8 @@ module Api
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
       if @product.save
+        # Assign platforms using platform_ids
+        @product.platform_ids = params[:platform_ids] if params[:platform_ids].present?
         render json: @product, status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
@@ -45,13 +47,16 @@ module Api
       if @product.update(product_params)
         @product.image = uploaded_image if uploaded_image
         @product.bg_image = uploaded_bg_image if uploaded_bg_image
-        @product.save
+
+        # Update platforms
+        @product.platform_ids = params[:platform_ids] if params[:platform_ids].present?
 
         render json: @product, status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
+
 
     # DELETE /products/:id
     def destroy
