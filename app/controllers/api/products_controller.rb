@@ -1,6 +1,6 @@
 module Api
   class ProductsController < ApplicationController
-    before_action :set_product, only: [:show, :update, :destroy]
+    before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
 
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
@@ -22,7 +22,7 @@ module Api
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
       if @products.any?
-        render json: @products, status: :ok
+        render json: @product.as_json(include: { platforms: { only: :id } }), status: :ok
       else
         render json: { message: "No products found for this platform" }, status: :not_found
       end
@@ -47,7 +47,7 @@ module Api
       end
 
       if @product.save
-        render json: @product, status: :created
+        render json: @product.as_json(include: { platforms: { only: :id } }), status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
       end
@@ -66,13 +66,11 @@ module Api
       if @product.update(product_params.except(:platform_ids))
         @product.image = uploaded_image if uploaded_image
         @product.bg_image = uploaded_bg_image if uploaded_bg_image
-        render json: @product, status: :ok
+        render json: @product.as_json(include: { platforms: { only: :id } }), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
-
-
 
     # DELETE /products/:id
     def destroy
@@ -107,8 +105,10 @@ module Api
     private
 
     def set_product
-      @product = Product.find(params[:id])
+      @product = Product.find_by(id: params[:id])
+      render json: { error: 'Product not found' }, status: :not_found if @product.nil?
     end
+
 
     def product_params
       params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tag_line, :primary_color, :secondary_color, features: [], platform_ids: [])
