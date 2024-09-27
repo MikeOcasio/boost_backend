@@ -34,7 +34,7 @@ Rails.application.routes.draw do
     # Products routes with member actions
     resources :products do
       collection do
-        get 'by_platform/:platform_id', to: 'products#by_platform'  # Get products by platform ID
+        get 'by_platforms/:platform_id', to: 'products#by_platform'  # Get products by platform ID
       end
 
       member do

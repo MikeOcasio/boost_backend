@@ -13,6 +13,12 @@ module Api
 
     def by_platform
       platform_id = params[:platform_id]
+      platform = Platform.find_by(id: platform_id)
+
+      unless platform
+        return render json: { message: "Platform not found" }, status: :not_found
+      end
+
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
       if @products.any?
