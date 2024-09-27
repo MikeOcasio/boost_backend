@@ -33,12 +33,17 @@ Rails.application.routes.draw do
 
     # Products routes with member actions
     resources :products do
+      collection do
+        get 'by_platform/:platform_id', to: 'products#by_platform'  # Get products by platform ID
+      end
+
       member do
         get :platforms          # Get platforms associated with the product
         post :add_platform      # Add a platform to the product
         delete :remove_platform  # Remove a platform from the product
       end
     end
+
 
     # Resources for product attribute categories
     resources :product_attribute_categories
