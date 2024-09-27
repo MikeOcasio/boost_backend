@@ -9,11 +9,8 @@
 #  product_attribute_category_id :bigint
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
-#  order_id                    :bigint
-#  cart_id                     :bigint
 #  is_priority                 :boolean          default(false)
 #  tax                         :decimal
-#  platform                    :string
 #  is_active                   :boolean          default(false)
 #  most_popular                :boolean          default(false)
 #  tag_line                    :string
@@ -37,11 +34,18 @@ class Product < ApplicationRecord
   has_many :product_promotions
   has_many :promotions, through: :product_promotions
 
-  validates :platform, presence: true
   validates :name, presence: true
   validates :price, presence: true
 
+  validate :has_at_least_one_platform
+
   # Scope to find products by platform
   scope :by_platform, ->(platform) { where(platform: platform) }
+
+private
+
+  def has_at_least_one_platform
+    errors.add(:platforms, "must have at least one platform") if platforms.empty?
+  end
 
 end
