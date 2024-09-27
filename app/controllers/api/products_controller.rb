@@ -119,8 +119,29 @@ module Api
         obj = S3_BUCKET.object("products/#{file.original_filename}")
         obj.upload_file(file.tempfile)
         obj.public_url
+      elsif file.is_a?(String) && file.start_with?('data:image/')
+        # Extract the base64 part from the data URL
+        base64_data = file.split(',')[1]
+        # Decode the base64 data
+        decoded_data = Base64.decode64(base64_data)
+
+        # Generate a unique filename (you can adjust the logic as needed)
+        filename = "products/#{SecureRandom.uuid}.webp" # Change the extension based on the image type if needed
+
+        # Create a temporary file to upload
+        Tempfile.create(['product_image', '.webp']) do |temp_file|
+          temp_file.binmode
+          temp_file.write(decoded_data)
+          temp_file.rewind
+
+          # Upload the temporary file to S3
+          obj = S3_BUCKET.object(filename)
+          obj.upload_file(temp_file)
+
+          return obj.public_url
+        end
       else
-        raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile, got #{file.class.name}"
+        raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{file.class.name}"
       end
     end
   end
