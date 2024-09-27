@@ -26,36 +26,40 @@ module Api
       uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
 
-      @product = Product.new(product_params)
+      @product = Product.new(product_params.except(:platform_ids)) # Exclude platform_ids for now
       @product.image = uploaded_image if uploaded_image
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
+      if params[:platform_ids].present?
+        @product.platforms = Platform.where(id: params[:platform_ids]) # Associate platforms before saving
+      end
+
       if @product.save
-        # Assign platforms using platform_ids
-        @product.platform_ids = params[:platform_ids] if params[:platform_ids].present?
         render json: @product, status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
 
+
     # PATCH/PUT /products/:id
     def update
       uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
 
-      if @product.update(product_params)
+      if params[:platform_ids].present?
+        @product.platforms = Platform.where(id: params[:platform_ids]) # Assign platforms
+      end
+
+      if @product.update(product_params.except(:platform_ids))
         @product.image = uploaded_image if uploaded_image
         @product.bg_image = uploaded_bg_image if uploaded_bg_image
-
-        # Update platforms
-        @product.platform_ids = params[:platform_ids] if params[:platform_ids].present?
-
         render json: @product, status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
+
 
 
     # DELETE /products/:id
