@@ -90,7 +90,7 @@ module Api
     end
 
     def product_params
-      params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tag_line, :primary_color, :secondary_color, features: [])
+      params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tag_line, :primary_color, :secondary_color, features: [], platform_ids: [])
     end
 
     def upload_to_s3(file)
@@ -104,4 +104,3 @@ module Api
     end
   end
 end
-
