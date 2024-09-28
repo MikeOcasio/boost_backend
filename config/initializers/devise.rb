@@ -71,12 +71,13 @@ Devise.setup do |config|
 
 
   config.jwt do |jwt|
-    jwt.secret = ENV['DEVISE_JWT_SECRET_KEY']
+    jwt.secret = Rails.application.credentials.devise_jwt_secret_key # Load from Rails credentials
     jwt.dispatch_requests = [['POST', %r{^/login$}]]
     jwt.revocation_requests = [['DELETE', %r{^/logout$}]]
     jwt.expiration_time = 1.day.to_i
-    jwt.algorithm = ['HS256']
+    jwt.algorithm = 'HS256' # Use a single string instead of an array
   end
+
 
   # Tell if authentication through request.params is enabled. True by default.
   # It can be set to an array that will enable params authentication only for the
