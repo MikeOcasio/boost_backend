@@ -23,20 +23,22 @@ class Api::UsersController < ApplicationController
     end
   end
 
-  # GET /api/users/current_user
-  def current_user
-    authenticate_with_http_token do |token, _options|
-      secret = Rails.application.credentials[:devise_jwt_secret_key]
-      algorithm = 'HS256'
+# GET /api/current_user
+def current_user
+  authenticate_with_http_token do |token, _options|
+    secret = Rails.application.credentials[:devise_jwt_secret_key]
+    algorithm = 'HS256'
 
-      begin
-        decoded_token = JWT.decode token, secret, true, { algorithm: algorithm }
-        User.find(decoded_token[0]['user_id'])
-      rescue JWT::DecodeError => e
-        nil
-      end
+    begin
+      decoded_token = JWT.decode token, secret, true, { algorithm: algorithm }
+      user = User.find(decoded_token[0]['user_id'])
+      render json: user # Ensure to render the user as JSON
+    rescue JWT::DecodeError => e
+      render json: { error: 'Invalid token' }, status: :unauthorized
     end
   end
+end
+
 
   # GET /api/users
   def index
