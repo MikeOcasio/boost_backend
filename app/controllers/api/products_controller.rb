@@ -59,6 +59,10 @@ module Api
       old_image_url = @product.image
       old_bg_image_url = @product.bg_image
 
+      # Check if images are marked for deletion
+      remove_image = params[:remove_image] == 'true'  # Expect a param `remove_image=true` to remove the image
+      remove_bg_image = params[:remove_bg_image] == 'true'  # Expect a param `remove_bg_image=true`
+
       # Upload new images if present
       uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
@@ -69,13 +73,20 @@ module Api
       end
 
       if @product.update(product_params.except(:platform_ids))
-        # Assign new images if uploaded and delete old ones from S3
-        if uploaded_image
+        # Handle image removal or update
+        if remove_image
+          delete_from_s3(old_image_url) if old_image_url.present?
+          @product.image = nil
+        elsif uploaded_image
           delete_from_s3(old_image_url) if old_image_url.present?
           @product.image = uploaded_image
         end
 
-        if uploaded_bg_image
+        # Handle background image removal or update
+        if remove_bg_image
+          delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+          @product.bg_image = nil
+        elsif uploaded_bg_image
           delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
           @product.bg_image = uploaded_bg_image
         end
@@ -144,7 +155,7 @@ module Api
     end
 
     def product_params
-      params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tax, :tag_line, :primary_color, :secondary_color, features: [], platform_ids: [])
+      params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tax, :tag_line, :primary_color, :secondary_color, features: [], platform_ids: [], :remove_image, :remove_bg_image)
     end
 
     def upload_to_s3(file)
