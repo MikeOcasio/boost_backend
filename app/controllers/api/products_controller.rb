@@ -53,19 +53,34 @@ module Api
       end
     end
 
-
     # PATCH/PUT /products/:id
     def update
+      # Store old image URLs before updating
+      old_image_url = @product.image
+      old_bg_image_url = @product.bg_image
+
+      # Upload new images if present
       uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
 
+      # Assign platforms if provided
       if params[:platform_ids].present?
-        @product.platforms = Platform.where(id: params[:platform_ids]) # Assign platforms
+        @product.platforms = Platform.where(id: params[:platform_ids])
       end
 
       if @product.update(product_params.except(:platform_ids))
-        @product.image = uploaded_image if uploaded_image
-        @product.bg_image = uploaded_bg_image if uploaded_bg_image
+        # Assign new images if uploaded and delete old ones from S3
+        if uploaded_image
+          delete_from_s3(old_image_url) if old_image_url.present?
+          @product.image = uploaded_image
+        end
+
+        if uploaded_bg_image
+          delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+          @product.bg_image = uploaded_bg_image
+        end
+
+        @product.save
         render json: @product.as_json(include: { platforms: { only: :id } }), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
@@ -83,15 +98,18 @@ module Api
       head :no_content
     end
 
-private
+    # Helper method to delete from S3
+    private
 
     def delete_from_s3(file_url)
+      return if file_url.blank?
+
       # Extract the object key from the URL
-      file_key = file_url.split('/').last
+      file_key = URI.parse(file_url).path[1..]  # Strip leading "/"
 
       # Delete the object from S3
-      obj = S3_BUCKET.object("products/#{file_key}")
-      obj.delete
+      obj = S3_BUCKET.object(file_key)
+      obj.delete if obj.exists?
     end
 
     # GET /products/:id/platforms
@@ -124,7 +142,6 @@ private
       @product = Product.find_by(id: params[:id])
       render json: { error: 'Product not found' }, status: :not_found if @product.nil?
     end
-
 
     def product_params
       params.require(:product).permit(:name, :description, :price, :category_id, :product_attribute_category_id, :is_priority, :is_active, :most_popular, :tax, :tag_line, :primary_color, :secondary_color, features: [], platform_ids: [])
