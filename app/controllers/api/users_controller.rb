@@ -149,7 +149,14 @@ class Api::UsersController < ApplicationController
 
   # Permit only the trusted parameters for creating or updating a user
   def user_params
-    params.require(:user).permit(:email, :password, :first_name, :last_name, :role, :image_url)
+    params.require(:user).permit(
+      :email,
+      :password,
+      :first_name,
+      :last_name,
+      :role,
+      :image_url
+      )
   end
 
   def upload_image_to_s3(user, image_param)
