@@ -23,7 +23,7 @@ class Api::UsersController < ApplicationController
     end
   end
 
-  # GET /api/users/current
+  # GET /api/users/current_user
   def current_user
     authenticate_with_http_token do |token, _options|
       secret = Rails.application.credentials[:devise_jwt_secret_key]
