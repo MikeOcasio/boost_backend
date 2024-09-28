@@ -5,9 +5,8 @@ class Api::UsersController < ApplicationController
   skip_before_action :verify_authenticity_token
 
   before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :enable_two_factor, :disable_two_factor, :verify_two_factor, :generate_backup_codes]
-
   before_action :set_default_format
-  
+
   # POST /api/users/login
   def login
     @user = User.find_by(email: params[:email])
@@ -25,32 +24,29 @@ class Api::UsersController < ApplicationController
     end
   end
 
-# GET /api/current_user
-def current_user
-  authenticate_with_http_token do |token, _options|
-    secret = Rails.application.credentials[:devise_jwt_secret_key]
-    algorithm = 'HS256'
-
-    begin
-      decoded_token = JWT.decode token, secret, true, { algorithm: algorithm }
-      user = User.find(decoded_token[0]['user_id'])
-      render json: user # Ensure to render the user as JSON
-    rescue JWT::DecodeError => e
-      render json: { error: 'Invalid token' }, status: :unauthorized
+  # GET /api/users/:id
+  def show
+    if @user
+      render json: @user, status: :ok
+    else
+      render json: { error: 'User not found' }, status: :not_found
     end
   end
-end
 
+  # GET /api/current_user
+  def show_current_user
+    user = current_user
+    if user
+      render json: user, status: :ok
+    else
+      render json: { error: 'Unauthorized access' }, status: :unauthorized
+    end
+  end
 
   # GET /api/users
   def index
     @users = User.all
     render json: @users
-  end
-
-  # GET /api/users/:id
-  def show
-    render json: @user
   end
 
   # POST /api/users
@@ -155,6 +151,44 @@ end
     @user = User.find(params[:id])
   end
 
+  def current_user
+    authenticate_with_http_token do |token, _options|
+      secret = Rails.application.credentials[:devise_jwt_secret_key]
+      algorithm = 'HS256'
+
+      Rails.logger.debug "Starting current_user method"
+
+      begin
+        Rails.logger.debug "Received token: #{token}"
+
+        # Decode the JWT token
+        decoded_token = JWT.decode(token, secret, true, { algorithm: algorithm })
+        Rails.logger.debug "Decoded token: #{decoded_token}"
+
+        # Extract user ID from decoded token
+        user_id = decoded_token[0]['user_id']
+        Rails.logger.debug "Extracted user_id: #{user_id}"
+
+        # Find the user by user_id
+        @user = User.find(user_id)
+        Rails.logger.debug "User found: #{@user.inspect}"
+
+        @user # Return the user object without rendering anything here
+      rescue JWT::DecodeError => e
+        Rails.logger.error "JWT Decode Error: #{e.message}"
+        nil # Return nil to indicate failure
+      rescue ActiveRecord::RecordNotFound => e
+        Rails.logger.error "Record Not Found: #{e.message}"
+        nil # Return nil to indicate failure
+      rescue StandardError => e
+        Rails.logger.error "Unexpected Error: #{e.message}"
+        nil # Return nil to indicate failure
+      ensure
+        Rails.logger.debug "Ending current_user method"
+      end
+    end
+  end
+
   # Permit only the trusted parameters for creating or updating a user
   def user_params
     params.require(:user).permit(
@@ -164,7 +198,7 @@ end
       :last_name,
       :role,
       :image_url
-      )
+    )
   end
 
   def upload_image_to_s3(user, image_param)
@@ -195,5 +229,4 @@ end
       raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
     end
   end
-
 end
