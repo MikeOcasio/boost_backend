@@ -14,7 +14,7 @@ class Api::UsersController < ApplicationController
     if @user&.valid_password?(params[:password])
       sign_in @user
       payload = { user_id: @user.id }
-      secret = Rails.application.credentials[:devise_jwt_secret_key]
+      secret = Rails.application.credentials.devise_jwt_secret_key
       algorithm = 'HS256'
       token = JWT.encode payload, secret, algorithm
       puts "Encoded Token: #{token}"
@@ -153,7 +153,7 @@ class Api::UsersController < ApplicationController
 
   def current_user
     authenticate_with_http_token do |token, _options|
-      secret = Rails.application.credentials[:devise_jwt_secret_key]
+      secret = Rails.application.credentials.devise_jwt_secret_key
       algorithm = 'HS256'
 
       Rails.logger.debug "Starting current_user method"
