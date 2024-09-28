@@ -74,8 +74,24 @@ module Api
 
     # DELETE /products/:id
     def destroy
+      # Delete images from S3 if they exist
+      delete_from_s3(@product.image) if @product.image.present?
+      delete_from_s3(@product.bg_image) if @product.bg_image.present?
+
+      # Destroy the product record
       @product.destroy
       head :no_content
+    end
+
+private
+
+    def delete_from_s3(file_url)
+      # Extract the object key from the URL
+      file_key = file_url.split('/').last
+
+      # Delete the object from S3
+      obj = S3_BUCKET.object("products/#{file_key}")
+      obj.delete
     end
 
     # GET /products/:id/platforms
