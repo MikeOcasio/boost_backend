@@ -8,7 +8,7 @@ Rails.application.routes.draw do
     # User authentication routes using Devise
     devise_for :users, skip: [:sessions, :registrations]
     post '/login', to: 'users#login'                     # Log in a user
-    get '/current_user', to: 'users#current_user'  # Retrieve the current logged-in user
+    get '/current_user', to: 'users#show_current_user'  # Retrieve the current logged-in user
 
     # Users routes with member actions
     resources :users do
