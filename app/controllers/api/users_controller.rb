@@ -6,6 +6,8 @@ class Api::UsersController < ApplicationController
 
   before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :enable_two_factor, :disable_two_factor, :verify_two_factor, :generate_backup_codes]
 
+  before_action :set_default_format
+  
   # POST /api/users/login
   def login
     @user = User.find_by(email: params[:email])
@@ -143,6 +145,10 @@ end
   end
 
   private
+
+  def set_default_format
+    request.format = :json
+  end
 
   # Set the user instance variable based on the provided ID
   def set_user
