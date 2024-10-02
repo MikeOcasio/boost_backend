@@ -1,6 +1,6 @@
 module Api
   class ProductAttributeCategoriesController < ApplicationController
-    before_action :set_product_attribute_category, only: [:show, :update, :destroy]
+    before_action :set_product_attribute_category, only: [:show, :update, :destroy, :products]
 
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
@@ -68,6 +68,7 @@ module Api
 
     def set_product_attribute_category
       @product_attribute_category = ProductAttributeCategory.find_by(id: params[:id])
+      Rails.logger.info("Product Attribute Category found: #{@product_attribute_category.inspect}")
     end
 
     def product_attribute_category_params
