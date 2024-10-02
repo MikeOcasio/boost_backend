@@ -36,19 +36,14 @@ class Api::UsersController < ApplicationController
   # GET /api/current_user
   def show_current_user
     Rails.logger.debug "Fetching current user..."
-    authenticate_with_http_token do |token, _options|
-      Rails.logger.debug "Incoming Token: #{token}"  # Log the incoming token
-      user = current_user  # This will still log in current_user
-      if user
-        render json: user, status: :ok
-      else
-        Rails.logger.debug "Unauthorized access"
-        render json: { error: 'Unauthorized access' }, status: :unauthorized
-      end
+    user = current_user # Use Devise's built-in current_user method
+    if user
+      render json: user, status: :ok
+    else
+      Rails.logger.debug "Unauthorized access"
+      render json: { error: 'Unauthorized access' }, status: :unauthorized
     end
   end
-
-
 
   # GET /api/users
   def index
@@ -156,44 +151,6 @@ class Api::UsersController < ApplicationController
   # Set the user instance variable based on the provided ID
   def set_user
     @user = User.find(params[:id])
-  end
-
-  def current_user
-    authenticate_with_http_token do |token, _options|
-      secret = Rails.application.credentials.devise_jwt_secret_key
-      algorithm = 'HS256'
-
-      Rails.logger.debug "Starting current_user method"
-
-      begin
-        Rails.logger.debug "Received token: #{token}"
-
-        # Decode the JWT token
-        decoded_token = JWT.decode(token, secret, true, { algorithm: algorithm })
-        Rails.logger.debug "Decoded token: #{decoded_token}"
-
-        # Extract user ID from decoded token
-        user_id = decoded_token[0]['user_id']
-        Rails.logger.debug "Extracted user_id: #{user_id}"
-
-        # Find the user by user_id
-        @user = User.find(user_id)
-        Rails.logger.debug "User found: #{@user.inspect}"
-
-        @user # Return the user object without rendering anything here
-      rescue JWT::DecodeError => e
-        Rails.logger.error "JWT Decode Error: #{e.message}"
-        nil # Return nil to indicate failure
-      rescue ActiveRecord::RecordNotFound => e
-        Rails.logger.error "Record Not Found: #{e.message}"
-        nil # Return nil to indicate failure
-      rescue StandardError => e
-        Rails.logger.error "Unexpected Error: #{e.message}"
-        nil # Return nil to indicate failure
-      ensure
-        Rails.logger.debug "Ending current_user method"
-      end
-    end
   end
 
   # Permit only the trusted parameters for creating or updating a user
