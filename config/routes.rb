@@ -1,55 +1,51 @@
-# config/routes.rb
-
 Rails.application.routes.draw do
-  # Define a root route that returns a simple response or redirect
   root to: 'application#health_check'
 
   namespace :api do
     # User authentication routes using Devise
     devise_for :users, skip: [:sessions, :registrations]
-    post '/login', to: 'users#login'                     # Log in a user
-    get '/current_user', to: 'users#show_current_user'  # Retrieve the current logged-in user
+    post '/login', to: 'users#login'
+    get '/current_user', to: 'users#show_current_user'
 
-    # Users routes with member actions
+    # Users routes
     resources :users do
       member do
-        get :platforms           # Get platforms associated with the user
-        post :add_platform       # Add a platform to the user
-        delete :remove_platform  # Remove a platform from the user
+        get :platforms
+        post :add_platform
+        delete :remove_platform
       end
       collection do
-        get :skillmasters        # Get users with the 'skillmaster' role
+        get :skillmasters
       end
     end
 
-    # Platforms routes with member actions
+    # Platforms routes
     resources :platforms do
       member do
-        get :products            # Get products associated with the platform
-        post :add_product        # Add a product to the platform
-        delete :remove_product   # Remove a product from the platform
+        get :products
+        post :add_product
+        delete :remove_product
       end
     end
 
-    # Products routes with member actions
+    # Products routes
     resources :products do
       collection do
-        get 'by_platforms/:platform_id', to: 'products#by_platform'  # Get products by platform ID
+        get 'by_platforms/:platform_id', to: 'products#by_platform'
       end
-
       member do
-        get :platforms          # Get platforms associated with the product
-        post :add_platform      # Add a platform to the product
-        delete :remove_platform  # Remove a platform from the product
-      end
-
-      resources :categories do
-        member do
-          get :products          # Get products associated with the category
-        end
+        get :platforms
+        post :add_platform
+        delete :remove_platform
       end
     end
 
+    # Categories routes
+    resources :categories do
+      member do
+        get :products  # Get products for a specific category
+      end
+    end
 
     # Resources for product attribute categories
     resources :product_attribute_categories
@@ -63,10 +59,10 @@ Rails.application.routes.draw do
     # Resources for orders management
     resources :orders do
       collection do
-        get :graveyard_orders    # Get graveyard orders
+        get :graveyard_orders
       end
       member do
-        patch :pick_up_order     # Mark order as picked up
+        patch :pick_up_order
       end
     end
   end
