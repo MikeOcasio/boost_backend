@@ -42,6 +42,12 @@ Rails.application.routes.draw do
         post :add_platform      # Add a platform to the product
         delete :remove_platform  # Remove a platform from the product
       end
+
+      resources :categories do
+        member do
+          get :products          # Get products associated with the category
+        end
+      end
     end
 
 
