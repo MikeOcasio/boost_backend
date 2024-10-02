@@ -67,7 +67,7 @@ module Api
     private
 
     def set_product_attribute_category
-      @product_attribute_category = ProductAttributeCategory.find(params[:id])
+      @product_attribute_category = ProductAttributeCategory.find_by(id: params[:id])
     end
 
     def product_attribute_category_params
