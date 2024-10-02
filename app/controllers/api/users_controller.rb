@@ -1,5 +1,6 @@
 class Api::UsersController < ApplicationController
   include ActionController::HttpAuthentication::Token::ControllerMethods
+  include Devise::Controllers::Helpers
 
   #! Remove this line once login is implemented
   skip_before_action :verify_authenticity_token
@@ -35,8 +36,7 @@ class Api::UsersController < ApplicationController
 
   # GET /api/current_user
   def show_current_user
-    Rails.logger.debug "Fetching current user..."
-    user = current_user # Use Devise's built-in current_user method
+    user = current_user
     if user
       render json: user, status: :ok
     else
