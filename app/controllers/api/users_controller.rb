@@ -12,16 +12,17 @@ class Api::UsersController < ApplicationController
     @user = User.find_by(email: params[:email])
 
     if @user&.valid_password?(params[:password])
-      sign_in @user # Automatically signs in the user and generates the JWT token
+      sign_in @user # Automatically signs in the user
 
-      # Assuming you are using Devise JWT, this should retrieve the JWT token
-      token = current_user.generate_jwt # Replace this with the correct method to generate the JWT token
+      # Use your existing jwt_token method to generate the token
+      token = @user.jwt_token
 
       render json: { message: 'Logged in successfully', token: token }, status: :ok
     else
       render json: { error: 'Invalid email or password' }, status: :unauthorized
     end
   end
+
 
   # GET /api/users/:id
   def show
