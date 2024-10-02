@@ -36,14 +36,18 @@ class Api::UsersController < ApplicationController
   # GET /api/current_user
   def show_current_user
     Rails.logger.debug "Fetching current user..."
-    user = current_user
-    if user
-      render json: user, status: :ok
-    else
-      Rails.logger.debug "Unauthorized access"
-      render json: { error: 'Unauthorized access' }, status: :unauthorized
+    authenticate_with_http_token do |token, _options|
+      Rails.logger.debug "Incoming Token: #{token}"  # Log the incoming token
+      user = current_user  # This will still log in current_user
+      if user
+        render json: user, status: :ok
+      else
+        Rails.logger.debug "Unauthorized access"
+        render json: { error: 'Unauthorized access' }, status: :unauthorized
+      end
     end
   end
+
 
 
   # GET /api/users
