@@ -7,8 +7,13 @@ module Api
 
     # GET /products
     def index
-      @products = Product.all
-      render json: @products
+      @products = Product.includes(:category, :platforms).all
+      render json: @products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } })
+    end
+
+    # GET /products/:id
+    def show
+      render json: @product.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } })
     end
 
     def by_platform
@@ -26,11 +31,6 @@ module Api
       else
         render json: { message: "No products found for this platform" }, status: :not_found
       end
-    end
-
-    # GET /products/:id
-    def show
-      render json: @product.as_json(include: { platforms: { only: :id } })
     end
 
     # POST /products
@@ -160,7 +160,7 @@ module Api
         :name,
         :description,
         :price,
-        :category_id,
+        :category_id, # Include this to allow category assignment
         :product_attribute_category_id,
         :is_priority,
         :is_active,
@@ -174,6 +174,7 @@ module Api
         platform_ids: []
       )
     end
+
 
     def upload_to_s3(file)
       if file.is_a?(ActionDispatch::Http::UploadedFile)

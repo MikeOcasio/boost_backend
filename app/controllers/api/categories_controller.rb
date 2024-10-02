@@ -1,7 +1,7 @@
 module Api
   class CategoriesController < ApplicationController
     # Set the category instance variable for actions that require it
-    before_action :set_category, only: [:show, :update, :destroy]
+    before_action :set_category, only: [:show, :products, :update, :destroy]
 
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
@@ -20,6 +20,18 @@ module Api
     def show
       # Render the specified category in JSON format
       render json: @category
+    end
+
+        # GET /categories/:id/products
+    # Get all products for a specific category
+    def products
+      products = @category.products
+
+      if products.any?
+        render json: products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } }), status: :ok
+      else
+        render json: { message: "No products found for this category" }, status: :not_found
+      end
     end
 
     # POST /categories
