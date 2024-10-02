@@ -5,6 +5,8 @@ class Api::UsersController < ApplicationController
   before_action :set_default_format
   before_action :authenticate_user_from_token!, only: [:show_current_user]
 
+  skip_before_action :verify_authenticity_token
+
   # POST /api/users/login
   def login
     @user = User.find_by(email: params[:email])
