@@ -1,12 +1,9 @@
 class Api::UsersController < ApplicationController
   include ActionController::HttpAuthentication::Token::ControllerMethods
-  include Devise::Controllers::Helpers
-
-  #! Remove this line once login is implemented
-  skip_before_action :verify_authenticity_token
 
   before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :enable_two_factor, :disable_two_factor, :verify_two_factor, :generate_backup_codes]
   before_action :set_default_format
+  before_action :authenticate_user_from_token!, only: [:show_current_user]
 
   # POST /api/users/login
   def login
@@ -143,6 +140,28 @@ class Api::UsersController < ApplicationController
   end
 
   private
+
+  def current_user
+    @current_user ||=
+      if request.headers['Authorization'].present?
+        token = request.headers['Authorization'].split(' ').last
+        user_id = JsonWebToken.decode(token)[:user_id] # Assuming you have a method to decode JWT
+        User.find_by(id: user_id)
+      end
+  end
+
+
+  def authenticate_user_from_token!
+    token = request.headers['Authorization']&.split(' ')&.last
+    if token
+      user_id = JsonWebToken.decode(token)[:user_id] # Assumes you have a method to decode your token
+      @current_user = User.find_by(id: user_id)
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Unauthorized access' }, status: :unauthorized
+  rescue JWT::DecodeError
+    render json: { error: 'Invalid token' }, status: :unauthorized
+  end
 
   def set_default_format
     request.format = :json
