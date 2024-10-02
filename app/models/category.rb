@@ -14,6 +14,8 @@
 
 class Category < ApplicationRecord
 
+  has_many :products
+
   validates :name, presence: true, uniqueness: true
 
   after_create :add_to_cat_list
