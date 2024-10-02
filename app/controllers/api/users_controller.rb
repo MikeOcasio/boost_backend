@@ -35,13 +35,16 @@ class Api::UsersController < ApplicationController
 
   # GET /api/current_user
   def show_current_user
+    Rails.logger.debug "Fetching current user..."
     user = current_user
     if user
       render json: user, status: :ok
     else
+      Rails.logger.debug "Unauthorized access"
       render json: { error: 'Unauthorized access' }, status: :unauthorized
     end
   end
+
 
   # GET /api/users
   def index
