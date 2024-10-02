@@ -53,6 +53,17 @@ module Api
       end
     end
 
+    # GET /api/product_attribute_categories/:id/products
+    def products
+      products = @product_attribute_category.products
+
+      if products.any?
+        render json: products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name] } }), status: :ok
+      else
+        render json: { message: "No products found for this product attribute category" }, status: :not_found
+      end
+    end
+
 
     private
 
