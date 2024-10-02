@@ -12,13 +12,8 @@ class Api::UsersController < ApplicationController
     @user = User.find_by(email: params[:email])
 
     if @user&.valid_password?(params[:password])
-      sign_in @user
-      payload = { user_id: @user.id }
-      secret = Rails.application.credentials.devise_jwt_secret_key
-      algorithm = 'HS256'
-      token = JWT.encode payload, secret, algorithm
-      puts "Encoded Token: #{token}"
-      render json: { token: token }
+      sign_in @user  # Automatically signs in the user and generates the JWT token
+      render json: { message: 'Logged in successfully' }, status: :ok
     else
       render json: { error: 'Invalid email or password' }, status: :unauthorized
     end
