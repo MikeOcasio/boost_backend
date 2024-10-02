@@ -40,7 +40,7 @@ class Product < ApplicationRecord
   validate :has_at_least_one_platform
 
   # Scope to find products by platform
-  scope :by_platform, ->(platform) { where(platform: platform) }
+  scope :by_platform, ->(platform_id) { joins(:platforms).where(platforms: { id: platform_id }) }
 
 private
 
