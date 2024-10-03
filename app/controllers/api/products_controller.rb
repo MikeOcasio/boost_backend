@@ -27,7 +27,7 @@ module Api
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
       if @products.any?
-        render json: @product.as_json(include: { platforms: { only: [:id, :name } }), status: :ok
+        render json: @product.as_json(include: { platforms: { only: [:id, :name ] } }), status: :ok
       else
         render json: { message: "No products found for this platform" }, status: :not_found
       end
