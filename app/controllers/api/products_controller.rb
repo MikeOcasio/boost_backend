@@ -1,9 +1,8 @@
 module Api
   class ProductsController < ApplicationController
-    before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
 
-    #! Remove this line once login is implemented
-    skip_before_action :verify_authenticity_token
+    
+    before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
 
 
     # GET /products

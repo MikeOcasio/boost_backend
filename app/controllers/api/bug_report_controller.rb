@@ -4,8 +4,6 @@ module Api
     before_action :authorize_developer!, only: [:index, :show, :update, :destroy]
     before_action :set_bug_report, only: [:show, :update, :destroy]
 
-    #! Temporarily disable CSRF protection for development purposes
-    skip_before_action :verify_authenticity_token, if: -> { Rails.env.development? }
 
     def index
       @bug_reports = BugReport.all

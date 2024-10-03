@@ -3,9 +3,11 @@ Rails.application.routes.draw do
 
   namespace :api do
     # User authentication routes using Devise
-    devise_for :users, skip: [:sessions, :registrations]
-    post '/login', to: 'users#login'
-    get '/current_user', to: 'users#show_current_user'
+    devise_for :users, defaults: { format: :json }
+    
+    post '/login', to: 'sessions#create'
+    delete '/logout', to: 'sessions#destroy'
+    get '/current_user', to: 'sessions#show'
 
     # Users routes
     resources :users do
