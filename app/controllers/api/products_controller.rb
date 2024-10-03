@@ -8,12 +8,23 @@ module Api
     # GET /products
     def index
       @products = Product.includes(:category, :platforms).all
-      render json: @product.as_json(include: { platforms: { only: [:id, :name] }, category: { only: [:id, :name, :description] } })
+      render json: @product.as_json(
+        include: {
+          platforms: { only: [:id, :name] },
+          category: { only: [:id, :name, :description] }
+        }
+      )
     end
 
     # GET /products/:id
     def show
-      render json: @product.as_json(include: { platforms: { only: [:id, :name] }, category: { only: [:id, :name, :description] } })
+      @product = Product.includes(:platforms, :category).find(params[:id])
+      render json: @product.as_json(
+        include: {
+          platforms: { only: [:id, :name] },
+          category: { only: [:id, :name, :description] }
+        }
+      )
     end
 
     def by_platform
