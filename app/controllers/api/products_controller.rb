@@ -8,12 +8,12 @@ module Api
     # GET /products
     def index
       @products = Product.includes(:category, :platforms).all
-      render json: @products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } })
+      render json: @product.as_json(include: { platforms: { only: [:id, :name] }, category: { only: [:id, :name, :description] } })
     end
 
     # GET /products/:id
     def show
-      render json: @product.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } })
+      render json: @product.as_json(include: { platforms: { only: [:id, :name] }, category: { only: [:id, :name, :description] } })
     end
 
     def by_platform
@@ -27,7 +27,7 @@ module Api
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
       if @products.any?
-        render json: @product.as_json(include: { platforms: { only: :id } }), status: :ok
+        render json: @product.as_json(include: { platforms: { only: [:id, :name } }), status: :ok
       else
         render json: { message: "No products found for this platform" }, status: :not_found
       end
