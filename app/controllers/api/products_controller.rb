@@ -5,16 +5,18 @@ module Api
     #! Remove this line once login is implemented
     skip_before_action :verify_authenticity_token
 
+
     # GET /products
     def index
       @products = Product.includes(:category, :platforms).all
-      render json: @product.as_json(
+      render json: @products.as_json(
         include: {
           platforms: { only: [:id, :name] },
           category: { only: [:id, :name, :description] }
         }
       )
     end
+
 
     # GET /products/:id
     def show
