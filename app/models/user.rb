@@ -21,20 +21,11 @@ class User < ApplicationRecord
 
   #add Devise modules
   devise :database_authenticatable,
-  :registerable,
-  :recoverable,
-  :rememberable,
-  :trackable,
-  :validatable,
-  # :confirmable,
-  # :lockable,
-  # :timeoutable,
-  # :two_factor_authenticatable,
-  :jwt_authenticatable,
-  jwt_revocation_strategy: JwtDenylist
-
-
-  # :two_factor_backupable
+         :registerable,
+         :recoverable,
+         :rememberable,
+         :validatable,
+         :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   has_many :user_platforms, dependent: :destroy
   has_many :platforms, through: :user_platforms
@@ -84,8 +75,10 @@ class User < ApplicationRecord
     end
   end
 
-  def jwt_token
-    Warden::JWTAuth::UserEncoder.new.call(self, :user, nil).first
+  def generate_jwt
+    # Use your secret key stored in Rails credentials
+    payload = { user_id: id, exp: 24.hours.from_now.to_i }
+    JWT.encode(payload, Rails.application.credentials.devise_jwt_secret_key)
   end
 
 

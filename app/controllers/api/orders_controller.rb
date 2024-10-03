@@ -3,8 +3,6 @@ module Api
     # before_action :authenticate_user!
     before_action :set_order, only: [:show, :update, :destroy, :pick_up_order]
 
-    #! Remove this line once login is implemented
-    skip_before_action :verify_authenticity_token
 
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.

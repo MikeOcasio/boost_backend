@@ -9,16 +9,12 @@
 # Use this hook to configure devise mailer, warden hooks and so forth.
 # Many of these configuration options can be set straight in your model.
 Devise.setup do |config|
-  config.warden do |manager|
-    manager.default_strategies(:scope => :user).unshift :two_factor_authenticatable
-  end
-
   # The secret key used by Devise. Devise uses this key to generate
   # random tokens. Changing this key will render invalid all existing
   # confirmation, reset password and unlock tokens in the database.
   # Devise will use the `secret_key_base` as its `secret_key`
   # by default. You can change it below and use your own secret key.
-  # config.secret_key = '4c294d9ab033456daf870610c5faf02f2bf06842e139c96f530733f47d76e0a0cdda3caaec041a462b3631ee490bb2e54a2b8069aa67e2ccdf315fa2c31a5fd5'
+  # config.secret_key = '718c7e629374ca4f622fb1b9bdfa46c07d51c02a1ccb2eea790e768c519da35e3fa8feef3165274e559d9c9b8aa3b0fb3ec7e6dd731a82053f8a7b7543b76c91'
 
   # ==> Controller configuration
   # Configure the parent class to the devise controllers.
@@ -68,16 +64,6 @@ Devise.setup do |config|
   # These keys will have whitespace before and after removed upon creating or
   # modifying a user and when used to authenticate or find a user. Default is :email.
   config.strip_whitespace_keys = [:email]
-
-
-  config.jwt do |jwt|
-    jwt.secret = Rails.application.credentials.devise_jwt_secret_key # Load from Rails credentials
-    jwt.dispatch_requests = [['POST', %r{^/login$}]]
-    jwt.revocation_requests = [['DELETE', %r{^/logout$}]]
-    jwt.expiration_time = 1.day.to_i
-    jwt.algorithm = 'HS256' # Use a single string instead of an array
-  end
-
 
   # Tell if authentication through request.params is enabled. True by default.
   # It can be set to an array that will enable params authentication only for the
@@ -140,7 +126,22 @@ Devise.setup do |config|
   config.stretches = Rails.env.test? ? 1 : 12
 
   # Set up a pepper to generate the hashed password.
-  # config.pepper = '357abbdeaf4d54cbb3ec150c06bee3295242d1a2a956043f2e2a4a2d0c9cbda4e1e6ae8cb12602b3b92855e89a125e18dd5e5d2a21392d8f664887662febb087'
+  # config.pepper = 'bb0ede8d5811d015e040e0585936f6befab273e3a6e081dea2047cda35636122cbaca5aef34e06397ac862ad069729457748dd09b445ae87a27e8f348f655015'
+
+  config.jwt do |jwt|
+    jwt.secret = Rails.application.credentials.devise_jwt_secret_key # Make sure you have this secret set in your credentials
+    jwt.dispatch_requests = [
+      ['POST', %r{^/api/login$}],
+      ['POST', %r{^/api/users$}] # adjust as necessary for your app
+    ]
+    jwt.revocation_requests = [
+      ['DELETE', %r{^/api/logout$}]
+    ]
+    jwt.expiration_time = 1.day.to_i # Adjust as necessary
+    algorithm = 'HS256' # Adjust as necessary
+  end
+
+
 
   # Send a notification to the original email when the user's email is changed.
   # config.send_email_changed_notification = false

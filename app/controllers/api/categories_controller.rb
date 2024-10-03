@@ -3,8 +3,6 @@ module Api
     # Set the category instance variable for actions that require it
     before_action :set_category, only: [:show, :products, :update, :destroy]
 
-    #! Remove this line once login is implemented
-    skip_before_action :verify_authenticity_token
 
     # GET /categories
     # List all categories.

@@ -2,8 +2,6 @@ module Api
   class PlatformsController < ApplicationController
     before_action :set_platform, only: [:update, :destroy]
 
-    #! Remove this line once login is implemented
-    skip_before_action :verify_authenticity_token
 
     # GET /api/platforms
     def index

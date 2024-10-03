@@ -1,27 +1,7 @@
 class Api::UsersController < ApplicationController
-  include ActionController::HttpAuthentication::Token::ControllerMethods
 
   before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :enable_two_factor, :disable_two_factor, :verify_two_factor, :generate_backup_codes]
   before_action :set_default_format
-  before_action :authenticate_user_from_token!, only: [:show_current_user]
-
-  skip_before_action :verify_authenticity_token
-
-  # POST /api/users/login
-  def login
-    @user = User.find_by(email: params[:email])
-
-    if @user&.valid_password?(params[:password])
-      sign_in @user # Automatically signs in the user
-
-      # Use your existing jwt_token method to generate the token
-      token = @user.jwt_token
-
-      render json: { message: 'Logged in successfully', token: token }, status: :ok
-    else
-      render json: { error: 'Invalid email or password' }, status: :unauthorized
-    end
-  end
 
 
   # GET /api/users/:id
@@ -33,16 +13,6 @@ class Api::UsersController < ApplicationController
     end
   end
 
-  # GET /api/current_user
-  def show_current_user
-    user = current_user
-    if user
-      render json: user, status: :ok
-    else
-      Rails.logger.debug "Unauthorized access"
-      render json: { error: 'Unauthorized access' }, status: :unauthorized
-    end
-  end
 
   # GET /api/users
   def index
@@ -84,38 +54,38 @@ class Api::UsersController < ApplicationController
     render json: @users
   end
 
-  # POST /api/users/:id/enable_two_factor
-  def enable_two_factor
-    @user.otp_required_for_login = true
-    @user.otp_secret = User.generate_otp_secret
-    @user.save!
-    UserMailer.otp(@user, @user.otp_secret).deliver_now
-    render json: { message: 'OTP has been sent to your email.' }
-  end
+  # # POST /api/users/:id/enable_two_factor
+  # def enable_two_factor
+  #   @user.otp_required_for_login = true
+  #   @user.otp_secret = User.generate_otp_secret
+  #   @user.save!
+  #   UserMailer.otp(@user, @user.otp_secret).deliver_now
+  #   render json: { message: 'OTP has been sent to your email.' }
+  # end
 
-  # POST /api/users/:id/disable_two_factor
-  def disable_two_factor
-    @user.otp_required_for_login = false
-    @user.otp_secret = nil
-    @user.save!
-    head :no_content
-  end
+  # # POST /api/users/:id/disable_two_factor
+  # def disable_two_factor
+  #   @user.otp_required_for_login = false
+  #   @user.otp_secret = nil
+  #   @user.save!
+  #   head :no_content
+  # end
 
-  # POST /api/users/:id/verify_two_factor
-  def verify_two_factor
-    if @user.validate_and_consume_otp!(params[:otp_attempt])
-      render json: { success: true }
-    else
-      render json: { success: false }, status: :unauthorized
-    end
-  end
+  # # POST /api/users/:id/verify_two_factor
+  # def verify_two_factor
+  #   if @user.validate_and_consume_otp!(params[:otp_attempt])
+  #     render json: { success: true }
+  #   else
+  #     render json: { success: false }, status: :unauthorized
+  #   end
+  # end
 
-  # POST /api/users/:id/generate_backup_codes
-  def generate_backup_codes
-    @user.generate_otp_backup_codes!
-    @user.save!
-    render json: { backup_codes: @user.otp_backup_codes }
-  end
+  # # POST /api/users/:id/generate_backup_codes
+  # def generate_backup_codes
+  #   @user.generate_otp_backup_codes!
+  #   @user.save!
+  #   render json: { backup_codes: @user.otp_backup_codes }
+  # end
 
   # GET /api/users/:id/platforms
   # Retrieve all platforms associated with a specific user
@@ -142,29 +112,6 @@ class Api::UsersController < ApplicationController
   end
 
   private
-
-  def current_user
-    @current_user ||=
-      if request.headers['Authorization'].present?
-        token = request.headers['Authorization'].split(' ').last
-        user_id = JsonWebToken.decode(token)[:user_id] # Assuming you have a method to decode JWT
-        User.find_by(id: user_id)
-      end
-  end
-
-
-  def authenticate_user_from_token!
-    token = request.headers['Authorization']&.split(' ')&.last
-    if token
-      user_id = JsonWebToken.decode(token)[:user_id] # Assumes you have a method to decode your token
-      @current_user = User.find_by(id: user_id)
-    end
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Unauthorized access' }, status: :unauthorized
-  rescue JWT::DecodeError
-    render json: { error: 'Invalid token' }, status: :unauthorized
-  end
-
   def set_default_format
     request.format = :json
   end
