@@ -22,6 +22,7 @@ Rails.application.routes.draw do
         get :skillmasters
       end
     end
+  end
 
   delete 'users/sign_out', to: 'users/sessions#destroy'
 
