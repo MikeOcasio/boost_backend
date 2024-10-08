@@ -3,13 +3,7 @@ module Users
     before_action :authenticate_user!
     before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform]
 
-    # GET /member-data/:id
-    def show
-      user = get_user_from_token
-      render json: user, status: :ok
-    end
-
-    # GET GET /users/member-data/signed_in_user
+    # GET /users/member-data/signed_in_user
     def signed_in_user
       user = get_user_from_token
       render json: user, status: :ok
@@ -22,59 +16,83 @@ module Users
       render json: @users, status: :ok
     end
 
-    # GET users/members/skillmasters
+    # GET /users/members/skillmasters
     def skillmasters
       @users = User.where(role: 'skillmaster')
       render json: @users
     end
 
+    # GET /users/members/skillmasters/:id
+    def show_skillmaster
+      # Find the skillmaster by the provided ID
+      @skillmaster = User.find_by(id: params[:id], role: 'skillmaster')
 
-    # POST /member-data
-    def create
-      @user = User.new(user_params)
-      upload_image_to_s3(@user, params[:image]) if params[:image].present?
+      if @skillmaster
+        render json: @skillmaster, status: :ok
+      else
+        render json: { error: 'Skillmaster not found.' }, status: :not_found
+      end
+    end
 
-      if @user.save
+
+    # PATCH/PUT /users/member-data
+    def update
+      current_user = get_user_from_token # Fetch the current user from the token
+
+      if current_user.update(user_params)
+        upload_image_to_s3(current_user, params[:image]) if params[:image].present?
+        render json: current_user, status: :ok
+      else
+        render json: current_user.errors, status: :unprocessable_entity
+      end
+    end
+
+    # DELETE /users/member-data
+    def destroy
+      user_to_destroy = get_user_from_token # Fetch the user from the token
+      current_user = @user # Assuming @user is set in the before_action
+
+      if current_user.id == user_to_destroy.id || current_user.role.in?(["dev", "admin"])
+        user_to_destroy.destroy # Destroy the user
+        head :no_content # Return a success response
+      else
+        render json: { error: 'You are not authorized to delete this user.' }, status: :forbidden
+      end
+    end
+
+    # GET /users/member-data/platforms
+    def platforms
+      current_user = get_user_from_token # Fetch the current user from the token
+      render json: current_user.platforms, status: :ok
+    end
+
+
+    # POST /users/member-data/:id/platforms
+    def add_platform
+      current_user = get_user_from_token # Fetch the current user from the token
+
+      if current_user.id == @user.id || current_user.role.in?(["dev", "admin"])
+        platform = Platform.find(params[:platform_id])
+        @user.platforms << platform unless @user.platforms.include?(platform)
         render json: @user, status: :created
       else
-        render json: @user.errors, status: :unprocessable_entity
+        render json: { error: 'You are not authorized to add platforms for this user.' }, status: :forbidden
       end
     end
 
-    # PATCH/PUT users/member-data/:id
-    def update
-      if @user.update(user_params)
-        upload_image_to_s3(@user, params[:image]) if params[:image].present?
-        render json: @user, status: :ok
-      else
-        render json: @user.errors, status: :unprocessable_entity
-      end
-    end
-
-    # DELETE /member-data/:id
-    def destroy
-      @user.destroy
-      head :no_content
-    end
-
-    # GET /member-data/:id/platforms
-    def platforms
-      render json: @user.platforms, status: :ok
-    end
-
-    # POST /member-data/:id/platforms
-    def add_platform
-      platform = Platform.find(params[:platform_id])
-      @user.platforms << platform unless @user.platforms.include?(platform)
-      render json: @user, status: :created
-    end
-
-    # DELETE /member-data/:id/platforms/:platform_id
+    # DELETE /users/member-data/:id/platforms/:platform_id
     def remove_platform
-      platform = Platform.find(params[:platform_id])
-      @user.platforms.delete(platform)
-      head :no_content
+      current_user = get_user_from_token # Fetch the current user from the token
+
+      if current_user.id == @user.id || current_user.role.in?(["dev", "admin"])
+        platform = Platform.find(params[:platform_id])
+        @user.platforms.delete(platform)
+        head :no_content
+      else
+        render json: { error: 'You are not authorized to remove platforms for this user.' }, status: :forbidden
+      end
     end
+
 
     private
 
