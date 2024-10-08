@@ -9,18 +9,21 @@ Rails.application.routes.draw do
     registrations: 'users/registrations'
   }
 
-  namespace :users do
-    resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
-      member do
-        get :platforms
-        post :add_platform
-        delete :remove_platform
-      end
+  Rails.application.routes.draw do
+    namespace :users do
+      resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
+        member do
+          get :platforms
+          post :add_platform
+          delete :remove_platform
+          get 'skillmasters/:id', to: 'members#show_skillmaster', as: :show_skillmaster  # Add this line
+        end
 
-      # Define the route for retrieving the signed-in user
-      collection do
-        get :signed_in_user
-        get :skillmasters
+        # Define the route for retrieving the signed-in user
+        collection do
+          get :signed_in_user
+          get :skillmasters
+        end
       end
     end
   end
