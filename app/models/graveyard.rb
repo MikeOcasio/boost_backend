@@ -1,0 +1,2 @@
+class Graveyard < ApplicationRecord
+end

@@ -13,7 +13,6 @@ Rails.application.routes.draw do
         get :platforms
         post :add_platform
         delete :remove_platform
-        get 'skillmasters/:id', to: 'members#show_skillmaster'
       end
 
       # Define the route for retrieving the signed-in user
@@ -21,8 +20,16 @@ Rails.application.routes.draw do
         get :signed_in_user
         get :skillmasters
       end
+
+      # Add this line for getting a skillmaster by ID
+      member do
+        get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
+      end
     end
   end
+
+
+
 
   delete 'users/sign_out', to: 'users/sessions#destroy'
 
