@@ -125,22 +125,21 @@ Devise.setup do |config|
   # a value of 20 is already extremely slow: approx. 60 seconds for 1 calculation).
   config.stretches = Rails.env.test? ? 1 : 12
 
+  config.navigational_formats = [:json]
+
   # Set up a pepper to generate the hashed password.
   # config.pepper = 'bb0ede8d5811d015e040e0585936f6befab273e3a6e081dea2047cda35636122cbaca5aef34e06397ac862ad069729457748dd09b445ae87a27e8f348f655015'
 
   config.jwt do |jwt|
-    jwt.secret = Rails.application.credentials.devise_jwt_secret_key # Make sure you have this secret set in your credentials
+    jwt.secret = Rails.application.credentials.devise_jwt_secret_key
     jwt.dispatch_requests = [
-      ['POST', %r{^/api/login$}],
-      ['POST', %r{^/api/users$}] # adjust as necessary for your app
+      ['POST', %r{^/users/sign_in$}]
     ]
     jwt.revocation_requests = [
-      ['DELETE', %r{^/api/logout$}]
+      ['DELETE', %r{^/users/sign_out$}]
     ]
-    jwt.expiration_time = 1.day.to_i # Adjust as necessary
-    algorithm = 'HS256' # Adjust as necessary
+    jwt.expiration_time = 1.day.to_i
   end
-
 
 
   # Send a notification to the original email when the user's email is changed.

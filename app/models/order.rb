@@ -31,6 +31,8 @@ class Order < ApplicationRecord
 
   aasm column: 'status' do
     state :open, initial: true
+    state :pending
+    state :graveyard
     state :assigned
     state :in_progress
     state :delayed
@@ -65,7 +67,7 @@ class Order < ApplicationRecord
   end
 
   def generate_internal_id
-    self.internal_id = SecureRandom.hex(10) # generates a random 20-character string
+    self.internal_id = SecureRandom.hex(5) # generates a random 20-character string
   end
 
   def calculate_price

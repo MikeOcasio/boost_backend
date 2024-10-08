@@ -25,7 +25,10 @@ class User < ApplicationRecord
          :recoverable,
          :rememberable,
          :validatable,
-         :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
+         :jwt_authenticatable,
+         jwt_revocation_strategy: JwtDenylist
+
+
 
   has_many :user_platforms, dependent: :destroy
   has_many :platforms, through: :user_platforms
@@ -37,6 +40,7 @@ class User < ApplicationRecord
   has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user
   has_many :platform_credentials, dependent: :destroy
 
+  before_validation :set_default_role, on: :create
   # ---------------
   ROLE_LIST = ["admin", "skillmaster", "customer", "skillcoach", "coach", "dev"].freeze
 
@@ -44,15 +48,19 @@ class User < ApplicationRecord
   # ---------------
   validates :email, presence: true, uniqueness: true
   validates :role, presence: true, inclusion: { in: ROLE_LIST }
-  validate :password_complexity
+  # validate :password_complexity
 
   # Methods
   # ---------------
 
-  def password_complexity
-    return if password.blank? || password =~ /^(?=.*?[A-Z])(?=.*?[!@#$&*]).{8,}$/
+  # def password_complexity
+  #   return if password.blank? || password =~ /^(?=.*?[A-Z])(?=.*?[!@#$&*]).{8,}$/
 
-    errors.add :password, 'Complexity requirement not met. Please use: 8 characters, at least one uppercase letter and one special character'
+  #   errors.add :password, 'Complexity requirement not met. Please use: 8 characters, at least one uppercase letter and one special character'
+  # end
+
+  def set_default_role
+    self.role ||= "customer"
   end
 
   def timeout_in
@@ -74,12 +82,4 @@ class User < ApplicationRecord
       5.minutes
     end
   end
-
-  def generate_jwt
-    # Use your secret key stored in Rails credentials
-    payload = { user_id: id, exp: 24.hours.from_now.to_i }
-    JWT.encode(payload, Rails.application.credentials.devise_jwt_secret_key)
-  end
-
-
 end
