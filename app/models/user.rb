@@ -48,16 +48,16 @@ class User < ApplicationRecord
   # ---------------
   validates :email, presence: true, uniqueness: true
   validates :role, presence: true, inclusion: { in: ROLE_LIST }
-  # validate :password_complexity
+  validate :password_complexity
 
   # Methods
   # ---------------
 
-  # def password_complexity
-  #   return if password.blank? || password =~ /^(?=.*?[A-Z])(?=.*?[!@#$&*]).{8,}$/
+  def password_complexity
+    return if password.blank? || password =~ /^(?=.*?[A-Z])(?=.*?[!@#$&*]).{8,}$/
 
-  #   errors.add :password, 'Complexity requirement not met. Please use: 8 characters, at least one uppercase letter and one special character'
-  # end
+    errors.add :password, 'Complexity requirement not met. Please use: 8 characters, at least one uppercase letter and one special character'
+  end
 
   def set_default_role
     self.role ||= "customer"
