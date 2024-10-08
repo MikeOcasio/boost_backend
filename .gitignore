@@ -7,3 +7,5 @@ tmp/
 log/
 
 .byebug_history
+
+/config/credentials/production.key
