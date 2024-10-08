@@ -1,25 +1,49 @@
 Rails.application.routes.draw do
   root to: 'application#health_check'
 
-  namespace :api do
-    # User authentication routes using Devise
-    devise_for :users, defaults: { format: :json }
-    
-    post '/login', to: 'sessions#create'
-    delete '/logout', to: 'sessions#destroy'
-    get '/current_user', to: 'sessions#show'
 
-    # Users routes
-    resources :users do
+  ####User Authentication Routes####
+
+  devise_for :users, controllers: {
+    sessions: 'users/sessions',
+    registrations: 'users/registrations'
+  }
+
+  namespace :users do
+    resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
       member do
         get :platforms
         post :add_platform
         delete :remove_platform
       end
+
+      # Define the route for retrieving the signed-in user
       collection do
+        get :signed_in_user
         get :skillmasters
       end
     end
+  end
+
+   delete 'users/sign_out', to: 'users/sessions#destroy'
+
+
+
+
+
+
+  namespace :api do
+    # # Users routes
+    # resources :users do
+    #   member do
+    #     get :platforms
+    #     post :add_platform
+    #     delete :remove_platform
+    #   end
+    #   collection do
+    #     get :skillmasters
+    #   end
+    # end
 
     # Platforms routes
     resources :platforms do
