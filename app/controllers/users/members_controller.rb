@@ -64,10 +64,10 @@ module Users
       end
     end
 
+    #! TODO: destroy_and_ban anyone but other admins
 
     # DELETE /users/members/:id/ban
     def destroy_and_ban
-      byebug
       current_user = get_user_from_token # Fetch the current user
 
       # Load the user based on the ID from the parameters
