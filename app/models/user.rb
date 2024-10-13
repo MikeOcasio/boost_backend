@@ -54,10 +54,24 @@ class User < ApplicationRecord
   # ---------------
 
   def password_complexity
-    return if password.blank? || password =~ /^(?=.*?[A-Z])(?=.*?[!@#$&*]).{8,}$/
+    return if password.blank?
 
-    errors.add :password, 'Complexity requirement not met. Please use: 8 characters, at least one uppercase letter and one special character'
+    # Check length
+    if password.length < 8
+      errors.add :password, 'Must be at least 8 characters long.'
+    end
+
+    # Check for uppercase letter
+    unless password =~ /[A-Z]/
+      errors.add :password, 'Must contain at least one uppercase letter.'
+    end
+
+    # Check for special character
+    unless password =~ /[!@#$&*]/
+      errors.add :password, 'Must contain at least one special character.'
+    end
   end
+
 
   def set_default_role
     self.role ||= "customer"
