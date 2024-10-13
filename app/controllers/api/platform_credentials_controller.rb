@@ -19,6 +19,29 @@ class Api::PlatformCredentialsController < ApplicationController
     end
   end
 
+  def create
+    # Find the platform by name
+    platform = Platform.find_by(name: params[:platform_name])
+
+    unless platform
+      return render json: { success: false, message: "Platform not found." }, status: :not_found
+    end
+
+    # Build the platform credential with the associated platform
+    platform_credential = current_user.platform_credentials.build(
+      platform: platform,
+      username: params[:username],
+      password: params[:password]
+    )
+
+    if platform_credential.save
+      render json: { success: true, message: "Platform credentials added successfully.", platform_credential: platform_credential }, status: :created
+    else
+      render json: { success: false, errors: platform_credential.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+
   private
 
   # Set the platform credential instance variable for the actions that require it
@@ -28,4 +51,3 @@ class Api::PlatformCredentialsController < ApplicationController
     @platform_credential = PlatformCredential.find(params[:id])
   end
 end
-
