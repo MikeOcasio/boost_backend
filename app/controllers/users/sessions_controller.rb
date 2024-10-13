@@ -3,6 +3,16 @@ module Users
   class SessionsController < Devise::SessionsController
     respond_to :json
 
+    def create
+      # Check if the email is banned
+      if BannedEmail.exists?(email: params[:user][:email])
+        render json: { error: 'This email is banned and cannot be used to sign in.' }, status: :forbidden
+        return
+      end
+
+      super # Call the original Devise create action
+    end
+
     private
 
     def respond_with(resource, _opts = {})

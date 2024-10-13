@@ -47,25 +47,51 @@ module Users
       end
     end
 
-    # DELETE /users/member-data
+    # DELETE /users/members/:id
     def destroy
-      user_to_destroy = get_user_from_token # Fetch the user from the token
-      current_user = @user # Assuming @user is set in the before_action
+      current_user = get_user_from_token # Fetch the current user
 
-      if current_user.id == user_to_destroy.id || current_user.role.in?(["dev", "admin"])
-        user_to_destroy.destroy # Destroy the user
-        head :no_content # Return a success response
+      if current_user.id == @user.id && current_user.role == "customer"
+        # Customer can delete their own account (standard deletion)
+        @user.destroy
+        render json: { message: 'Your account has been deleted successfully.' }, status: :ok
+      elsif current_user.role == 'admin' || (current_user.role == 'dev' && current_user.id != @user.id)
+        # Admin or Dev can delete other users (but not themselves)
+        @user.destroy
+        render json: { message: 'User account has been deleted successfully.' }, status: :ok
       else
         render json: { error: 'You are not authorized to delete this user.' }, status: :forbidden
       end
     end
 
-    # GET /users/member-data/platforms
-    def platforms
-      current_user = get_user_from_token # Fetch the current user from the token
-      render json: current_user.platforms, status: :ok
-    end
 
+    # DELETE /users/members/:id/ban
+    def destroy_and_ban
+      byebug
+      current_user = get_user_from_token # Fetch the current user
+
+      # Load the user based on the ID from the parameters
+      @user = User.find_by(id: params[:id])
+
+      # Check if the user exists
+      if @user.nil?
+        render json: { error: 'User not found.' }, status: :not_found
+        return
+      end
+
+      if current_user.role == 'admin' || current_user.role == 'dev' && current_user.id != @user.id
+        # Admin or Dev can delete and ban other users (but not themselves)
+        BannedEmail.create!(email: @user.email) # Add the email to the banned list
+        @user.destroy
+        render json: { message: 'User account has been deleted and banned successfully.' }, status: :ok
+      else
+        render json: { error: 'You are not authorized to ban this user.' }, status: :forbidden
+      end
+end
+
+
+
+    private
 
     # POST /users/member-data/:id/platforms
     def add_platform

@@ -25,6 +25,11 @@ Rails.application.routes.draw do
       member do
         get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
       end
+
+      # Add route for deleting and banning a user
+      member do
+        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
+      end
     end
   end
 

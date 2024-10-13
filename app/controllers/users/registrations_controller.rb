@@ -2,17 +2,23 @@ class Users::RegistrationsController < Devise::RegistrationsController
   respond_to :json
 
   def create
-    build_resource(sign_up_params)
-
-    puts "Params: #{params.inspect}"  # Debugging line
-
-    resource.save
-    yield resource if block_given?
-
-    if resource.persisted?
-      register_success
+    # Check if the email is banned
+    if BannedEmail.exists?(email: sign_up_params[:email])
+      render json: { message: 'This email is banned and cannot be used to register.' }, status: :forbidden
     else
-      register_failed
+      # Proceed with building the user resource
+      build_resource(sign_up_params)
+
+      # Debugging line to check params
+      puts "Params: #{params.inspect}"
+
+      # Save the resource
+      if resource.save
+        yield resource if block_given?
+        register_success
+      else
+        register_failed
+      end
     end
   end
 
