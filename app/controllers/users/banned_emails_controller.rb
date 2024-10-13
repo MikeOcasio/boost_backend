@@ -1,17 +1,19 @@
 # app/controllers/banned_emails_controller.rb
-class BannedEmailsController < ApplicationController
-  before_action :authenticate_user!, :authorize_admin
+Module Users
+  class BannedEmailsController < ApplicationController
+    before_action :authenticate_user!, :authorize_admin
 
-  def index
-    @banned_emails = BannedEmail.all
-    render json: @banned_emails, status: :ok
-  end
+    def index
+      @banned_emails = BannedEmail.all
+      render json: @banned_emails, status: :ok
+    end
 
-  private
+    private
 
-  def authorize_admin
-    unless current_user.role == 'admin' || current_user.role == 'dev'
-      render json: { error: 'You are not authorized to perform this action.' }, status: :forbidden
+    def authorize_admin
+      unless current_user.role == 'admin' || current_user.role == 'dev'
+        render json: { error: 'You are not authorized to perform this action.' }, status: :forbidden
+      end
     end
   end
 end
