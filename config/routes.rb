@@ -15,22 +15,19 @@ Rails.application.routes.draw do
         delete :remove_platform
       end
 
-      # Define the route for retrieving the signed-in user
       collection do
         get :signed_in_user
         get :skillmasters
       end
 
-      # Add this line for getting a skillmaster by ID
       member do
         get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
-      end
-
-      # Add route for deleting and banning a user
-      member do
         delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
       end
     end
+
+    # Define the route for BannedEmailsController
+    resources :banned_emails, only: [:index]
   end
 
   namespace :orders do
