@@ -1,5 +1,5 @@
-# app/controllers/banned_emails_controller.rb
-Module Users
+# app/controllers/users/banned_emails_controller.rb
+module Users
   class BannedEmailsController < ApplicationController
     before_action :authenticate_user!, :authorize_admin
 
