@@ -87,6 +87,7 @@ module Users
       else
         render json: { error: 'You are not authorized to ban this user.' }, status: :forbidden
       end
+    end
 
 
     # POST /users/member-data/:id/platforms
