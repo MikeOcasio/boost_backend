@@ -21,15 +21,20 @@ class Order < ApplicationRecord
   scope :graveyard_orders, -> { where(assigned_skill_master_id: nil) }
 
   belongs_to :user
+  belongs_to :platform_credential
   has_many :order_products, dependent: :destroy
   has_many :products, through: :order_products
-  has_one :promotion, through: :product
-  has_one :platform_credential
+  has_one :promotion, through: :products
 
   before_create :generate_internal_id
   after_touch :update_totals
+  before_save :assign_platform_credentials
 
-  aasm column: 'status' do
+  validates :state, presence: true
+  validates :internal_id, uniqueness: true
+  validates :user, presence: true
+
+  aasm column: 'state' do
     state :open, initial: true
     state :pending
     state :graveyard
@@ -42,7 +47,8 @@ class Order < ApplicationRecord
 
     # Define state transitions
     event :assign do
-      transitions from: :open, to: :assigned
+      # Transition from `open` to `assigned` only if `assigned_skill_master_id` is set
+      transitions from: :open, to: :assigned, guard: :skill_master_assigned?
     end
 
     event :start_progress do
@@ -50,7 +56,7 @@ class Order < ApplicationRecord
     end
 
     event :mark_delayed do
-      transitions from: :in_progress, to: :delayed
+      transitions from: :in_progress, to: :delayedn
     end
 
     event :mark_disputed do
@@ -71,11 +77,11 @@ class Order < ApplicationRecord
   end
 
   def calculate_price
-    self.price = products.sum(:price)
+    self.price = order_products.includes(:product).sum { |order_product| order_product.product.price }
   end
 
   def calculate_tax
-    self.tax = products.sum(:tax)
+    self.tax = order_products.includes(:product).sum { |order_product| order_product.product.tax }
   end
 
   def calculate_total_price
@@ -87,6 +93,16 @@ class Order < ApplicationRecord
     calculate_tax
     calculate_total_price
     save
+  end
+
+  def assign_platform_credentials
+    if platform_credential.nil? && user.present? && platform.present?
+      self.platform_credential = user.platform_credentials.find_by(platform_id: platform)
+    end
+  end
+
+  def skill_master_assigned?
+    assigned_skill_master_id.present?
   end
 
 end

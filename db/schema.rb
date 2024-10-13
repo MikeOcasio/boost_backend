@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_08_221017) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_13_034514) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -103,7 +103,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_08_221017) do
 
   create_table "orders", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "status"
+    t.string "state"
     t.decimal "total_price"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -112,7 +112,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_08_221017) do
     t.string "internal_id"
     t.decimal "price"
     t.decimal "tax"
-    t.string "platform"
+    t.integer "platform"
+    t.integer "platform_credential_id"
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
@@ -120,12 +121,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_08_221017) do
 
   create_table "platform_credentials", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "encrypted_username"
-    t.string "encrypted_password"
-    t.string "encrypted_username_iv"
-    t.string "encrypted_password_iv"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "username", limit: 1024
+    t.string "password", limit: 1024
+    t.bigint "platform_id"
+    t.index ["platform_id"], name: "index_platform_credentials_on_platform_id"
     t.index ["user_id"], name: "index_platform_credentials_on_user_id"
   end
 
@@ -258,9 +259,11 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_08_221017) do
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
+  add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
+  add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"

@@ -28,6 +28,20 @@ Rails.application.routes.draw do
     end
   end
 
+  namespace :orders do
+    resources :orders, path: 'info', only: [:index, :show, :create, :update, :destroy] do
+      member do
+        post 'pick_up_order'  # POST /orders/:id/pick_up_order
+        get 'download_invoice'  # GET /orders/:id/download_invoice
+      end
+
+      collection do
+        get 'graveyard_orders'  # GET /orders/graveyard_orders
+      end
+    end
+  end
+
+
 
 
 
@@ -75,15 +89,7 @@ Rails.application.routes.draw do
     # Resources for files management
     resources :files, only: [:index, :create, :destroy]
 
-    # Resources for orders management
-    resources :orders do
-      collection do
-        get :graveyard_orders
-      end
-      member do
-        patch :pick_up_order
-      end
-    end
+    resources :skillmasters, only: [:index, :show]
   end
 
   # CSRF token route for frontend usage
