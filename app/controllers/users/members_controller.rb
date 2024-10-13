@@ -87,17 +87,13 @@ module Users
       else
         render json: { error: 'You are not authorized to ban this user.' }, status: :forbidden
       end
-end
 
-
-
-    private
 
     # POST /users/member-data/:id/platforms
     def add_platform
       current_user = get_user_from_token # Fetch the current user from the token
 
-      if current_user.id == @user.id || current_user.role.in?(["dev", "admin"])
+      if current_user.id == @user.id || current_user.role == 'dev' || current_user.role == 'admin'
         platform = Platform.find(params[:platform_id])
         @user.platforms << platform unless @user.platforms.include?(platform)
         render json: @user, status: :created
