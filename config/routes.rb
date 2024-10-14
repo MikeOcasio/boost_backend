@@ -99,6 +99,8 @@ Rails.application.routes.draw do
     resources :files, only: [:index, :create, :destroy]
 
     resources :skillmasters, only: [:index, :show]
+
+    resources :platform_credentials, only: [:show, :create, :update, :destroy]
   end
 
   # CSRF token route for frontend usage
