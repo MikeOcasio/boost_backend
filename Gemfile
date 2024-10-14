@@ -36,6 +36,12 @@ gem 'devise-jwt'
 gem 'listen', '~> 3.2'
 gem 'prawn'
 
+# Gem for Mailgun email service
+gem 'mailgun-ruby', '~> 1.2'
+
+# Gem for Stripe payments
+gem 'stripe', '~> 13.0.0'
+
 # Use Active Storage variant
 # gem 'image_processing', '~> 1.2'
 
