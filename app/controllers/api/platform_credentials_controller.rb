@@ -27,19 +27,34 @@ class Api::PlatformCredentialsController < ApplicationController
       return render json: { success: false, message: "Platform not found." }, status: :not_found
     end
 
-    # Build the platform credential with the associated platform
-    platform_credential = current_user.platform_credentials.build(
-      platform: platform,
-      username: params[:username],
-      password: params[:password]
-    )
+    # Check if the platform credential already exists for the current user and platform
+    existing_credential = current_user.platform_credentials.find_by(platform_id: platform.id)
 
-    if platform_credential.save
-      render json: { success: true, message: "Platform credentials added successfully.", platform_credential: platform_credential }, status: :created
+    if existing_credential
+      # If it exists, you can choose to either update it or return an error message
+      existing_credential.update(username: params[:username], password: params[:password])
+
+      if existing_credential.errors.any?
+        render json: { success: false, errors: existing_credential.errors.full_messages }, status: :unprocessable_entity
+      else
+        render json: { success: true, message: "Platform credentials updated successfully.", platform_credential: existing_credential }, status: :ok
+      end
     else
-      render json: { success: false, errors: platform_credential.errors.full_messages }, status: :unprocessable_entity
+      # Build and save a new platform credential if it doesn't exist
+      platform_credential = current_user.platform_credentials.build(
+        platform: platform,
+        username: params[:username],
+        password: params[:password]
+      )
+
+      if platform_credential.save
+        render json: { success: true, message: "Platform credentials added successfully.", platform_credential: platform_credential }, status: :created
+      else
+        render json: { success: false, errors: platform_credential.errors.full_messages }, status: :unprocessable_entity
+      end
     end
   end
+
 
   # PATCH/PUT /api/platform_credentials/:id
   # Update an existing platform credential.
