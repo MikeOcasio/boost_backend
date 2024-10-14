@@ -25,6 +25,8 @@ class User < ApplicationRecord
          :recoverable,
          :rememberable,
          :validatable,
+         :trackable,
+         :lockable,
          :jwt_authenticatable,
          jwt_revocation_strategy: JwtDenylist
 
@@ -50,6 +52,8 @@ class User < ApplicationRecord
   validates :role, presence: true, inclusion: { in: ROLE_LIST }
   validate :password_complexity
 
+  scope :active, -> { where(deleted_at: nil) }
+
   # Methods
   # ---------------
 
@@ -70,6 +74,13 @@ class User < ApplicationRecord
     unless password =~ /[!@#$&*]/
       errors.add :password, 'Must contain at least one special character.'
     end
+  end
+
+  def valid_password?(password)
+    # Return false if the user is marked as deleted
+    return false if deleted?
+
+    super(password)
   end
 
 
@@ -95,5 +106,24 @@ class User < ApplicationRecord
     else
       5.minutes
     end
+  end
+
+
+  def lock_access!(opts = { send_instructions: true })
+    if locked_by_admin
+      update!(locked_at: Time.current)
+    else
+      super(opts)
+    end
+  end
+
+  def send_unlock_instructions
+    unless locked_by_admin
+      super
+    end
+  end
+
+  def deleted?
+    deleted_at.present?
   end
 end

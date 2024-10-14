@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_13_143643) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -46,7 +46,9 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_13_143643) do
     t.string "email", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
     t.index ["email"], name: "index_banned_emails_on_email", unique: true
+    t.index ["user_id"], name: "index_banned_emails_on_user_id"
   end
 
   create_table "bug_reports", force: :cascade do |t|
@@ -216,6 +218,18 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_13_143643) do
     t.index ["updated_at"], name: "index_sessions_on_updated_at"
   end
 
+  create_table "skillmaster_applications", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "submitted_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "reviewed_at"
+    t.bigint "reviewer_id"
+    t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
+    t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
+  end
+
   create_table "user_platforms", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "platform_id", null: false
@@ -255,11 +269,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_13_143643) do
     t.boolean "otp_required_for_login"
     t.string "platforms", default: [], array: true
     t.string "image_url"
+    t.boolean "locked_by_admin", default: false
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "banned_emails", "users"
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
@@ -280,6 +298,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_13_143643) do
   add_foreign_key "product_promotions", "promotions"
   add_foreign_key "products", "categories"
   add_foreign_key "products", "product_attribute_categories"
+  add_foreign_key "skillmaster_applications", "users"
+  add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
 end

@@ -4,31 +4,38 @@ Rails.application.routes.draw do
   #### User Authentication Routes ####
   devise_for :users, controllers: {
     sessions: 'users/sessions',
-    registrations: 'users/registrations'
+    registrations: 'users/registrations',
+    unlocks: 'users/unlocks'
   }
 
-  namespace :users do
-    resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
-      member do
-        get :platforms
-        post :add_platform
-        delete :remove_platform
+  Rails.application.routes.draw do
+    namespace :users do
+      resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
+        member do
+          get :platforms
+          post :add_platform
+          delete :remove_platform
+          post :lock, to: 'members#lock_user'
+          post :unlock, to: 'members#unlock_user'
+        end
+
+        collection do
+          get :signed_in_user
+          get :skillmasters
+        end
+
+        member do
+          get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
+          delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
+        end
       end
 
-      collection do
-        get :signed_in_user
-        get :skillmasters
-      end
-
-      member do
-        get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
-        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
-      end
+      # Adding the skillmaster applications routes
+      resources :skillmaster_applications, only: [:show]
     end
-
-    # Define the route for BannedEmailsController
-    resources :banned_emails, only: [:index]
   end
+
+
 
   namespace :orders do
     resources :orders, path: 'info', only: [:index, :show, :create, :update, :destroy] do
