@@ -14,6 +14,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
       # Optionally, you might want to check if the current user is authorized to view this application
       # For example:
       # render json: { error: 'Not authorized' }, status: :forbidden unless @application.user_id == current_user.id
+    end
 
-      
+
 end
