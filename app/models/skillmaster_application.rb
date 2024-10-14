@@ -1,0 +1,2 @@
+class SkillmasterApplication < ApplicationRecord
+end

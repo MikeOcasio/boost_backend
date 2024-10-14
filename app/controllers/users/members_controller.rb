@@ -1,7 +1,7 @@
 module Users
   class MembersController < ApplicationController
     before_action :authenticate_user!
-    before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform]
+    before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :lock_user, :unlock_user]
 
     # GET /users/member-data/signed_in_user
     def signed_in_user
@@ -48,21 +48,34 @@ module Users
     end
 
     # DELETE /users/members/:id
+    # DELETE /users/member-data/:id
     def destroy
       current_user = get_user_from_token # Fetch the current user
 
-      if current_user.id == @user.id && current_user.role == "customer"
-        # Customer can delete their own account (standard deletion)
-        @user.destroy
-        render json: { message: 'Your account has been deleted successfully.' }, status: :ok
-      elsif current_user.role == 'admin' || (current_user.role == 'dev' && current_user.id != @user.id)
-        # Admin or Dev can delete other users (but not themselves)
-        @user.destroy
-        render json: { message: 'User account has been deleted successfully.' }, status: :ok
+      if current_user.id == @user.id
+        render json: { error: 'You cannot delete yourself.' }, status: :forbidden
+      elsif current_user.role == 'customer'
+        # Customer can delete their own account (mark as deleted)
+        @user.update(deleted_at: Time.current)
+        render json: { message: 'Your account has been marked as deleted successfully.' }, status: :ok
+      elsif current_user.role == 'admin'
+        # Admin can delete any user that is not themselves and not other admins
+        if @user.role == 'admin'
+          render json: { error: 'You are not authorized to delete this user.' }, status: :forbidden
+        else
+          @user.update(deleted_at: Time.current)
+          render json: { message: 'User account has been marked as deleted successfully.' }, status: :ok
+        end
+      elsif current_user.role == 'dev'
+        # Dev can delete any user except themselves
+        @user.update(deleted_at: Time.current)
+        render json: { message: 'User account has been marked as deleted successfully.' }, status: :ok
       else
         render json: { error: 'You are not authorized to delete this user.' }, status: :forbidden
       end
     end
+
+
 
     #! TODO: destroy_and_ban anyone but other admins
 
@@ -70,24 +83,37 @@ module Users
     def destroy_and_ban
       current_user = get_user_from_token # Fetch the current user
 
-      # Load the user based on the ID from the parameters
       @user = User.find_by(id: params[:id])
-
-      # Check if the user exists
       if @user.nil?
         render json: { error: 'User not found.' }, status: :not_found
         return
       end
 
-      if current_user.role == 'admin' || current_user.role == 'dev' && current_user.id != @user.id
-        # Admin or Dev can delete and ban other users (but not themselves)
-        BannedEmail.create!(email: @user.email) # Add the email to the banned list
-        @user.destroy
-        render json: { message: 'User account has been deleted and banned successfully.' }, status: :ok
+      if current_user.role == 'dev'
+        if current_user.id == @user.id
+          render json: { error: 'You cannot delete yourself.' }, status: :forbidden
+        else
+          BannedEmail.create!(email: @user.email, user_id: @user.id) # Store user_id
+          @user.update(deleted_at: Time.current)
+          render json: { message: 'User account has been banned successfully.' }, status: :ok
+        end
+      elsif current_user.role == 'admin'
+        if current_user.id == @user.id
+          render json: { error: 'You cannot delete yourself.' }, status: :forbidden
+        elsif @user.role == 'admin'
+          render json: { error: 'You are not authorized to ban this user.' }, status: :forbidden
+        else
+          BannedEmail.create!(email: @user.email, user_id: @user.id) # Store user_id
+          @user.update(deleted_at: Time.current)
+          render json: { message: 'User account has been banned successfully.' }, status: :ok
+        end
       else
         render json: { error: 'You are not authorized to ban this user.' }, status: :forbidden
       end
     end
+
+
+
 
 
     # POST /users/member-data/:id/platforms
@@ -115,6 +141,42 @@ module Users
         render json: { error: 'You are not authorized to remove platforms for this user.' }, status: :forbidden
       end
     end
+
+
+    # POST /users/members/:id/lock
+    def lock_user
+      current_user = get_user_from_token
+
+      if current_user.role == 'admin' || current_user.role == 'dev'
+        if @user.access_locked?
+          render json: { error: 'User account is already locked.' }, status: :unprocessable_entity
+        else
+          @user.update(locked_by_admin: true)
+          @user.lock_access!(send_instructions: false) # Do not send unlock instructions
+          render json: { message: 'User account has been locked by admin.' }, status: :ok
+        end
+      else
+        render json: { error: 'You are not authorized to lock this user.' }, status: :forbidden
+      end
+    end
+
+    # POST /users/members/:id/unlock
+    def unlock_user
+      current_user = get_user_from_token
+
+      if current_user.role == 'admin' || current_user.role == 'dev'
+        if @user.access_locked?
+          @user.update(locked_by_admin: false)
+          @user.unlock_access!
+          render json: { message: 'User account has been unlocked.' }, status: :ok
+        else
+          render json: { error: 'User account is not locked.' }, status: :unprocessable_entity
+        end
+      else
+        render json: { error: 'You are not authorized to unlock this user.' }, status: :forbidden
+      end
+    end
+
 
 
     private

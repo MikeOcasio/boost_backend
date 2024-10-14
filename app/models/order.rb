@@ -52,11 +52,11 @@ class Order < ApplicationRecord
     end
 
     event :start_progress do
-      transitions from: :assigned, to: :in_progress
+      transitions from: :assigned, to: :in_progress #! Need to add reassign logic
     end
 
     event :mark_delayed do
-      transitions from: :in_progress, to: :delayedn
+      transitions from: :in_progress, to: :delayed
     end
 
     event :mark_disputed do
