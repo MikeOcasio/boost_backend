@@ -20,8 +20,9 @@ class Api::PlatformCredentialsController < ApplicationController
   # POST /api/platform_credentials
   # Create a new platform credential for the current user.
   def create
+    byebug
     # Find the platform by id
-    platform = Platform.find_by(name: params[:platform_id])
+    platform = Platform.find_by(id: params[:platform_id])
 
     unless platform
       return render json: { success: false, message: "Platform not found." }, status: :not_found
