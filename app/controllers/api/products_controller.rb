@@ -12,7 +12,7 @@ module Api
         include: {
           platforms: { only: [:id, :name] },
           category: { only: [:id, :name, :description] },
-          prod_attr_cats: { only: [:id, :name] }  
+          prod_attr_cats: { only: [:id, :name] }
         }
       )
     end
@@ -82,38 +82,34 @@ module Api
         @product.platforms = Platform.where(id: params[:platform_ids])
       end
 
-      # Initialize variables for the updated images
-      uploaded_image = nil
-      uploaded_bg_image = nil
-
       # Handle image update and deletion logic
-      if ActiveModel::Type::Boolean.new.cast(params[:remove_image]) || params[:image].nil?
+      if ActiveModel::Type::Boolean.new.cast(params[:remove_image])
         delete_from_s3(old_image_url) if old_image_url.present?
         @product.image = nil
-      elsif params[:image] && params[:image] != old_image_url
+      elsif params[:image].present? && params[:image] != old_image_url
         uploaded_image = upload_to_s3(params[:image])
-        delete_from_s3(old_image_url) if old_image_url.present? && uploaded_image.present?
-        @product.image = uploaded_image if uploaded_image.present?
+        delete_from_s3(old_image_url) if old_image_url.present?
+        @product.image = uploaded_image
       end
 
       # Handle background image update and deletion logic
-      if ActiveModel::Type::Boolean.new.cast(params[:remove_bg_image]) || params[:bg_image].nil?
+      if ActiveModel::Type::Boolean.new.cast(params[:remove_bg_image])
         delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
         @product.bg_image = nil
-      elsif params[:bg_image] && params[:bg_image] != old_bg_image_url
+      elsif params[:bg_image].present? && params[:bg_image] != old_bg_image_url
         uploaded_bg_image = upload_to_s3(params[:bg_image])
-        delete_from_s3(old_bg_image_url) if old_bg_image_url.present? && uploaded_bg_image.present?
-        @product.bg_image = uploaded_bg_image if uploaded_bg_image.present?
+        delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+        @product.bg_image = uploaded_bg_image
       end
 
-      # Update the product
+      # Update the product without affecting images if not specified
       if @product.update(product_params.except(:platform_ids))
         render json: @product.as_json(
           include: {
             platforms: { only: [:id, :name] },
             category: { only: [:id, :name, :description] },
             prod_attr_cats: { only: [:id, :name] }  # Include both IDs and names of prod_attr_cats
-          },
+          }
         ), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
