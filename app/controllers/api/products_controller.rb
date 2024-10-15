@@ -49,27 +49,45 @@ module Api
 
     # POST /products
     def create
-      uploaded_image = params[:image] ? upload_to_s3(params[:image]) : nil
-      uploaded_bg_image = params[:bg_image] ? upload_to_s3(params[:bg_image]) : nil
+      byebug
+      # Handle image upload if provided
+      uploaded_image = params[:image] && params[:remove_image] == 'false' ? upload_to_s3(params[:image]) : nil
+      uploaded_bg_image = params[:bg_image] && params[:remove_bg_image] == 'false' ? upload_to_s3(params[:bg_image]) : nil
 
-      @product = Product.new(product_params.except(:platform_ids)) # Exclude platform_ids for now
+      # Create a new product with the provided attributes, excluding platform_ids for now
+      @product = Product.new(product_params.except(:platform_ids))
+
+      # Assign the uploaded images if they exist
       @product.image = uploaded_image if uploaded_image
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
+      # Assign platforms if provided
       if params[:platform_ids].present?
-        @product.platforms = Platform.where(id: params[:platform_ids]) # Associate platforms before saving
+        @product.platforms = Platform.where(id: params[:platform_ids])
       end
 
+      # Assign prod_attr_cats if provided
+      if params[:prod_attr_cat_ids].present?
+        prod_attr_cats = params[:prod_attr_cat_ids].map do |id|
+          ProdAttrCat.find_by(id: id)
+        end.compact
+        @product.prod_attr_cats = prod_attr_cats
+      end
+
+      # Attempt to save the product
       if @product.save
         render json: @product.as_json(
-          platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description] },
-          prod_attr_cats: { only: [:id, :name] }
+          include: {
+            platforms: { only: [:id, :name] },
+            category: { only: [:id, :name, :description] },
+            prod_attr_cats: { only: [:id, :name] }
+          }
         ), status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
+
 
 
     def update
@@ -180,18 +198,21 @@ module Api
         :name,
         :description,
         :price,
-        :category_id, # Include this to allow category assignment
+        :image,
+        :bg_image,
         :is_priority,
+        :remove_image,
+        :remove_bg_image
+        :tax,
         :is_active,
         :most_popular,
-        :tax,
         :tag_line,
         :primary_color,
         :secondary_color,
-        :remove_image,
-        features: [],
-        platform_ids: [],
-        prod_attr_cat_ids: []
+        features: [], # if features is an array
+        :category_id,
+        platform_ids: [], # Assuming platform_ids is an array
+        prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
       )
     end
 
