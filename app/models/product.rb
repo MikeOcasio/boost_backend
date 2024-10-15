@@ -21,7 +21,7 @@
 
 class Product < ApplicationRecord
   belongs_to :category
-  belongs_to :product_attribute_category
+  has_and_belongs_to_many :prod_attr_cats
 
   has_many :order_products
   has_many :orders, through: :order_products
