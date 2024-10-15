@@ -95,8 +95,8 @@ module Api
       old_bg_image_url = @product.bg_image
 
       # Assign platforms if provided
-      if params[:platform_ids].present?
-        @product.platform_ids = params[:platform_ids]
+      if params[:product][:platform_ids].present?
+        @product.platform_ids = params[:product][:platform_ids]
       end
 
       # Handle image update and deletion logic
