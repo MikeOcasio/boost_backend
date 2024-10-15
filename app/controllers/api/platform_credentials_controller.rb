@@ -31,7 +31,7 @@ class Api::PlatformCredentialsController < ApplicationController
     existing_credential = current_user.platform_credentials.find_by(platform_id: platform.id)
 
     if existing_credential
-      # If it exists, you can choose to either update it or return an error message
+      # If it exists, update it with the new username and password
       existing_credential.update(username: params[:username], password: params[:password])
 
       if existing_credential.errors.any?
@@ -47,6 +47,11 @@ class Api::PlatformCredentialsController < ApplicationController
         password: params[:password]
       )
 
+      # Check if the user has the platform in their platforms
+      unless current_user.platforms.exists?(platform.id)
+        current_user.platforms << platform  # Add platform to user's platforms
+      end
+
       if platform_credential.save
         render json: { success: true, message: "Platform credentials added successfully.", platform_credential: platform_credential }, status: :created
       else
@@ -54,6 +59,7 @@ class Api::PlatformCredentialsController < ApplicationController
       end
     end
   end
+
 
 
   # PATCH/PUT /api/platform_credentials/:id
