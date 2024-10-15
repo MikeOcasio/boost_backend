@@ -201,7 +201,7 @@ module Api
         :bg_image,
         :is_priority,
         :remove_image,
-        :remove_bg_image
+        :remove_bg_image,
         :tax,
         :is_active,
         :most_popular,
