@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -154,10 +154,32 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
     t.index ["user_id"], name: "index_preferred_skill_masters_on_user_id"
   end
 
+  create_table "prod_attr_cats", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "prod_attr_cats_products", id: false, force: :cascade do |t|
+    t.bigint "prod_attr_cat_id", null: false
+    t.bigint "product_id", null: false
+    t.index ["prod_attr_cat_id"], name: "index_prod_attr_cats_on_pac_id"
+    t.index ["product_id"], name: "index_prod_attr_cats_on_product_id"
+  end
+
   create_table "product_attribute_categories", force: :cascade do |t|
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "product_categories", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_product_categories_on_category_id"
+    t.index ["product_id"], name: "index_product_categories_on_product_id"
   end
 
   create_table "product_platforms", force: :cascade do |t|
@@ -183,10 +205,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
     t.text "description"
     t.decimal "price"
     t.string "image"
-    t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "product_attribute_category_id"
     t.boolean "is_priority", default: false
     t.decimal "tax"
     t.boolean "is_active"
@@ -196,8 +216,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
-    t.index ["category_id"], name: "index_products_on_category_id"
-    t.index ["product_attribute_category_id"], name: "index_products_on_product_attribute_category_id"
+    t.bigint "category_id"
   end
 
   create_table "promotions", force: :cascade do |t|
@@ -292,12 +311,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_14_053524) do
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
+  add_foreign_key "product_categories", "categories"
+  add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
   add_foreign_key "product_promotions", "products"
   add_foreign_key "product_promotions", "promotions"
-  add_foreign_key "products", "categories"
-  add_foreign_key "products", "product_attribute_categories"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "user_platforms", "platforms"

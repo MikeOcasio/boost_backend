@@ -1,7 +1,7 @@
 module Api
   class ProductsController < ApplicationController
 
-    
+
     before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
 
 
@@ -12,7 +12,8 @@ module Api
         include: {
           platforms: { only: [:id, :name] },
           category: { only: [:id, :name, :description] }
-        }
+        },
+        methods: [:prod_attr_cat_ids]
       )
     end
 
@@ -24,7 +25,8 @@ module Api
         include: {
           platforms: { only: [:id, :name] },
           category: { only: [:id, :name, :description] }
-        }
+        },
+        methods: [:prod_attr_cat_ids]
       )
     end
 
@@ -59,7 +61,10 @@ module Api
       end
 
       if @product.save
-        render json: @product.as_json(include: { platforms: { only: :id } }), status: :created
+        render json: @product.as_json(
+          include: { platforms: { only: :id } },
+          methods: [:prod_attr_cat_ids]
+        ), status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
       end
@@ -102,7 +107,10 @@ module Api
 
       # Update the product
       if @product.update(product_params.except(:platform_ids))
-        render json: @product.as_json(include: { platforms: { only: :id } }), status: :ok
+        render json: @product.as_json(
+          include: { platforms: { only: :id } },
+          methods: [:prod_attr_cat_ids]
+        ), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
       end
@@ -173,7 +181,6 @@ module Api
         :description,
         :price,
         :category_id, # Include this to allow category assignment
-        :product_attribute_category_id,
         :is_priority,
         :is_active,
         :most_popular,
@@ -183,7 +190,8 @@ module Api
         :secondary_color,
         :remove_image,
         features: [],
-        platform_ids: []
+        platform_ids: [],
+        prod_attr_cat_ids: []
       )
     end
 

@@ -86,12 +86,11 @@ Rails.application.routes.draw do
     end
 
     # Resources for product attribute categories
-    resources :product_attribute_categories do
+    resources :prod_attr_cats do
       member do
-        get :products  # Route to list products for the specific product attribute category
+        get :products
       end
     end
-
     # Resources for categories with limited actions
     resources :categories, only: [:index, :show, :create, :update, :destroy]
 
