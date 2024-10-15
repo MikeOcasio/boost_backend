@@ -199,21 +199,22 @@ module Api
         :price,
         :image,
         :bg_image,
-        :is_priority,
-        :remove_image,
         :remove_bg_image,
+        :remove_image,
+        :is_priority,
         :tax,
         :is_active,
         :most_popular,
         :tag_line,
         :primary_color,
         :secondary_color,
-        features: [], # if features is an array
         :category_id,
-        platform_ids: [], # Assuming platform_ids is an array
+        features: [],          # Allows an array of features
+        platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
       )
     end
+
 
 
     def upload_to_s3(file)
