@@ -96,7 +96,7 @@ module Api
 
       # Assign platforms if provided
       if params[:platform_ids].present?
-        @product.platforms = Platform.where(id: params[:platform_ids])
+        @product.platform_ids = params[:platform_ids]
       end
 
       # Handle image update and deletion logic
