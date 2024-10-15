@@ -49,7 +49,6 @@ module Api
 
     # POST /products
     def create
-      byebug
       # Handle image upload if provided
       uploaded_image = params[:image] && params[:remove_image] == 'false' ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] && params[:remove_bg_image] == 'false' ? upload_to_s3(params[:bg_image]) : nil
