@@ -6,17 +6,8 @@ module Users
     # GET /users/member-data/signed_in_user
     def signed_in_user
       user = get_user_from_token
-
-      if user
-        render json: {
-          user: user.as_json(only: [:id, :name, :email]), # Adjust the attributes as needed
-          platforms: user.platforms.as_json(only: [:id, :name]) # Include platforms
-        }, status: :ok
-      else
-        render json: { success: false, message: "User not found." }, status: :not_found
-      end
+      render json: user, status: :ok
     end
-
 
     # GET /users/members
     # New action to get all users
