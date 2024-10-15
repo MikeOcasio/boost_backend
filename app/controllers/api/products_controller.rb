@@ -11,9 +11,9 @@ module Api
       render json: @products.as_json(
         include: {
           platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description] }
-        },
-        methods: [:prod_attr_cat_ids]
+          category: { only: [:id, :name, :description] },
+          prod_attr_cats: { only: [:id, :name] }  
+        }
       )
     end
 
@@ -24,9 +24,9 @@ module Api
       render json: @product.as_json(
         include: {
           platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description] }
-        },
-        methods: [:prod_attr_cat_ids]
+          category: { only: [:id, :name, :description] },
+          prod_attr_cats: { only: [:id, :name] }
+        }
       )
     end
 
@@ -62,8 +62,9 @@ module Api
 
       if @product.save
         render json: @product.as_json(
-          include: { platforms: { only: :id } },
-          methods: [:prod_attr_cat_ids]
+          platforms: { only: [:id, :name] },
+          category: { only: [:id, :name, :description] },
+          prod_attr_cats: { only: [:id, :name] }
         ), status: :created
       else
         render json: @product.errors, status: :unprocessable_entity
@@ -108,8 +109,11 @@ module Api
       # Update the product
       if @product.update(product_params.except(:platform_ids))
         render json: @product.as_json(
-          include: { platforms: { only: :id } },
-          methods: [:prod_attr_cat_ids]
+          include: {
+            platforms: { only: [:id, :name] },
+            category: { only: [:id, :name, :description] },
+            prod_attr_cats: { only: [:id, :name] }  # Include both IDs and names of prod_attr_cats
+          },
         ), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
