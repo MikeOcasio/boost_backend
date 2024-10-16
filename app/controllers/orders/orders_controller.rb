@@ -23,7 +23,7 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price]
+            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             order.merge(platform: platform ? { id: platform.id, name: platform.name } : nil) # Add platform info or nil
@@ -63,7 +63,7 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price]
+            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
         }
       elsif current_user&.id == @order.user_id
@@ -75,7 +75,7 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price]
+            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
         }
       else
