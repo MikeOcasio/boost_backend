@@ -258,7 +258,7 @@ module Orders
               only: [:id, :name, :price, :tax, :image, :quantity]
             }
           },
-          only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id, :internal_id, :platform]
+          only: [:id, :state, :created_at, :total_price, :internal_id, :platform]
         ).map do |order|
           platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
           order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
