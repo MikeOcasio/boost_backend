@@ -23,29 +23,25 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id, :internal_id, :platform]
           ).map do |order|
-            # Fetch platform details
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
-
             # Fetch skill master info
             skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
 
-            # Merge platform and skill master info into the order hash
             order.merge(
-              platform: platform ? { id: platform.id, name: platform.name } : nil,
-              skill_master: {
+            platform: { id: platform.id, name: platform.name },
+            skill_master: {
                 id: skill_master_info&.id,
                 gamer_tag: skill_master_info&.gamer_tag
               }
-            )
+            ) # Add platform info or nil
           end
         }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
 
 
     # GET /api/orders/:id
@@ -65,7 +61,7 @@ module Orders
                 only: [:id, :name, :price]
               }
             },
-            only: [:id, :status, :created_at, :total_price]
+            only: [:id, :state, :created_at, :total_price, :internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           platform_credentials: @order.platform_credential,
           skill_master: {
@@ -84,7 +80,7 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           skill_master: {
             id: skill_master_info&.id,
@@ -102,7 +98,7 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           skill_master: {
             id: skill_master_info&.id,
@@ -249,13 +245,27 @@ module Orders
       end
     end
 
-
+    #! TODO: Update to include all data as index and show methods
     # Method to retrieve orders in the graveyard pool (unassigned orders).
     #GET /orders/info/graveyard_orders
     def graveyard_orders
       @graveyard_orders = Order.where(assigned_skill_master_id: nil)
-      render json: @graveyard_orders
+
+      render json: {
+        orders: @graveyard_orders.as_json(
+          include: {
+            products: {
+              only: [:id, :name, :price, :tax, :image, :quantity]
+            }
+          },
+          only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id, :internal_id, :platform]
+        ).map do |order|
+          platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
+          order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
+        end
+      }
     end
+
 
     # POST orders/info/:id/pick_up_order
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
