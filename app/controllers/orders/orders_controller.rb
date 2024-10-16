@@ -19,7 +19,10 @@ module Orders
           orders = Order.where(user_id: current_user.id)
         end
 
-        render json: { orders: orders }
+        render json: {
+          orders: orders.as_json(include: :platform)
+        }
+
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
@@ -32,12 +35,16 @@ module Orders
     def show
       # Ensure current_user is not nil and check the role or if the order belongs to the current_user
       if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
-        render json: { order: @order, platform_credentials: @order.platform_credential }
+        render json: { order: @order.as_json(include: :platform), platform_credentials: @order.platform_credential }
       elsif current_user&.role == 'admin' || current_user&.role == 'dev'
-        render json: @order
+        render json: {
+          orders: orders.as_json(include: :platform)
+        }
       elsif current_user&.id == @order.user_id
         # If the current user is the one who created the order, allow them to view it
-        render json: @order
+        rrender json: {
+          orders: orders.as_json(include: :platform)
+        }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
