@@ -7,21 +7,33 @@ module Orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
       if current_user
+        # Fetch orders based on user role
         if current_user.role == 'admin' || current_user.role == 'dev'
-          orders = Order.includes(:platform).all
-        elsif current_user.role == 'skillmaster'
-          orders = Order.includes(:platform).where(assigned_skill_master_id: current_user.id, state: 'assigned')
+          orders = Order.all
+        elsif current_user.role == 'skill_master'
+          orders = Order.where(assigned_skill_master_id: current_user.id, state: 'assigned')
         else
-          orders = Order.includes(:platform).where(user_id: current_user.id)
+          orders = Order.where(user_id: current_user.id)
         end
 
         render json: {
-          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
+          orders: orders.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price]
+              }
+            },
+            only: [:id, :status, :created_at, :total_price]
+          ).map do |order|
+            platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
+            order.merge(platform: platform ? { id: platform.id, name: platform.name } : nil) # Add platform info or nil
+          end
         }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
+
 
     # GET /api/orders/:id
     # Show details of a specific order.
@@ -30,20 +42,44 @@ module Orders
     def show
       # Ensure current_user is not nil and check the role or if the order belongs to the current_user
       if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
+        # Skill masters can view their assigned order with platform credentials
         render json: {
-          order: @order.as_json(include: { platform: { only: [:name, :id] } }),
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price]
+              }
+            },
+            only: [:id, :status, :created_at, :total_price]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           platform_credentials: @order.platform_credential
         }
-      elsif current_user&.role == 'admin' || current_user&.role == 'dev'
+      elsif current_user&.role.in?(['admin', 'dev'])
+        # Admins and devs can view all order details
         render json: {
-          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price]
+              }
+            },
+            only: [:id, :status, :created_at, :total_price]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
         }
       elsif current_user&.id == @order.user_id
         # If the current user is the one who created the order, allow them to view it
         render json: {
-          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price]
+              }
+            },
+            only: [:id, :status, :created_at, :total_price]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
         }
       else
+        # If unauthorized, return forbidden status
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
