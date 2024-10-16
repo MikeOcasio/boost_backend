@@ -8,20 +8,16 @@ module Orders
     def index
       if current_user
         if current_user.role == 'admin' || current_user.role == 'dev'
-          # Admins and devs can see all orders
-          orders = Order.all
+          orders = Order.includes(:platform).all
         elsif current_user.role == 'skillmaster'
-          # Skill masters can see only the orders assigned to them
-          orders = Order.where(assigned_skill_master_id: current_user.id, state: 'assigned')
+          orders = Order.includes(:platform).where(assigned_skill_master_id: current_user.id, state: 'assigned')
         else
-          # Regular users can see only their own orders
-          orders = Order.where(user_id: current_user.id)
+          orders = Order.includes(:platform).where(user_id: current_user.id)
         end
 
         render json: {
           orders: orders.as_json(include: { platform: { only: [:name, :id] } })
         }
-
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
