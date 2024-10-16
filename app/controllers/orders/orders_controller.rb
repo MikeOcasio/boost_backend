@@ -20,7 +20,7 @@ module Orders
           orders: orders.as_json(
             include: {
               products: {
-                only: [:id, :name, :price]
+                only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
             only: [:id, :status, :created_at, :total_price]
@@ -60,7 +60,7 @@ module Orders
           order: @order.as_json(
             include: {
               products: {
-                only: [:id, :name, :price]
+                only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
             only: [:id, :status, :created_at, :total_price]
@@ -72,7 +72,7 @@ module Orders
           order: @order.as_json(
             include: {
               products: {
-                only: [:id, :name, :price]
+                only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
             only: [:id, :status, :created_at, :total_price]
