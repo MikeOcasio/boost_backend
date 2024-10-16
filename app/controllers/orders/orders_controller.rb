@@ -3,27 +3,46 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order, only: [:show, :update, :destroy, :pick_up_order]
 
-
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
       if current_user
+        # Fetch orders based on user role
         if current_user.role == 'admin' || current_user.role == 'dev'
-          # Admins and devs can see all orders
           orders = Order.all
-        elsif current_user.role == 'skillmaster'
-          # Skill masters can see only the orders assigned to them
+        elsif current_user.role == 'skill_master'
           orders = Order.where(assigned_skill_master_id: current_user.id, state: 'assigned')
         else
-          # Regular users can see only their own orders
           orders = Order.where(user_id: current_user.id)
         end
 
-        render json: { orders: orders }
+        render json: {
+          orders: orders.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price, :tax, :image, :quantity]
+              }
+            },
+            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id, :internal_id, :platform]
+          ).map do |order|
+            platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
+            # Fetch skill master info
+            skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
+
+            order.merge(
+            platform: { id: platform.id, name: platform.name },
+            skill_master: {
+                id: skill_master_info&.id,
+                gamer_tag: skill_master_info&.gamer_tag
+              }
+            ) # Add platform info or nil
+          end
+        }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
+
 
     # GET /api/orders/:id
     # Show details of a specific order.
@@ -32,18 +51,65 @@ module Orders
     def show
       # Ensure current_user is not nil and check the role or if the order belongs to the current_user
       if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
-        render json: { order: @order, platform_credentials: @order.platform_credential }
-      elsif current_user&.role == 'admin' || current_user&.role == 'dev'
-        render json: @order
+        # Skill masters can view their assigned order with platform credentials
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+        render json: {
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price]
+              }
+            },
+            only: [:id, :state, :created_at, :total_price, :internal_id]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
+          platform_credentials: @order.platform_credential,
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
+        }
+      elsif current_user&.role.in?(['admin', 'dev'])
+        # Admins and devs can view all order details
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+        render json: {
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price, :tax, :image, :quantity]
+              }
+            },
+            only: [:id, :state, :created_at, :total_price, :internal_id]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
+        }
       elsif current_user&.id == @order.user_id
         # If the current user is the one who created the order, allow them to view it
-        render json: @order
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+        render json: {
+          order: @order.as_json(
+            include: {
+              products: {
+                only: [:id, :name, :price, :tax, :image, :quantity]
+              }
+            },
+            only: [:id, :state, :created_at, :total_price, :internal_id]
+          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
+        }
       else
+        # If unauthorized, return forbidden status
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
-
 
     # POST orders/info
     # Create a new order.
@@ -84,10 +150,6 @@ module Orders
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
-
-
-
 
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
@@ -165,11 +227,6 @@ module Orders
       end
     end
 
-
-
-
-
-
     # DELETE /api/orders/:id
     # Delete an existing order.
     # Only accessible by admins or devs.
@@ -188,13 +245,27 @@ module Orders
       end
     end
 
-
+    #! TODO: Update to include all data as index and show methods
     # Method to retrieve orders in the graveyard pool (unassigned orders).
     #GET /orders/info/graveyard_orders
     def graveyard_orders
       @graveyard_orders = Order.where(assigned_skill_master_id: nil)
-      render json: @graveyard_orders
+
+      render json: {
+        orders: @graveyard_orders.as_json(
+          include: {
+            products: {
+              only: [:id, :name, :price, :tax, :image, :quantity]
+            }
+          },
+          only: [:id, :state, :created_at, :total_price, :internal_id, :platform]
+        ).map do |order|
+          platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
+          order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
+        end
+      }
     end
+
 
     # POST orders/info/:id/pick_up_order
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
@@ -320,8 +391,6 @@ module Orders
 
       order.update_totals  # Update order totals after adding products
     end
-
-
 
     # Set the order for actions that require it
     def set_order
