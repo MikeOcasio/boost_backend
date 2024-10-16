@@ -3,7 +3,6 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order, only: [:show, :update, :destroy, :pick_up_order]
 
-
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
@@ -20,7 +19,7 @@ module Orders
         end
 
         render json: {
-          orders: orders.as_json(include: :platform)
+          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
         }
 
       else
@@ -35,22 +34,23 @@ module Orders
     def show
       # Ensure current_user is not nil and check the role or if the order belongs to the current_user
       if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
-        render json: { order: @order.as_json(include: :platform), platform_credentials: @order.platform_credential }
+        render json: {
+          order: @order.as_json(include: { platform: { only: [:name, :id] } }),
+          platform_credentials: @order.platform_credential
+        }
       elsif current_user&.role == 'admin' || current_user&.role == 'dev'
         render json: {
-          orders: orders.as_json(include: :platform)
+          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
         }
       elsif current_user&.id == @order.user_id
         # If the current user is the one who created the order, allow them to view it
-        rrender json: {
-          orders: orders.as_json(include: :platform)
+        render json: {
+          orders: orders.as_json(include: { platform: { only: [:name, :id] } })
         }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
-
 
     # POST orders/info
     # Create a new order.
@@ -91,10 +91,6 @@ module Orders
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
-
-
-
 
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
@@ -171,11 +167,6 @@ module Orders
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
-
-
-
-
-
 
     # DELETE /api/orders/:id
     # Delete an existing order.
@@ -327,8 +318,6 @@ module Orders
 
       order.update_totals  # Update order totals after adding products
     end
-
-
 
     # Set the order for actions that require it
     def set_order
