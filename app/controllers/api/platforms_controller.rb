@@ -9,6 +9,13 @@ module Api
       render json: @platforms
     end
 
+
+    # GET /api/platforms/:id
+    def show
+      @platform = Platform.find(params[:id])
+      render json: @platform
+    end
+
     # POST /api/platforms
     def create
       @platform = Platform.new(platform_params)
