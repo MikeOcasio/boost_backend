@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -91,6 +91,16 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
     t.index ["jti"], name: "index_jwt_denylist_on_jti"
   end
 
+  create_table "level_prices", force: :cascade do |t|
+    t.bigint "category_id", null: false
+    t.integer "min_level", null: false
+    t.integer "max_level", null: false
+    t.decimal "price_per_level", precision: 8, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_level_prices_on_category_id"
+  end
+
   create_table "notifications", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.text "content"
@@ -123,6 +133,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
     t.decimal "tax"
     t.integer "platform"
     t.integer "platform_credential_id"
+    t.integer "selected_level"
+    t.decimal "dynamic_price", precision: 8, scale: 2
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
@@ -290,6 +302,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
     t.string "image_url"
     t.boolean "locked_by_admin", default: false
     t.datetime "deleted_at"
+    t.string "gamer_tag"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
   end
@@ -300,6 +313,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_15_171028) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
+  add_foreign_key "level_prices", "categories"
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"

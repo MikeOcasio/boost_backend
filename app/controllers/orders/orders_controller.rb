@@ -23,16 +23,29 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
           ).map do |order|
+            # Fetch platform details
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
-            order.merge(platform: platform ? { id: platform.id, name: platform.name } : nil) # Add platform info or nil
+
+            # Fetch skill master info
+            skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
+
+            # Merge platform and skill master info into the order hash
+            order.merge(
+              platform: platform ? { id: platform.id, name: platform.name } : nil,
+              skill_master: {
+                id: skill_master_info&.id,
+                gamer_tag: skill_master_info&.gamer_tag
+              }
+            )
           end
         }
       else
         render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
+
 
 
     # GET /api/orders/:id
@@ -43,6 +56,8 @@ module Orders
       # Ensure current_user is not nil and check the role or if the order belongs to the current_user
       if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
         # Skill masters can view their assigned order with platform credentials
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
         render json: {
           order: @order.as_json(
             include: {
@@ -52,10 +67,16 @@ module Orders
             },
             only: [:id, :status, :created_at, :total_price]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
-          platform_credentials: @order.platform_credential
+          platform_credentials: @order.platform_credential,
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
         }
       elsif current_user&.role.in?(['admin', 'dev'])
         # Admins and devs can view all order details
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
         render json: {
           order: @order.as_json(
             include: {
@@ -63,11 +84,17 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
         }
       elsif current_user&.id == @order.user_id
         # If the current user is the one who created the order, allow them to view it
+        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
         render json: {
           order: @order.as_json(
             include: {
@@ -75,8 +102,12 @@ module Orders
                 only: [:id, :name, :price, :tax, :image, :quantity]
               }
             },
-            only: [:id, :status, :created_at, :total_price, :assigned_skill_master_id]
+            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
+          skill_master: {
+            id: skill_master_info&.id,
+            gamer_tag: skill_master_info&.gamer_tag
+          }
         }
       else
         # If unauthorized, return forbidden status
