@@ -11,7 +11,7 @@ module Orders
         if current_user.role == 'admin' || current_user.role == 'dev'
           orders = Order.all
         elsif current_user.role == 'skillmaster'
-          orders = Order.where(assigned_skill_master_id: current_user.id, state: 'assigned')
+          orders = Order.where(assigned_skill_master_id: current_user.id, state: ['assigned', 'in_progress', 'delayed', 'disputed', 'complete'])
         else
           orders = Order.where(user_id: current_user.id)
         end
