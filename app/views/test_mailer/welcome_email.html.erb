@@ -1,3 +1,56 @@
 <!-- app/views/test_mailer/welcome_email.html.erb -->
-<h1>Welcome to RavenBoost, <%= @user.name %>!</h1>
-<p>We're glad to have you with us.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to RavenBoost!</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif; /* Fallback font */
+      background-color: #f4f4f4; /* Light gray background */
+      margin: 0;
+      padding: 20px;
+      color: #333; /* Darker text color */
+    }
+
+    .container {
+      max-width: 600px; /* Container width */
+      margin: 0 auto; /* Center the container */
+      background: #ffffff; /* White background */
+      padding: 20px;
+      border-radius: 8px; /* Rounded corners */
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    }
+
+    h1 {
+      color: #2c3e50; /* Darker blue color for the heading */
+      font-size: 24px; /* Font size for the heading */
+      margin-bottom: 10px; /* Space below heading */
+    }
+
+    p {
+      font-size: 16px; /* Font size for paragraphs */
+      line-height: 1.5; /* Line height for readability */
+      margin: 15px 0; /* Margin above and below paragraphs */
+    }
+
+    .footer {
+      margin-top: 20px; /* Space above footer */
+      font-size: 12px; /* Smaller font size for footer */
+      color: #777; /* Lighter text color */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to RavenBoost, <%= @user.name %>!</h1>
+    <p>We're glad to have you with us.</p>
+    <p>Explore our features, and don't hesitate to reach out if you have any questions.</p>
+    <p>Best regards,<br>The RavenBoost Team</p>
+    <div class="footer">
+      <p>© 2024 RavenBoost. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
