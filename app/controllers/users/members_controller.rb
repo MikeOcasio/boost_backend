@@ -40,8 +40,10 @@ module Users
       current_user = get_user_from_token # Fetch the current user from the token
 
       if current_user.update(user_params)
-        # Check for the image_url in user_params (which holds the nested user data)
-        upload_image_to_s3(current_user, user_params[:image_url]) if user_params[:image_url].present?
+        if user_params[:image_url].present?
+          s3_image_url = upload_image_to_s3(current_user, user_params[:image_url])
+          current_user.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
+        end
         render json: current_user, status: :ok
       else
         render json: current_user.errors, status: :unprocessable_entity
