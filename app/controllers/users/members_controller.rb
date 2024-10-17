@@ -76,9 +76,6 @@ module Users
     end
 
 
-
-    #! TODO: destroy_and_ban anyone but other admins
-
     # DELETE /users/members/:id/ban
     def destroy_and_ban
       current_user = get_user_from_token # Fetch the current user

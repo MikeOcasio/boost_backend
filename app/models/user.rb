@@ -41,6 +41,8 @@ class User < ApplicationRecord
   has_many :preferred_skill_masters
   has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user
   has_many :platform_credentials, dependent: :destroy
+  has_many :users_categories
+  has_many :categories, through: :users_categories
 
   before_validation :set_default_role, on: :create
   # ---------------

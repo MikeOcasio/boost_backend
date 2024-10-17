@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_17_033239) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -76,6 +76,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_active", default: true, null: false
+  end
+
+  create_table "categories_skillmaster_apps", id: false, force: :cascade do |t|
+    t.bigint "category_id", null: false
+    t.bigint "skillmaster_application_id", null: false
+    t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
   end
 
   create_table "graveyards", force: :cascade do |t|
@@ -155,6 +161,12 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "platforms_skillmaster_apps", id: false, force: :cascade do |t|
+    t.bigint "platform_id", null: false
+    t.bigint "skillmaster_application_id", null: false
+    t.index ["platform_id", "skillmaster_application_id"], name: "index_plat_sma_on_plat_id_and_sma_id", unique: true
   end
 
   create_table "preferred_skill_masters", force: :cascade do |t|
@@ -257,6 +269,9 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
     t.datetime "submitted_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.datetime "reviewed_at"
     t.bigint "reviewer_id"
+    t.string "gamer_tag"
+    t.text "reasons"
+    t.string "images", default: [], array: true
     t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
@@ -303,8 +318,20 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
     t.boolean "locked_by_admin", default: false
     t.datetime "deleted_at"
     t.string "gamer_tag"
+    t.text "bio"
+    t.string "achievements", default: [], array: true
+    t.string "gameplay_info", default: [], array: true
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
+  end
+
+  create_table "users_categories", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_users_categories_on_category_id"
+    t.index ["user_id"], name: "index_users_categories_on_user_id"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
@@ -335,4 +362,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_16_203134) do
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
+  add_foreign_key "users_categories", "categories"
+  add_foreign_key "users_categories", "users"
 end
