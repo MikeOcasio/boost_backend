@@ -234,6 +234,8 @@ module Users
           obj = S3_BUCKET.object(filename)
           obj.upload_file(temp_file)
           user.image_url = obj.public_url
+
+          return obj.public_url
         end
       else
         raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
