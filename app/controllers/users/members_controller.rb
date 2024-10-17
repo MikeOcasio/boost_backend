@@ -38,15 +38,33 @@ module Users
     def update
       current_user = get_user_from_token # Fetch the current user from the token
 
-      if current_user.update(user_params)
-        # Check if the image_url param is present and has changed
-        if user_params[:image_url].present? && current_user.image_url != user_params[:image_url]
-          # Delete the old image from S3 if it exists
-          delete_image_from_s3(current_user.image_url) if current_user.image_url.present?
+      # Store the old image URL before the user is updated
+      old_image_url = current_user.image_url
 
-          # Upload the new image
-          s3_image_url = upload_image_to_s3(current_user, user_params[:image_url])
-          current_user.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
+      if current_user.update(user_params)
+        # Check if the image_url param is present
+        if user_params[:image_url].present?
+          # If the new image is a Base64 string, treat it as a new upload regardless of old_image_url
+          if user_params[:image_url].start_with?('data:image/')
+            # If the old image is an S3 URL, delete it
+            if old_image_url.present? && old_image_url.start_with?('https://')
+              delete_image_from_s3(old_image_url)
+            end
+
+            # Upload the new Base64 image to S3
+            s3_image_url = upload_image_to_s3(current_user, user_params[:image_url])
+            current_user.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
+
+          # Otherwise, it's a direct URL change (assuming S3 URL), so compare and update
+          elsif old_image_url != user_params[:image_url]
+            # If the old image is an S3 URL, delete it
+            if old_image_url.present? && old_image_url.start_with?('https://')
+              delete_image_from_s3(old_image_url)
+            end
+
+            # Update the new image URL directly if it's already an S3 URL
+            current_user.update(image_url: user_params[:image_url])
+          end
         end
 
         render json: current_user, status: :ok
@@ -54,6 +72,9 @@ module Users
         render json: current_user.errors, status: :unprocessable_entity
       end
     end
+
+
+
 
 
     # DELETE /users/member-data/:id
