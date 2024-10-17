@@ -34,21 +34,27 @@ module Users
       end
     end
 
-
     # PATCH/PUT /users/member-data
     def update
       current_user = get_user_from_token # Fetch the current user from the token
 
       if current_user.update(user_params)
-        if user_params[:image_url].present?
+        # Check if the image_url param is present and has changed
+        if user_params[:image_url].present? && current_user.image_url != user_params[:image_url]
+          # Delete the old image from S3 if it exists
+          delete_image_from_s3(current_user.image_url) if current_user.image_url.present?
+
+          # Upload the new image
           s3_image_url = upload_image_to_s3(current_user, user_params[:image_url])
           current_user.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
         end
+
         render json: current_user, status: :ok
       else
         render json: current_user.errors, status: :unprocessable_entity
       end
     end
+
 
     # DELETE /users/member-data/:id
     def destroy
@@ -244,5 +250,17 @@ module Users
         raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
       end
     end
+
+    def delete_image_from_s3(image_url)
+      return unless image_url.present?
+
+      # Extract the S3 object key from the image URL
+      object_key = URI(image_url).path[1..] # Remove the leading '/' from the path
+
+      # Find the object in the S3 bucket and delete it
+      obj = S3_BUCKET.object(object_key)
+      obj.delete if obj.exists?
+    end
+
   end
 end
