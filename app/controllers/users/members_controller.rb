@@ -37,11 +37,20 @@ module Users
     # PATCH/PUT /users/member-data
     def update
       current_user = get_user_from_token # Fetch the current user from the token
+      user_to_update = current_user
+
+      # Allow only 'admin' or 'dev' roles to update other users
+      if ['admin', 'dev'].include?(current_user.role)
+        user_to_update = User.find(params[:id]) # Admins/Devs can update other users
+      elsif current_user.id != params[:id].to_i
+        # Prevent regular users from updating others
+        return render json: { error: 'You are not authorized to update this user' }, status: :forbidden
+      end
 
       # Store the old image URL before the user is updated
-      old_image_url = current_user.image_url
+      old_image_url = user_to_update.image_url
 
-      if current_user.update(user_params)
+      if user_to_update.update(user_params)
         # Check if the image_url param is present
         if user_params[:image_url].present?
           # If the new image is a Base64 string, treat it as a new upload regardless of old_image_url
@@ -52,8 +61,8 @@ module Users
             end
 
             # Upload the new Base64 image to S3
-            s3_image_url = upload_image_to_s3(current_user, user_params[:image_url])
-            current_user.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
+            s3_image_url = upload_image_to_s3(user_to_update, user_params[:image_url])
+            user_to_update.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
 
           # Otherwise, it's a direct URL change (assuming S3 URL), so compare and update
           elsif old_image_url != user_params[:image_url]
@@ -63,15 +72,16 @@ module Users
             end
 
             # Update the new image URL directly if it's already an S3 URL
-            current_user.update(image_url: user_params[:image_url])
+            user_to_update.update(image_url: user_params[:image_url])
           end
         end
 
-        render json: current_user, status: :ok
+        render json: user_to_update, status: :ok
       else
-        render json: current_user.errors, status: :unprocessable_entity
+        render json: user_to_update.errors, status: :unprocessable_entity
       end
     end
+
 
 
 
