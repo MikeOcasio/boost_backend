@@ -36,8 +36,6 @@ class Order < ApplicationRecord
 
   aasm column: 'state' do
     state :open, initial: true
-    state :pending
-    state :graveyard
     state :assigned
     state :in_progress
     state :delayed
@@ -48,7 +46,7 @@ class Order < ApplicationRecord
     # Define state transitions
     event :assign do
       # Transition from `open` to `assigned` only if `assigned_skill_master_id` is set
-      transitions from: :open, to: :assigned, guard: :skill_master_assigned?
+      transitions from:  [:re_assigned, :open], to: :assigned, guard: :skill_master_assigned?
     end
 
     event :start_progress do
@@ -60,15 +58,15 @@ class Order < ApplicationRecord
     end
 
     event :mark_disputed do
-      transitions from: [:assigned, :in_progress], to: :disputed
+      transitions from: [:assigned, :in_progress, :delayed], to: :disputed
     end
 
     event :re_assign do
-      transitions from: [:assigned, :in_progress], to: :re_assigned
+      transitions from: [:assigned, :in_progress, :disputed, :delayed], to: :re_assigned
     end
 
     event :complete_order do
-      transitions from: [:assigned, :in_progress, :delayed], to: :complete
+      transitions from: [:in_progress, :delayed], to: :complete
     end
   end
 

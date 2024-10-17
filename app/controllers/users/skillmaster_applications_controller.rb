@@ -1,10 +1,45 @@
 class Users::SkillmasterApplicationsController < ApplicationController
-
+  before_action :authenticate_user!
   before_action :set_application, only: [:show]
 
     # GET /users/skillmaster_applications/:id
     def show
       render json: @application
+    end
+
+    def index
+      if current_user.role == "admin" || current_user.role == "dev"
+        @applications = SkillmasterApplication.all
+        render json: @applications
+      else if current_user.id == params[:id]
+        @applications = SkillmasterApplication.where(user_id: current_user.id)
+        render json: @applications
+      else
+        render json: { error: 'Unauthorized access' }, status: :unauthorized
+      end
+    end
+
+
+    #! TODO: Implement the create action
+    def create
+      @application = SkillmasterApplication.new(application_params)
+      @application.user_id = current_user.id
+
+      if @application.save
+        render json: @application, status: :created
+      else
+        render json: @application.errors, status: :unprocessable_entity
+      end
+    end
+
+    def update
+      if current_user.role == "admin" || current_user.role == "dev"
+        #handel the update
+      else if current_user.id == params[:id]
+        #handel the update
+      else
+        render json: { error: 'Unauthorized access' }, status: :unauthorized
+      end
     end
 
     private

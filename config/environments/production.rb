@@ -62,6 +62,16 @@ Rails.application.configure do
   # config.active_job.queue_adapter     = :resque
   # config.active_job.queue_name_prefix = "operation_boost_production"
 
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    port:           587,
+    address:        'smtp.mailgun.org',
+    user_name:      Rails.application.credentials.mailgun[:smtp_login],
+    password:       Rails.application.credentials.mailgun[:smtp_password],
+    domain:         Rails.application.credentials.mailgun[:domain],
+    authentication: :plain,
+  }
+  config.action_mailer.default_url_options = { host: 'ravenboost.com' }
   config.action_mailer.perform_caching = false
 
   # Ignore bad email addresses and do not raise email delivery errors.
