@@ -66,13 +66,15 @@ Rails.application.configure do
   config.action_mailer.smtp_settings = {
     port:           587,
     address:        'smtp.mailgun.org',
-    user_name:      Rails.application.credentials.mailgun[:smtp_login],
-    password:       Rails.application.credentials.mailgun[:smtp_password],
-    domain:         Rails.application.credentials.mailgun[:domain],
+    user_name:      'support@bot.ravenboost.com',
+    password:       Rails.application.credentials.mailgun[:smtp_password], # Ensure this matches
+    domain:         'bot.ravenboost.com',
     authentication: :plain,
   }
-  config.action_mailer.default_url_options = { host: 'ravenboost.com' }
+  config.action_mailer.default_url_options = { host: 'bot.ravenboost.com' } # Use your Mailgun domain
   config.action_mailer.perform_caching = false
+  config.action_mailer.raise_delivery_errors = true # Enable error reporting
+
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
