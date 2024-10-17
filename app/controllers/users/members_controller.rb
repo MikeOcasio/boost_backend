@@ -47,7 +47,6 @@ module Users
       end
     end
 
-    # DELETE /users/members/:id
     # DELETE /users/member-data/:id
     def destroy
       current_user = get_user_from_token # Fetch the current user
