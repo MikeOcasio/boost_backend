@@ -40,7 +40,7 @@ module Users
       current_user = get_user_from_token # Fetch the current user from the token
 
       if current_user.update(user_params)
-        upload_image_to_s3(current_user, params[:image]) if params[:image].present?
+        upload_image_to_s3(current_user, params[:image_url]) if params[:image_url].present?
         render json: current_user, status: :ok
       else
         render json: current_user.errors, status: :unprocessable_entity
