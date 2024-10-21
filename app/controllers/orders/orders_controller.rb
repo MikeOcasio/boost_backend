@@ -6,6 +6,7 @@ module Orders
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
+      byebug
       if current_user
         # Fetch orders based on user role
         if current_user.role == 'admin' || current_user.role == 'dev'
@@ -120,6 +121,9 @@ module Orders
         # Admin/Dev creating an order
         @order = Order.new(order_params)
 
+        # Check if the product has dynamic pricing based on levels
+        handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
+
         # Assign the platform credential
         assign_platform_credentials(@order, params[:platform])
 
@@ -133,6 +137,9 @@ module Orders
       elsif current_user.role == 'customer'
         # Customer creating an order
         @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+
+        # Check if the product has dynamic pricing based on levels
+        handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
 
         # Assign platform credentials and save order
         if assign_platform_credentials(@order, params[:platform])
@@ -355,7 +362,23 @@ module Orders
 
     private
 
-    private
+    # Method to handle dynamic pricing based on levels
+    def handle_dynamic_pricing(order, product_id, selected_level)
+      product = Product.find(product_id)
+
+      if product.prod_attr_cats.exists?(name: 'Levels')
+        # Dynamic pricing logic if 'Levels' attribute category is selected
+        selected_level = selected_level.to_i
+        price = product.calculate_price(selected_level)
+
+        # Update the order with dynamic price and selected level
+        order.selected_level = selected_level
+        order.dynamic_price = price
+      else
+        # Use the product's static price for non-level based products
+        order.price = product.price
+      end
+    end
 
     def assign_platform_credentials(order, platform_id)
       # Use the platform set on the order itself
@@ -398,8 +421,24 @@ module Orders
     end
 
     # Strong parameters for order creation and update
+    private
+
     def order_params
-      params.require(:order).permit(:user_id, :state, :total_price, :platform, :platform_credential_id, :promotion_id, :assigned_skill_master_id, :price, :tax)
+      params.require(:order).permit(
+        :user_id,
+        :state,
+        :total_price,
+        :platform,
+        :platform_credential_id,
+        :promotion_id,
+        :assigned_skill_master_id,
+        :price,
+        :tax,
+        :dynamic_price,
+        :start_level,     # Added to allow start_level
+        :end_level        # Added to allow end_level
+      )
     end
+
   end
 end

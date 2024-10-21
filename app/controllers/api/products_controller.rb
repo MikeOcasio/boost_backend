@@ -20,15 +20,29 @@ module Api
 
     # GET /products/:id
     def show
-      @product = Product.includes(:platforms, :category).find(params[:id])
+      @product = Product.includes(:platforms, :category, :prod_attr_cats).find(params[:id])
+
+      # Check if the product has 'Levels' attribute and calculate dynamic price if applicable
+      dynamic_price = nil
+      if @product.prod_attr_cats.exists?(name: 'Levels')
+        # Assuming `selected_level` is coming from the params or set a default
+        selected_level = params[:level].to_i || 1  # Default to level 1 if no level is passed
+
+        # Calculate dynamic price using the method we defined earlier
+        dynamic_price = @product.calculate_price(selected_level)
+      end
+
       render json: @product.as_json(
         include: {
           platforms: { only: [:id, :name] },
           category: { only: [:id, :name, :description] },
           prod_attr_cats: { only: [:id, :name] }
-        }
+        },
+        methods: :static_price, # This is if you want to include the product's static price as well
+        dynamic_price: dynamic_price
       )
     end
+
 
     def by_platform
       platform_id = params[:platform_id]
@@ -49,6 +63,7 @@ module Api
 
     # POST /products
     def create
+      byebug
       # Handle image upload if provided
       uploaded_image = params[:image] && params[:remove_image] == 'false' ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] && params[:remove_bg_image] == 'false' ? upload_to_s3(params[:bg_image]) : nil
@@ -61,13 +76,13 @@ module Api
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
       # Assign platforms if provided
-      if params[:platform_ids].present?
-        @product.platforms = Platform.where(id: params[:platform_ids])
+      if params[:product][:platform_ids].present?
+        @product.platform_ids = params[:product][:platform_ids]
       end
 
       # Assign prod_attr_cats if provided
-      if params[:prod_attr_cat_ids].present?
-        prod_attr_cats = params[:prod_attr_cat_ids].map do |id|
+      if params[:product][:prod_attr_cat_ids].present?
+        prod_attr_cats = params[:product][:prod_attr_cat_ids].map do |id|
           ProdAttrCat.find_by(id: id)
         end.compact
         @product.prod_attr_cats = prod_attr_cats

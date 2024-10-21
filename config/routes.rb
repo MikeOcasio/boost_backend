@@ -100,6 +100,8 @@ Rails.application.routes.draw do
     resources :skillmasters, only: [:index, :show]
 
     resources :platform_credentials, only: [:show, :create, :update, :destroy]
+
+    resources :level_prices
   end
 
   # CSRF token route for frontend usage
