@@ -10,8 +10,8 @@ module Orders
         # Fetch orders based on user role
         if current_user.role == 'admin' || current_user.role == 'dev'
           orders = Order.all
-        elsif current_user.role == 'skill_master'
-          orders = Order.where(assigned_skill_master_id: current_user.id, state: 'assigned')
+        elsif current_user.role == 'skillmaster'
+          orders = Order.where(assigned_skill_master_id: current_user.id, state: ['assigned', 'in_progress', 'delayed', 'disputed', 'complete'])
         else
           orders = Order.where(user_id: current_user.id)
         end

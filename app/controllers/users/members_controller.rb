@@ -34,20 +34,59 @@ module Users
       end
     end
 
-
     # PATCH/PUT /users/member-data
     def update
       current_user = get_user_from_token # Fetch the current user from the token
+      user_to_update = current_user
 
-      if current_user.update(user_params)
-        upload_image_to_s3(current_user, params[:image]) if params[:image].present?
-        render json: current_user, status: :ok
+      # Allow only 'admin' or 'dev' roles to update other users
+      if ['admin', 'dev'].include?(current_user.role)
+        user_to_update = User.find(params[:id]) # Admins/Devs can update other users
+      elsif current_user.id != params[:id].to_i
+        # Prevent regular users from updating others
+        return render json: { error: 'You are not authorized to update this user' }, status: :forbidden
+      end
+
+      # Store the old image URL before the user is updated
+      old_image_url = user_to_update.image_url
+
+      if user_to_update.update(user_params)
+        # Check if the image_url param is present
+        if user_params[:image_url].present?
+          # If the new image is a Base64 string, treat it as a new upload regardless of old_image_url
+          if user_params[:image_url].start_with?('data:image/')
+            # If the old image is an S3 URL, delete it
+            if old_image_url.present? && old_image_url.start_with?('https://')
+              delete_image_from_s3(old_image_url)
+            end
+
+            # Upload the new Base64 image to S3
+            s3_image_url = upload_image_to_s3(user_to_update, user_params[:image_url])
+            user_to_update.update(image_url: s3_image_url) # Ensure the correct S3 URL is set
+
+          # Otherwise, it's a direct URL change (assuming S3 URL), so compare and update
+          elsif old_image_url != user_params[:image_url]
+            # If the old image is an S3 URL, delete it
+            if old_image_url.present? && old_image_url.start_with?('https://')
+              delete_image_from_s3(old_image_url)
+            end
+
+            # Update the new image URL directly if it's already an S3 URL
+            user_to_update.update(image_url: user_params[:image_url])
+          end
+        end
+
+        render json: user_to_update, status: :ok
       else
-        render json: current_user.errors, status: :unprocessable_entity
+        render json: user_to_update.errors, status: :unprocessable_entity
       end
     end
 
-    # DELETE /users/members/:id
+
+
+
+
+
     # DELETE /users/member-data/:id
     def destroy
       current_user = get_user_from_token # Fetch the current user
@@ -75,9 +114,6 @@ module Users
       end
     end
 
-
-
-    #! TODO: destroy_and_ban anyone but other admins
 
     # DELETE /users/members/:id/ban
     def destroy_and_ban
@@ -238,10 +274,24 @@ module Users
           obj = S3_BUCKET.object(filename)
           obj.upload_file(temp_file)
           user.image_url = obj.public_url
+
+          return obj.public_url
         end
       else
         raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
       end
     end
+
+    def delete_image_from_s3(image_url)
+      return unless image_url.present?
+
+      # Extract the S3 object key from the image URL
+      object_key = URI(image_url).path[1..] # Remove the leading '/' from the path
+
+      # Find the object in the S3 bucket and delete it
+      obj = S3_BUCKET.object(object_key)
+      obj.delete if obj.exists?
+    end
+
   end
 end
