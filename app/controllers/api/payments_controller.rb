@@ -4,15 +4,15 @@ class Api::PaymentsController < ApplicationController
   # before_action :authenticate_user!
 
   STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
+  YOUR_DOMAIN = 'http://127.0.0.1:3000'
 
-  def create_payment_intent
+  def create_checkout_session
     # Set the Stripe API key
     Stripe.api_key = STRIPE_API_KEY
 
     begin
       # Extract parameters directly from params
       currency = params[:currency]
-      description = params[:description]
       products = params[:products] || []
 
       # Check if currency and products are present
@@ -20,22 +20,31 @@ class Api::PaymentsController < ApplicationController
         return render json: { success: false, error: "Currency and products are required." }, status: :unprocessable_entity
       end
 
-      # Calculate total amount from products
-      total_amount = products.reduce(0) do |sum, product|
-        price = product[:price].to_i
-        quantity = product[:quantity].to_i
-        sum + (price * quantity)
+      # Create line items for the checkout session
+      line_items = products.map do |product|
+        {
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: product[:name] || 'Product Name', # Provide a default name if not present
+            },
+            unit_amount: (product[:price].to_i * 100), # Amount in cents
+          },
+          quantity: product[:quantity].to_i,
+        }
       end
 
-      # Create the payment intent
-      payment_intent = Stripe::PaymentIntent.create({
-        amount: total_amount,
-        currency: currency,
-        description: description
+      # Create the checkout session
+      session = Stripe::Checkout::Session.create({
+        payment_method_types: ['card'],
+        line_items: line_items,
+        mode: 'payment',
+        success_url: "#{YOUR_DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "#{YOUR_DOMAIN}/cancel",
       })
 
-      # Return the payment intent details
-      render json: { success: true, payment_intent: payment_intent }, status: :created
+      # Return the session ID (which can be used to redirect the customer)
+      render json: { success: true, sessionId: session.id }, status: :created
     rescue Stripe::StripeError => e
       render json: { success: false, error: e.message }, status: :unprocessable_entity
     rescue StandardError => e
@@ -43,10 +52,13 @@ class Api::PaymentsController < ApplicationController
     end
   end
 
-  private
-
-  def payment_intent_params
-    # Ensure this method is not being used, as we're extracting directly
-    params.permit(:currency, :description, products: [:price, :quantity])
+  # Optionally, you can add a method to retrieve the session status
+  def session_status
+    begin
+      session = Stripe::Checkout::Session.retrieve(params[:session_id])
+      render json: { status: session.status, customer_email: session.customer_email }, status: :ok
+    rescue Stripe::StripeError => e
+      render json: { success: false, error: e.message }, status: :unprocessable_entity
+    end
   end
 end

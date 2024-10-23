@@ -100,8 +100,9 @@ Rails.application.routes.draw do
     resources :level_prices
 
     resources :payments, only: [] do
-      post 'create_payment_intent', on: :collection
+      post 'create_checkout_session', on: :collection
     end
+
 
 
   end
