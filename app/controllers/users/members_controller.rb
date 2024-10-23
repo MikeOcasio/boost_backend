@@ -83,10 +83,6 @@ module Users
     end
 
 
-
-
-
-
     # DELETE /users/member-data/:id
     def destroy
       current_user = get_user_from_token # Fetch the current user
@@ -247,9 +243,14 @@ module Users
         :first_name,
         :last_name,
         :role,
-        :image_url
+        :image_url,
+        :bio,           # Add bio
+        :gamer_tag,     # Add gamer_tag
+        achievements: [], # Add achievements array
+        gameplay_info: [] # Add gameplay_info array
       )
     end
+
 
     def upload_image_to_s3(user, image_param)
       if image_param.is_a?(ActionDispatch::Http::UploadedFile)
