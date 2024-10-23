@@ -15,21 +15,16 @@
 #
 # Model for representing users in the application.
 class User < ApplicationRecord
-  devise :two_factor_authenticatable
-  # include Devise::Models::TwoFactorAuthenticatable
-  # include Devise::Models::TwoFactorBackupable
-
-  #add Devise modules
-  devise :database_authenticatable,
-         :registerable,
-         :recoverable,
-         :rememberable,
-         :validatable,
-         :trackable,
-         :lockable,
-         :jwt_authenticatable,
-         jwt_revocation_strategy: JwtDenylist
-
+  devise :two_factor_authenticatable,
+  :database_authenticatable,
+  :registerable,
+  :recoverable,
+  :rememberable,
+  :validatable,
+  :trackable,
+  :lockable,
+  :jwt_authenticatable,
+  jwt_revocation_strategy: JwtDenylist
 
 
   has_many :user_platforms, dependent: :destroy
@@ -58,6 +53,22 @@ class User < ApplicationRecord
 
   # Methods
   # ---------------
+
+
+  # Two-factor authentication configuration
+  # This uses the ROTP gem under the hood (part of devise-two-factor)
+  def need_two_factor_authentication?(request)
+    otp_required_for_login
+  end
+
+  # Ensure user has a OTP secret
+  def generate_otp_secret_if_missing!
+    if otp_secret.blank?
+      self.otp_secret = User.generate_otp_secret
+      save!
+    end
+  end
+
 
   def password_complexity
     return if password.blank?

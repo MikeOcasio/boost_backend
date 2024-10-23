@@ -8,34 +8,34 @@ Rails.application.routes.draw do
     unlocks: 'users/unlocks'
   }
 
-  Rails.application.routes.draw do
-    namespace :users do
-      resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
-        member do
-          get :platforms
-          post :add_platform
-          delete :remove_platform
-          post :lock, to: 'members#lock_user'
-          post :unlock, to: 'members#unlock_user'
-        end
-
-        collection do
-          get :signed_in_user
-          get :skillmasters
-        end
-
-        member do
-          get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
-          delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
-        end
+  namespace :users do
+    resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
+      member do
+        get :platforms
+        post :add_platform
+        delete :remove_platform
+        post :lock, to: 'members#lock_user'
+        post :unlock, to: 'members#unlock_user'
       end
 
-      # Adding the skillmaster applications routes
-      resources :skillmaster_applications, only: [:show]
+      collection do
+        get :signed_in_user
+        get :skillmasters
+      end
+
+      member do
+        get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
+        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
+      end
     end
+
+    resource :two_factor_authentication, only: [:show], controller: 'two_factor_authentication' do
+      post 'verify', to: 'two_factor_authentication#verify'
+    end
+
+    # Adding the skillmaster applications routes
+    resources :skillmaster_applications, only: [:show]
   end
-
-
 
   namespace :orders do
     resources :orders, path: 'info', only: [:index, :show, :create, :update, :destroy] do
@@ -49,10 +49,6 @@ Rails.application.routes.draw do
       end
     end
   end
-
-
-
-
 
   delete 'users/sign_out', to: 'users/sessions#destroy'
 

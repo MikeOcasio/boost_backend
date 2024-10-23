@@ -119,6 +119,7 @@ GEM
       activesupport
     cgi (0.4.1)
     childprocess (4.1.0)
+    chunky_png (1.4.0)
     concurrent-ruby (1.2.3)
     crass (1.0.6)
     date (3.3.4)
@@ -282,6 +283,10 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.6)
     rotp (6.3.0)
+    rqrcode (2.2.0)
+      chunky_png (~> 1.0)
+      rqrcode_core (~> 1.0)
+    rqrcode_core (1.2.0)
     rspec-core (3.13.1)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.3)
@@ -395,6 +400,8 @@ DEPENDENCIES
   rack-cors
   rails (~> 7.0.8)
   rbnacl
+  rotp
+  rqrcode
   rspec-rails
   sass-rails (>= 6)
   selenium-webdriver

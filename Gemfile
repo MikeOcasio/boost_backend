@@ -29,12 +29,18 @@ gem 'bcrypt', '~> 3.1.7'
 gem 'rbnacl'
 gem 'aasm'
 gem 'devise'
+gem 'devise-jwt'
 gem 'devise_token_auth'
 gem 'devise-two-factor'
 gem 'activerecord-session_store'
-gem 'devise-jwt'
+
+
+gem 'rqrcode'
+gem 'rotp'
+
 gem 'listen', '~> 3.2'
 gem 'prawn'
+
 
 # Gem for Mailgun email service
 gem 'mailgun-ruby', '~> 1.2'
