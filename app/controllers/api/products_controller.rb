@@ -7,7 +7,6 @@ module Api
 
     # GET /products
     def index
-      byebug
       @products = Product.includes(:category, :platforms).all
       render json: @products.as_json(
         include: {

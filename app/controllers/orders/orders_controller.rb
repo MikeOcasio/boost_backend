@@ -6,7 +6,6 @@ module Orders
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
-      byebug
       if current_user
         # Fetch orders based on user role
         if current_user.role == 'admin' || current_user.role == 'dev'
