@@ -26,6 +26,8 @@ class Order < ApplicationRecord
   has_many :products, through: :order_products
   has_one :promotion, through: :products
 
+  attr_accessor :selected_level, :dynamic_price
+
   before_create :generate_internal_id
   after_touch :update_totals
   before_save :assign_platform_credentials
