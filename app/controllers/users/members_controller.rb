@@ -247,7 +247,7 @@ module Users
         :bio,           # Add bio
         :gamer_tag,     # Add gamer_tag
         achievements: [], # Add achievements array
-        gameplay_info: [] # Add gameplay_info array
+        gameplay_info: [:name, :url] # Add gameplay_info array
       )
     end
 
