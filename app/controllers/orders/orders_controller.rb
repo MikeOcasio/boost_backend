@@ -116,45 +116,68 @@ module Orders
     # Create a new order.
     # Admins and devs can create orders for any user and attach platform credentials.
     # Customers can create their own orders and attach their own platform credentials.
-    def create
-      if current_user.role == 'admin' || current_user.role == 'dev'
-        # Admin/Dev creating an order
-        @order = Order.new(order_params)
+    class Api::OrdersController < ApplicationController
+      # Existing create action
+      def create
+        # Accept payment_intent_id as a parameter
+        payment_intent_id = params[:payment_intent_id]
 
-        # Check if the product has dynamic pricing based on levels
-        handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
+        # Verify payment intent
+        if payment_intent_id.present?
+          begin
+            payment_intent = Stripe::PaymentIntent.retrieve(payment_intent_id)
 
-        # Assign the platform credential
-        assign_platform_credentials(@order, params[:platform])
+            # Check if the payment was successful
+            if payment_intent.status == 'succeeded'
+              # Proceed to create the order
+              if current_user.role == 'admin' || current_user.role == 'dev'
+                @order = Order.new(order_params)
 
-        if @order.save
-          add_products_to_order(@order, params[:product_ids])  # Add products to the order
-          render json: @order, status: :created
-        else
-          render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
-        end
+                # Check if the product has dynamic pricing based on levels
+                # handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
 
-      elsif current_user.role == 'customer'
-        # Customer creating an order
-        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+                # Assign the platform credential
+                assign_platform_credentials(@order, params[:platform])
 
-        # Check if the product has dynamic pricing based on levels
-        handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
+                if @order.save
+                  add_products_to_order(@order, params[:product_ids])  # Add products to the order
+                  render json: @order, status: :created
+                else
+                  render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+                end
 
-        # Assign platform credentials and save order
-        if assign_platform_credentials(@order, params[:platform])
-          if @order.save
-            add_products_to_order(@order, params[:product_ids])  # Add products to the order
-            render json: @order, status: :created
-          else
-            render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+              elsif current_user.role == 'customer'
+                # Customer creating an order
+                @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+
+                # Check if the product has dynamic pricing based on levels
+                # handle_dynamic_pricing(@order, params[:product_id], params[:start_level], params[:end_level])
+
+                # Assign platform credentials and save order
+                if assign_platform_credentials(@order, params[:platform])
+                  if @order.save
+                    add_products_to_order(@order, params[:product_ids])  # Add products to the order
+                    render json: @order, status: :created
+                  else
+                    render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+                  end
+                else
+                  render json: { success: false, message: "Invalid platform credential." }, status: :unprocessable_entity
+                end
+
+              else
+                render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+              end
+            else
+              # Payment was not successful
+              render json: { success: false, message: "Payment not successful: #{payment_intent.last_payment_error.message}" }, status: :unprocessable_entity
+            end
+          rescue Stripe::InvalidRequestError => e
+            render json: { success: false, message: e.message }, status: :unprocessable_entity
           end
         else
-          render json: { success: false, message: "Invalid platform credential." }, status: :unprocessable_entity
+          render json: { success: false, message: "Payment intent ID is required." }, status: :unprocessable_entity
         end
-
-      else
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
       end
     end
 
