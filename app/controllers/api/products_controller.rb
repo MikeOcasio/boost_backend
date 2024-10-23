@@ -7,6 +7,7 @@ module Api
 
     # GET /products
     def index
+      byebug
       @products = Product.includes(:category, :platforms).all
       render json: @products.as_json(
         include: {
@@ -23,14 +24,14 @@ module Api
       @product = Product.includes(:platforms, :category, :prod_attr_cats).find(params[:id])
 
       # Check if the product has 'Levels' attribute and calculate dynamic price if applicable
-      dynamic_price = nil
-      if @product.prod_attr_cats.exists?(name: 'Levels')
-        # Assuming `selected_level` is coming from the params or set a default
-        selected_level = params[:level].to_i || 1  # Default to level 1 if no level is passed
+      # dynamic_price = nil
+      # if @product.prod_attr_cats.exists?(name: 'Levels')
+      #   # Assuming `selected_level` is coming from the params or set a default
+      #   selected_level = params[:level].to_i || 1  # Default to level 1 if no level is passed
 
-        # Calculate dynamic price using the method we defined earlier
-        dynamic_price = @product.calculate_price(selected_level)
-      end
+      #   # Calculate dynamic price using the method we defined earlier
+      #   dynamic_price = @product.calculate_price(selected_level)
+      # end
 
       render json: @product.as_json(
         include: {
@@ -38,8 +39,8 @@ module Api
           category: { only: [:id, :name, :description] },
           prod_attr_cats: { only: [:id, :name] }
         },
-        methods: :static_price, # This is if you want to include the product's static price as well
-        dynamic_price: dynamic_price
+        # methods: :static_price, # This is if you want to include the product's static price as well
+        # dynamic_price: dynamic_price
       )
     end
 
@@ -63,7 +64,6 @@ module Api
 
     # POST /products
     def create
-      byebug
       # Handle image upload if provided
       uploaded_image = params[:image] && params[:remove_image] == 'false' ? upload_to_s3(params[:image]) : nil
       uploaded_bg_image = params[:bg_image] && params[:remove_bg_image] == 'false' ? upload_to_s3(params[:bg_image]) : nil

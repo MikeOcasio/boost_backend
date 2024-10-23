@@ -1,6 +1,8 @@
 require 'stripe'
 
 class Api::PaymentsController < ApplicationController
+  # before_action :authenticate_user!
+
   STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
 
   def create_payment_intent
