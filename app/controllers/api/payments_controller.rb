@@ -30,8 +30,6 @@ class Api::PaymentsController < ApplicationController
               images: [product[:image]],
             },
             unit_amount: (product[:price].to_i * 100),
-            tax: (product[:tax].to_i * 100),
-            total_amount: product[:tax].to_i + product[:price].to_i,
           },
           quantity: product[:quantity].to_i,
         }
