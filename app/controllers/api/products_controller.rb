@@ -131,7 +131,7 @@ module Api
             @product.image = uploaded_image
           end
         end
-      elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_image])
+      elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_image]) || params[:product][:image].nil?
         # If the remove_image flag is true, delete the old image
         delete_from_s3(old_image_url) if old_image_url.present? && !old_image_url.start_with?('data:image/')
         @product.image = nil
@@ -156,7 +156,7 @@ module Api
             @product.bg_image = uploaded_bg_image
           end
         end
-      elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_bg_image])
+      elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_bg_image]) || params[:product][:bg_image].nil?
         # If the remove_bg_image flag is true, delete the old background image
         delete_from_s3(old_bg_image_url) if old_bg_image_url.present? && !old_bg_image_url.start_with?('data:image/')
         @product.bg_image = nil
