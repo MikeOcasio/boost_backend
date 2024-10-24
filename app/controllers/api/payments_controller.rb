@@ -40,7 +40,7 @@ class Api::PaymentsController < ApplicationController
         payment_method_types: ['card', 'paypal'],
         line_items: line_items,
         mode: 'payment',
-        success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+        success_url: "#{YOUR_DOMAIN}/checkout/success",
         cancel_url: "#{YOUR_DOMAIN}/checkout",
       })
 
