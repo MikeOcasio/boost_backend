@@ -263,7 +263,7 @@ module Api
     def upload_to_s3(file)
       if file.is_a?(ActionDispatch::Http::UploadedFile)
         obj = S3_BUCKET.object("products/#{file.original_filename}")
-        obj.upload_file(file.tempfile)
+        obj.upload_file(file.tempfile, content_type: 'image/jpeg')
         obj.public_url
       elsif file.is_a?(String) && file.start_with?('data:image/')
         # Extract the base64 part from the data URL
@@ -282,7 +282,7 @@ module Api
 
           # Upload the temporary file to S3
           obj = S3_BUCKET.object(filename)
-          obj.upload_file(temp_file)
+          obj.upload_file(temp_file, content_type: 'image/jpeg')
 
           return obj.public_url
         end
