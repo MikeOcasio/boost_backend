@@ -27,9 +27,9 @@ class Api::PaymentsController < ApplicationController
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: 'https://images.pexels.com/photos/104827/cat-pet-animal-domestic-104827.jpeg?cs=srgb&amp;dl=pexels-pixabay-104827.jpg&amp;fm=jpg'
+              images: ['https://images.pexels.com/photos/104827/cat-pet-animal-domestic-104827.jpeg?cs=srgb&amp;dl=pexels-pixabay-104827.jpg&amp;fm=jpg']
             },
-            unit_amount: (product[:price].to_i * 100),
+            unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i,
           },
           quantity: product[:quantity].to_i,
         }
@@ -37,10 +37,10 @@ class Api::PaymentsController < ApplicationController
 
       # Create the checkout session
       session = Stripe::Checkout::Session.create({
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: ['card'],
         line_items: line_items,
         mode: 'payment',
-        success_url: "#{YOUR_DOMAIN}/checkout/success",
+        success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: "#{YOUR_DOMAIN}/checkout",
       })
 
