@@ -27,7 +27,7 @@ class Api::PaymentsController < ApplicationController
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: [product[:image]]
+              images: [product[:image] || "https://www.ravenboost.com/logo.svg"]
             },
             unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i,
           },
