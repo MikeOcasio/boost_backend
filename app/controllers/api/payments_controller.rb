@@ -1,7 +1,7 @@
 require 'stripe'
 
 class Api::PaymentsController < ApplicationController
-  # before_action :authenticate_user!
+  before_action :authenticate_user!
 
   STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
   YOUR_DOMAIN = 'http://localhost:3001'
@@ -22,7 +22,6 @@ class Api::PaymentsController < ApplicationController
 
       # Create line items for the checkout session
       line_items = products.map do |product|
-        Rails.logger.info("Image URL: #{product[:image]}")
         {
           price_data: {
             currency: currency,
@@ -41,6 +40,7 @@ class Api::PaymentsController < ApplicationController
         payment_method_types: ['card'],
         line_items: line_items,
         mode: 'payment',
+        customer_email: current_user.email,
         success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: "#{YOUR_DOMAIN}/checkout",
       })
