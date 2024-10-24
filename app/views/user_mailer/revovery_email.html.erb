@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your OTP Code</title>
+  <title>Password Recovery</title>
   <style>
     /* Global Styles */
     body {
@@ -50,13 +50,14 @@
       line-height: 1.6;
       color: #333;
     }
-    .otp-code {
-      display: block;
-      font-size: 22px;
-      font-weight: bold;
-      color: #FFD700; /* Gold */
+    .button {
+      display: inline-block;
       background-color: #4B0082; /* Purple */
-      padding: 10px;
+      color: #FFD700; /* Gold */
+      padding: 10px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      text-decoration: none;
       text-align: center;
       border-radius: 5px;
       margin-top: 20px;
@@ -80,21 +81,21 @@
     <!-- Email Header -->
     <div class="header">
       <img src="https://www.ravenboost.com/images/logo.png" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
-      <h1>One-Time Password (OTP)</h1>
+      <h1>Password Recovery</h1>
     </div>
 
     <!-- Email Content -->
     <div class="content">
       <h2>Hello, <%= @user.name %>,</h2>
-      <p>You are receiving this email because you have requested a one-time password (OTP) for authentication.</p>
+      <p>It seems like you've requested a password reset. No worries, we're here to help!</p>
 
-      <p>Your OTP is:</p>
+      <p>To reset your password, simply click the button below:</p>
 
-      <span class="otp-code"><%= @otp %></span>
+      <a href="<%= @reset_url %>" class="button">Reset Password</a>
 
-      <p>Please use this code to complete your authentication within the next 5 minutes.</p>
+      <p>If you didn’t request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
 
-      <p>If you didn't request this, please ignore this email or contact our support team.</p>
+      <p>If you need further assistance, feel free to <a href="https://www.ravenboost.com/support">contact our support team</a>.</p>
 
       <p>Thank you for using RavenBoost!</p>
 

@@ -4,7 +4,7 @@ class Api::PaymentsController < ApplicationController
   # before_action :authenticate_user!
 
   STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  YOUR_DOMAIN = 'http://127.0.0.1:3000'
+  YOUR_DOMAIN = 'http://127.0.0.1:3001'
 
   def create_checkout_session
     # Set the Stripe API key
@@ -26,9 +26,12 @@ class Api::PaymentsController < ApplicationController
           price_data: {
             currency: currency,
             product_data: {
-              name: product[:name] || 'Product Name', # Provide a default name if not present
+              name: product[:name] || 'Product Name',
+              images: [product[:image]],
             },
-            unit_amount: (product[:price].to_i * 100), # Amount in cents
+            unit_amount: (product[:price].to_i * 100),
+            tax: (product[:tax].to_i * 100),
+            total_amount: product[:tax].to_i + product[:price].to_i,
           },
           quantity: product[:quantity].to_i,
         }
@@ -36,11 +39,11 @@ class Api::PaymentsController < ApplicationController
 
       # Create the checkout session
       session = Stripe::Checkout::Session.create({
-        payment_method_types: ['card'],
+        payment_method_types: ['card', 'paypal'],
         line_items: line_items,
         mode: 'payment',
-        success_url: "#{YOUR_DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "#{YOUR_DOMAIN}/cancel",
+        success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "#{YOUR_DOMAIN}/checkout",
       })
 
       # Return the session ID (which can be used to redirect the customer)

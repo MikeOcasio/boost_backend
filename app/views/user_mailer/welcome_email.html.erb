@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your OTP Code</title>
+  <title>Welcome to RavenBoost!</title>
   <style>
     /* Global Styles */
     body {
@@ -42,7 +42,7 @@
     }
     .content h2 {
       color: #4B0082; /* Primary Color */
-      font-size: 22px;
+      font-size: 24px;
       margin-top: 0;
     }
     .content p {
@@ -50,17 +50,15 @@
       line-height: 1.6;
       color: #333;
     }
-    .otp-code {
-      display: block;
-      font-size: 22px;
-      font-weight: bold;
-      color: #FFD700; /* Gold */
-      background-color: #4B0082; /* Purple */
-      padding: 10px;
-      text-align: center;
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #4B0082; /* Primary Color */
+      color: #ffffff;
+      text-decoration: none;
       border-radius: 5px;
       margin-top: 20px;
-      margin-bottom: 20px;
+      font-size: 16px;
     }
     .footer {
       background-color: #4B0082; /* Primary Color */
@@ -80,25 +78,25 @@
     <!-- Email Header -->
     <div class="header">
       <img src="https://www.ravenboost.com/images/logo.png" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
-      <h1>One-Time Password (OTP)</h1>
+      <h1>Welcome to RavenBoost!</h1>
     </div>
 
     <!-- Email Content -->
     <div class="content">
-      <h2>Hello, <%= @user.name %>,</h2>
-      <p>You are receiving this email because you have requested a one-time password (OTP) for authentication.</p>
+      <h2>Hi <%= @user.name %>,</h2>
+      <p>Thank you for signing up with RavenBoost! We're thrilled to have you as a part of our community.</p>
 
-      <p>Your OTP is:</p>
+      <p>At RavenBoost, we strive to provide the best gaming experience with top-notch service. Whether you're leveling up, completing challenges, or simply exploring the community, we are here to support you.</p>
 
-      <span class="otp-code"><%= @otp %></span>
+      <p>To get started, please verify your email address by clicking the button below:</p>
 
-      <p>Please use this code to complete your authentication within the next 5 minutes.</p>
+      <a href="<%= @verification_link %>" class="button">Verify Your Email</a>
 
-      <p>If you didn't request this, please ignore this email or contact our support team.</p>
+      <p>If you have any questions or need assistance, feel free to reach out to our support team.</p>
 
-      <p>Thank you for using RavenBoost!</p>
+      <p>Welcome aboard and happy gaming!</p>
 
-      <p>Best regards,<br>The RavenBoost Team</p>
+      <p>Cheers,<br>The RavenBoost Team</p>
     </div>
 
     <!-- Footer Section -->
