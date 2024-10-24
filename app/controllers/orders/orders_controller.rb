@@ -123,6 +123,7 @@ module Orders
       if current_user.role == 'dev'
         @order = Order.new(order_params)
 
+        @order.platform = params[:platform] if params[:platform].present?
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
@@ -148,6 +149,8 @@ module Orders
             if session.payment_status == 'paid'
               @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
 
+              @order.platform = params[:platform] if params[:platform].present?
+              
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
                 if @order.save
