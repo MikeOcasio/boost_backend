@@ -1,22 +1,21 @@
 module Api
   class ProductsController < ApplicationController
-
-
     before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
-
 
     # GET /products
     def index
-      @products = Product.includes(:category, :platforms).all
+        @products = Product.includes(:category, :platforms, :prod_attr_cats)
+                        .where(categories: { is_active: true })
+
+      # Render the products that passed the condition (active categories only)
       render json: @products.as_json(
         include: {
           platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description] },
+          category: { only: [:id, :name, :description, :is_active] },
           prod_attr_cats: { only: [:id, :name] }
         }
       )
     end
-
 
     # GET /products/:id
     def show
@@ -42,7 +41,6 @@ module Api
         # dynamic_price: dynamic_price
       )
     end
-
 
     def by_platform
       platform_id = params[:platform_id]
@@ -101,7 +99,6 @@ module Api
       end
     end
 
-
     #GET api/products/id
     def update
       # Store old image URLs before updating
@@ -124,7 +121,7 @@ module Api
             uploaded_image = upload_to_s3(params[:product][:image])
             delete_from_s3(old_image_url) if old_image_url.present?
             @product.image = uploaded_image
-          elsif params[:product][:image].present?  # For regular URLs
+          elsif params[:product][:image].present? && params[:product][:image] != old_image_url
             # If the image is a URL, upload it to S3
             uploaded_image = upload_to_s3(params[:product][:image])
             delete_from_s3(old_image_url) if old_image_url.present?
