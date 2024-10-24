@@ -7,6 +7,7 @@ class Api::PaymentsController < ApplicationController
   YOUR_DOMAIN = 'http://localhost:3001'
 
   def create_checkout_session
+    byebug
     # Set the Stripe API key
     Stripe.api_key = STRIPE_API_KEY
 
@@ -33,9 +34,7 @@ class Api::PaymentsController < ApplicationController
           },
           quantity: product[:quantity].to_i,
         }
-
-# Check the line_items array before creating the session
-puts line_items.inspect # This will help you debug the structure
+      end
 
       # Create the checkout session
       session = Stripe::Checkout::Session.create({
