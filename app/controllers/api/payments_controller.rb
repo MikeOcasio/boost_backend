@@ -27,7 +27,7 @@ class Api::PaymentsController < ApplicationController
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: [product[:image]],
+              images: 'https://images.pexels.com/photos/104827/cat-pet-animal-domestic-104827.jpeg?cs=srgb&amp;dl=pexels-pixabay-104827.jpg&amp;fm=jpg'
             },
             unit_amount: (product[:price].to_i * 100),
           },
