@@ -54,10 +54,9 @@ module Api
       # Attempt to update the category with the provided parameters
       if @category.update(category_params)
 
-        # If the category's is_active attribute is set to false, update associated products
-      if @category.is_active == false
-        Product.where(category_id: @category.id).update_all(is_active: false)
-      end
+        # Update associated products' is_active status based on the category's is_active attribute
+        Product.where(category_id: @category.id).update_all(is_active: @category.is_active)
+
         # Return the updated category in JSON format
         render json: @category
       else
@@ -65,6 +64,7 @@ module Api
         render json: @category.errors, status: :unprocessable_entity
       end
     end
+
 
     # DELETE /categories/:id
     # Delete a specific category based on the provided ID.
