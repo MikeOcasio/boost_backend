@@ -7,7 +7,6 @@ class Api::PaymentsController < ApplicationController
   YOUR_DOMAIN = 'http://localhost:3001'
 
   def create_checkout_session
-    byebug
     # Set the Stripe API key
     Stripe.api_key = STRIPE_API_KEY
 
@@ -23,12 +22,13 @@ class Api::PaymentsController < ApplicationController
 
       # Create line items for the checkout session
       line_items = products.map do |product|
+        Rails.logger.info("Image URL: #{product[:image]}")
         {
           price_data: {
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: [:image]
+              images: [product[:image]]
             },
             unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i,
           },

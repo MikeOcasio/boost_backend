@@ -272,10 +272,10 @@ module Api
         decoded_data = Base64.decode64(base64_data)
 
         # Generate a unique filename (you can adjust the logic as needed)
-        filename = "products/#{SecureRandom.uuid}.webp" # Change the extension based on the image type if needed
+        filename = "products/#{SecureRandom.uuid}.jpeg" # Change the extension based on the image type if needed
 
         # Create a temporary file to upload
-        Tempfile.create(['product_image', '.webp']) do |temp_file|
+        Tempfile.create(['product_image', '.jpeg']) do |temp_file|
           temp_file.binmode
           temp_file.write(decoded_data)
           temp_file.rewind
