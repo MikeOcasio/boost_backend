@@ -4,7 +4,7 @@ class Api::PaymentsController < ApplicationController
   # before_action :authenticate_user!
 
   STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  YOUR_DOMAIN = 'http://127.0.0.1:3001'
+  YOUR_DOMAIN = 'http://localhost:3001'
 
   def create_checkout_session
     # Set the Stripe API key
@@ -27,13 +27,15 @@ class Api::PaymentsController < ApplicationController
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: ['https://images.pexels.com/photos/104827/cat-pet-animal-domestic-104827.jpeg?cs=srgb&amp;dl=pexels-pixabay-104827.jpg&amp;fm=jpg']
+              images: [:image]
             },
             unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i,
           },
           quantity: product[:quantity].to_i,
         }
-      end
+
+# Check the line_items array before creating the session
+puts line_items.inspect # This will help you debug the structure
 
       # Create the checkout session
       session = Stripe::Checkout::Session.create({

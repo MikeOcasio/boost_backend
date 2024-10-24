@@ -109,32 +109,63 @@ module Api
       old_bg_image_url = @product.bg_image
 
       # Assign platforms if provided
-      if params[:product][:platform_ids].present?
-        @product.platform_ids = params[:product][:platform_ids]
-      end
+      @product.platform_ids = params[:product][:platform_ids] if params[:product][:platform_ids].present?
 
-      # Handle image update and deletion logic
-      if ActiveModel::Type::Boolean.new.cast(params[:remove_image])
-        delete_from_s3(old_image_url) if old_image_url.present?
+      # Handle image update logic
+      if params[:image].present?
+        if old_image_url.present? && old_image_url.start_with?('data:image/') # Check if old image is Base64
+          # If old image is Base64, simply set the new image
+          @product.image = upload_to_s3(params[:image])
+          @product.save
+        else
+          # Handle new image upload
+          if params[:image].start_with?('data:image/')  # Check for Base64
+            # Upload the Base64 image to S3
+            uploaded_image = upload_to_s3(params[:image])
+            delete_from_s3(old_image_url) if old_image_url.present?
+            @product.image = uploaded_image
+          elsif params[:image].present?  # For regular URLs
+            # If the image is a URL, upload it to S3
+            uploaded_image = upload_to_s3(params[:image])
+            delete_from_s3(old_image_url) if old_image_url.present?
+            @product.image = uploaded_image
+          end
+        end
+      elsif ActiveModel::Type::Boolean.new.cast(params[:remove_image])
+        # If the remove_image flag is true, delete the old image
+        delete_from_s3(old_image_url) if old_image_url.present? && !old_image_url.start_with?('data:image/')
         @product.image = nil
-      elsif params[:image].present? && params[:image] != old_image_url
-        uploaded_image = upload_to_s3(params[:image])
-        delete_from_s3(old_image_url) if old_image_url.present?
-        @product.image = uploaded_image
       end
 
-      # Handle background image update and deletion logic
-      if ActiveModel::Type::Boolean.new.cast(params[:remove_bg_image])
-        delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+      # Handle background image update logic
+      if params[:bg_image].present?
+        if old_bg_image_url.present? && old_bg_image_url.start_with?('data:image/') # Check if old bg image is Base64
+          # If old background image is Base64, simply set the new bg image
+          @product.bg_image = upload_to_s3(params[:bg_image])
+        else
+          # Handle new background image upload
+          if params[:bg_image].start_with?('data:image/')  # Check for Base64
+            # Upload the Base64 background image to S3
+            uploaded_bg_image = upload_to_s3(params[:bg_image])
+            delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+            @product.bg_image = uploaded_bg_image
+          elsif params[:bg_image].present?  # For regular URLs
+            # If the background image is a URL, upload it to S3
+            uploaded_bg_image = upload_to_s3(params[:bg_image])
+            delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+            @product.bg_image = uploaded_bg_image
+          end
+        end
+      elsif ActiveModel::Type::Boolean.new.cast(params[:remove_bg_image])
+        # If the remove_bg_image flag is true, delete the old background image
+        delete_from_s3(old_bg_image_url) if old_bg_image_url.present? && !old_bg_image_url.start_with?('data:image/')
         @product.bg_image = nil
-      elsif params[:bg_image].present? && params[:bg_image] != old_bg_image_url
-        uploaded_bg_image = upload_to_s3(params[:bg_image])
-        delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
-        @product.bg_image = uploaded_bg_image
       end
+
+      @product.save
 
       # Update the product without affecting images if not specified
-      if @product.update(product_params.except(:platform_ids))
+      if @product.update(product_params.except(:image, :bg_image, :platform_ids))
         render json: @product.as_json(
           include: {
             platforms: { only: [:id, :name] },
@@ -146,9 +177,6 @@ module Api
         render json: @product.errors, status: :unprocessable_entity
       end
     end
-
-
-
 
     # DELETE /products/:id
     def destroy
