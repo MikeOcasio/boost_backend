@@ -149,7 +149,7 @@ module Api
             uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
             delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
             @product.bg_image = uploaded_bg_image
-          elsif params[:product][:bg_image].present?  # For regular URLs
+          elsif params[:product][:bg_image].present? && params[:product][:bg_image] != old_bg_image_url
             # If the background image is a URL, upload it to S3
             uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
             delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
