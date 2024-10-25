@@ -19,17 +19,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     else
       build_resource(sign_up_params)
 
-      # Generate OTP secret and QR code after user creation
-      if resource.save
-        resource.generate_otp_secret_if_missing! # Generate OTP secret
-        otp_uri = resource.otp_provisioning_uri(resource.email, issuer: 'RavenBoost') # Generate OTP URI
-        qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg # Generate QR code SVG
-
-        yield resource if block_given?
-        register_success(qr_code_svg) # Pass QR code SVG to success response
-      else
-        register_failed
-      end
     end
   end
 
@@ -39,8 +28,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     render json: {
       message: 'Signed up successfully.',
       user: resource,
-      qr_code: qr_code_svg,
-      otp_secret: resource.otp_secret # Send the OTP secret (optional)
     }, status: :ok
   end
 
@@ -52,4 +39,3 @@ class Users::RegistrationsController < Devise::RegistrationsController
     params.require(:user).permit(:email, :password, :password_confirmation, :role, :first_name, :last_name)
   end
 end
-

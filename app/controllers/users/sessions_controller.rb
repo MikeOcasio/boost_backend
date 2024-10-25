@@ -4,16 +4,13 @@ module Users
     respond_to :json
 
     def create
-      # First, fetch the user based on the email provided
       user = User.find_by(email: params[:user][:email])
 
-      # Check if the email is banned
       if BannedEmail.exists?(email: params[:user][:email])
         render json: { error: 'This email is banned and cannot be used to sign in.' }, status: :forbidden
         return
       end
 
-      # If user is found, check if the account has been deleted
       if user.present? && user.deleted_at.present?
         render json: { error: 'Your account has been deleted. Please re-register.' }, status: :forbidden
         return
@@ -25,37 +22,38 @@ module Users
       super
     end
 
-
     private
 
     def respond_with(resource, _opts = {})
       token = request.env['warden-jwt_auth.token']
+      qr_code_svg = nil
+
+      # Generate OTP secret and QR code if 2FA isn't set up
+      unless resource.otp_required_for_login
+        resource.generate_otp_secret_if_missing!
+        otp_uri = resource.otp_provisioning_uri(resource.email, issuer: 'RavenBoost')
+        qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
+      end
+
       render json: {
         message: 'You are logged in.',
         user: resource,
-        token: token
+        token: token,
+        qr_code: qr_code_svg, # Only includes QR code if 2FA setup is needed
+        otp_secret: resource.otp_secret
       }, status: :ok
     end
 
     def respond_to_on_destroy
-      if current_user
-        log_out_success
-      else
-        log_out_failed
-      end
+      current_user ? log_out_success : log_out_failed
     end
 
     def log_out_success
-      render json: {
-        message: 'You are logged out.',
-      }, status: :ok
+      render json: { message: 'You are logged out.' }, status: :ok
     end
 
     def log_out_failed
-      render json: {
-        message: 'Something went wrong.',
-      }, status: :unprocessable_entity
+      render json: { message: 'Something went wrong.' }, status: :unprocessable_entity
     end
-
   end
 end
