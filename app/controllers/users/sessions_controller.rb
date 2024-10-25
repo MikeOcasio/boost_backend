@@ -1,5 +1,4 @@
 # app/controllers/users/sessions_controller.rb
-# app/controllers/users/sessions_controller.rb
 module Users
   class SessionsController < Devise::SessionsController
     respond_to :json
@@ -25,10 +24,10 @@ module Users
         otp_attempt = params[:user][:otp_attempt]
 
         if otp_attempt.blank?
-          render json: { error: 'OTP code is required for login.' }, status: :unauthorized
+          render json: { error: 'OTP required' }, status: :unauthorized
           return
         elsif !user.validate_and_consume_otp!(otp_attempt)
-          render json: { error: 'Invalid OTP code.' }, status: :unauthorized
+          render json: { error: 'Invalid OTP code' }, status: :unauthorized
           return
         end
       end
