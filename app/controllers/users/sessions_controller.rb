@@ -44,10 +44,15 @@ module Users
       qr_code_svg = nil
 
       # Generate OTP secret and QR code if 2FA isn't set up
-      unless resource.otp_required_for_login
+      if !resource.otp_required_for_login && !resource.otp_secret
         resource.generate_otp_secret_if_missing!
         otp_uri = resource.otp_provisioning_uri(resource.email, issuer: 'RavenBoost')
         qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
+      end
+
+      # Check if OTP setup is complete and set otp_required_for_login
+      if qr_code_svg.nil? && !resource.otp_required_for_login
+        resource.update!(otp_required_for_login: true)
       end
 
       render json: {
