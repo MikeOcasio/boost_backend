@@ -38,7 +38,7 @@ gem 'activerecord-session_store'
 gem 'rqrcode'
 gem 'rotp'
 
-gem 'listen', '~> 3.2'
+gem 'listen', '~> 3.7'
 gem 'prawn'
 
 

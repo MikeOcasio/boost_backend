@@ -392,7 +392,7 @@ DEPENDENCIES
   image_processing (~> 1.2)
   jbuilder (~> 2.7)
   letter_opener
-  listen (~> 3.2)
+  listen (~> 3.7)
   mailgun-ruby (~> 1.2)
   pg
   prawn
