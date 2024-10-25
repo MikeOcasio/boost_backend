@@ -5,7 +5,8 @@ Rails.application.routes.draw do
   devise_for :users, controllers: {
     sessions: 'users/sessions',
     registrations: 'users/registrations',
-    unlocks: 'users/unlocks'
+    unlocks: 'users/unlocks',
+    passwords: 'users/passwords'
   }
 
   namespace :users do

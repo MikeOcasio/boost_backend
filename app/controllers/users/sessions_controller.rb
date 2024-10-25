@@ -19,6 +19,8 @@ module Users
         return
       end
 
+      params[:user][:remember_me] = params[:user][:remember_me] if params[:user].key?(:remember_me)
+
       # Call the original Devise create action
       super
     end

@@ -101,32 +101,20 @@ class User < ApplicationRecord
     self.role ||= "customer"
   end
 
-  def timeout_in
-    30.minutes
-  end
-
-  def maximum_attempts
-    if self.failed_attempts >= 3
-      1
-    else
-      3
-    end
-  end
-
-  def unlock_in
-    if self.failed_attempts >= 3
-      10.minutes
-    else
-      5.minutes
-    end
-  end
-
-
   def lock_access!(opts = { send_instructions: true })
     if locked_by_admin
       update!(locked_at: Time.current)
     else
       super(opts)
+    end
+  end
+
+  def unlock_access!
+    if locked_by_admin
+      update!(locked_at: nil)
+      update!(locked_by_admin: false)
+    else
+      super
     end
   end
 
