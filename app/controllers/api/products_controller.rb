@@ -62,8 +62,19 @@ module Api
     # POST /products
     def create
       # Handle image upload if provided
-      uploaded_image = params[:image] && params[:remove_image] == 'false' ? upload_to_s3(params[:image]) : nil
-      uploaded_bg_image = params[:bg_image] && params[:remove_bg_image] == 'false' ? upload_to_s3(params[:bg_image]) : nil
+      uploaded_image = if params[:product][:image].present? && params[:product][:remove_image] != 'true'
+        upload_to_s3(params[:product][:image])
+      else
+        nil
+      end
+
+    # Handle background image upload if provided and remove_bg_image flag is false
+    uploaded_bg_image = if params[:product][:bg_image].present? && params[:product][:remove_bg_image] != 'true'
+              upload_to_s3(params[:product][:bg_image])
+            else
+              nil
+            end
+
 
       # Create a new product with the provided attributes, excluding platform_ids for now
       @product = Product.new(product_params.except(:platform_ids))
@@ -73,13 +84,13 @@ module Api
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
       # Assign platforms if provided
-      if params[:product][:platform_ids].present?
-        @product.platform_ids = params[:product][:platform_ids]
+      if params[:platform_ids].present?
+        @product.platform_ids = params[:platform_ids]
       end
 
       # Assign prod_attr_cats if provided
-      if params[:product][:prod_attr_cat_ids].present?
-        prod_attr_cats = params[:product][:prod_attr_cat_ids].map do |id|
+      if params[:prod_attr_cat_ids].present?
+        prod_attr_cats = params[:prod_attr_cat_ids].map do |id|
           ProdAttrCat.find_by(id: id)
         end.compact
         @product.prod_attr_cats = prod_attr_cats
