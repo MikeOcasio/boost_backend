@@ -23,37 +23,6 @@ class Users::SessionsController < Devise::SessionsController
     # Remember me functionality if passed
     params[:user][:remember_me] = params[:user][:remember_me] if params[:user].key?(:remember_me)
 
-    # Check if OTP setup is incomplete
-    if user.otp_secret.blank? || !user.otp_setup_complete
-      # User does not have OTP fully set up; generate the OTP secret and QR code
-      user.generate_otp_secret_if_missing!
-      otp_uri = user.otp_provisioning_uri(user.email, issuer: 'RavenBoost')
-      qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
-
-      # Set otp_required_for_login to false until setup is complete
-      user.update!(otp_required_for_login: false)
-
-      render json: {
-        message: '2FA is not fully set up. Please scan the QR code to set it up.',
-        qr_code: qr_code_svg
-      }, status: :ok
-      return
-    end
-
-    # Require OTP if setup is complete
-    otp_attempt = params[:user][:otp_attempt]
-
-    if user.otp_required_for_login && otp_attempt.blank?
-      render json: { error: 'OTP required' }, status: :unauthorized
-      return
-    elsif user.otp_required_for_login && !user.validate_and_consume_otp!(otp_attempt)
-      render json: { error: 'Invalid OTP code' }, status: :unauthorized
-      return
-    end
-
-    # If OTP is validated, mark setup as complete
-    user.update!(otp_setup_complete: true, otp_required_for_login: true) if user.otp_secret.present?
-
     # Continue with the login
     super
   end
