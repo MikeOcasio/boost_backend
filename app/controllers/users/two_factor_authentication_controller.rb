@@ -10,7 +10,7 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       otp_uri = current_user.otp_provisioning_uri(current_user.email, issuer: 'RavenBoost')
       qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
 
-      render json: { qr_code: qr_code_svg, otp_secret: current_user.otp_secret }, status: :ok
+      render json: { qr_code: qr_code_svg }, status: :ok
     end
   end
 
