@@ -5,6 +5,11 @@ class Users::SessionsController < Devise::SessionsController
   def create
     user = User.find_by(email: params[:user][:email])
 
+    if user.nil?
+      render json: { error: 'User not found. Please register.' }, status: :not_found
+      return
+    end
+
     if BannedEmail.exists?(email: params[:user][:email])
       render json: { error: 'This email is banned and cannot be used to sign in.' }, status: :forbidden
       return
