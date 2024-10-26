@@ -1,14 +1,12 @@
 module Api
   class PlatformsController < ApplicationController
-    before_action :set_platform, only: [:update, :destroy]
-
+    before_action :set_platform, only: %i[update destroy]
 
     # GET /api/platforms
     def index
       @platforms = Platform.all
       render json: @platforms
     end
-
 
     # GET /api/platforms/:id
     def show

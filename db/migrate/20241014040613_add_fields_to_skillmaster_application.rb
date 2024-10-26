@@ -7,4 +7,3 @@ class AddFieldsToSkillmasterApplication < ActiveRecord::Migration[7.0]
     add_reference :skillmaster_applications, :reviewer, foreign_key: { to_table: :users } # assuming reviewer is an admin or dev from users table
   end
 end
-

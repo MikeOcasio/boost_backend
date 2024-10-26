@@ -1,11 +1,111 @@
-<!-- app/views/user_mailer/otp.html.erb -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your OTP Code</title>
+  <style>
+    /* Global Styles */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background-color: #4B0082; /* RavenBoost Primary Color: Purple */
+      padding: 20px;
+      text-align: center;
+    }
+    .header img {
+      max-width: 150px;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      color: #FFD700; /* RavenBoost Secondary Color: Gold */
+      margin: 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .content {
+      padding: 20px;
+    }
+    .content h2 {
+      color: #4B0082; /* Primary Color */
+      font-size: 22px;
+      margin-top: 0;
+    }
+    .content p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #333;
+    }
+    .otp-code {
+      display: block;
+      font-size: 22px;
+      font-weight: bold;
+      color: #FFD700; /* Gold */
+      background-color: #4B0082; /* Purple */
+      padding: 10px;
+      text-align: center;
+      border-radius: 5px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+    .footer {
+      background-color: #4B0082; /* Primary Color */
+      padding: 10px;
+      text-align: center;
+      color: #ffffff;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #FFD700; /* Gold */
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Email Header -->
+    <div class="header">
+      <img src="https://www.ravenboost.com/images/logo.png" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
+      <h1>One-Time Password (OTP)</h1>
+    </div>
 
-<p>Dear <%= @user.name %>,</p>
+    <!-- Email Content -->
+    <div class="content">
+      <h2>Hello, <%= @user.name %>,</h2>
+      <p>You are receiving this email because you have requested a one-time password (OTP) for authentication.</p>
 
-<p>Your OTP is: <%= @otp %></p>
+      <p>Your OTP is:</p>
 
-<p>Please enter this OTP to complete your authentication.</p>
+      <span class="otp-code"><%= @otp %></span>
 
-<p>Thank you,</p>
+      <p>Please use this code to complete your authentication within the next 5 minutes.</p>
 
-<p>Your Team</p>
+      <p>If you didn't request this, please ignore this email or contact our support team.</p>
+
+      <p>Thank you for using RavenBoost!</p>
+
+      <p>Best regards,<br>The RavenBoost Team</p>
+    </div>
+
+    <!-- Footer Section -->
+    <div class="footer">
+      <p>© 2024 RavenBoost. All rights reserved.</p>
+      <p><a href="https://www.ravenboost.com">Visit our website</a> | <a href="https://www.ravenboost.com/support">Contact Support</a></p>
+    </div>
+  </div>
+</body>
+</html>

@@ -126,23 +126,7 @@ Devise.setup do |config|
   config.stretches = Rails.env.test? ? 1 : 12
 
   config.navigational_formats = [:json]
-
-  # ==> Configuration for :lockable
-  # Number of authentication attempts before locking an account
-  config.lock_strategy = :failed_attempts
-  config.unlock_keys = [:email]  # Using email to unlock accounts
-
-  # The number of failed attempts before the account is locked
-  config.maximum_attempts = 5
-
-  # The time interval to unlock accounts (15 minutes for soft lock)
-  config.unlock_in = 15.minutes
-
   # Time interval for hard lock (requires admin intervention)
-  config.lock_strategy = :failed_attempts
-  config.unlock_in = 1.day
-  config.unlock_strategy = :both  # Can unlock via email or an admin manually
-
 
   # Set up a pepper to generate the hashed password.
   # config.pepper = 'bb0ede8d5811d015e040e0585936f6befab273e3a6e081dea2047cda35636122cbaca5aef34e06397ac862ad069729457748dd09b445ae87a27e8f348f655015'
@@ -157,7 +141,6 @@ Devise.setup do |config|
     ]
     jwt.expiration_time = 1.day.to_i
   end
-
 
   # Send a notification to the original email when the user's email is changed.
   # config.send_email_changed_notification = false
@@ -195,7 +178,7 @@ Devise.setup do |config|
 
   # ==> Configuration for :rememberable
   # The time the user will be remembered without asking for credentials again.
-  # config.remember_for = 2.weeks
+  config.remember_for = 2.days
 
   # Invalidates all the remember me tokens when the user signs out.
   config.expire_all_remember_me_on_sign_out = true
@@ -226,6 +209,11 @@ Devise.setup do |config|
   # :failed_attempts = Locks an account after a number of failed attempts to sign in.
   # :none            = No lock strategy. You should handle locking by yourself.
   # config.lock_strategy = :failed_attempts
+
+  config.lock_strategy = :failed_attempts
+  config.unlock_keys = [:email]
+  config.maximum_attempts = 5
+  config.unlock_in = 15.minutes
 
   # Defines which key will be used when locking and unlocking an account
   # config.unlock_keys = [:email]

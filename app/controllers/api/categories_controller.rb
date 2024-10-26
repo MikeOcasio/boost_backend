@@ -1,8 +1,7 @@
 module Api
   class CategoriesController < ApplicationController
     # Set the category instance variable for actions that require it
-    before_action :set_category, only: [:show, :products, :update, :destroy]
-
+    before_action :set_category, only: %i[show products update destroy]
 
     # GET /categories
     # List all categories.
@@ -20,15 +19,16 @@ module Api
       render json: @category
     end
 
-        # GET /categories/:id/products
+    # GET /categories/:id/products
     # Get all products for a specific category
     def products
       products = @category.products
 
       if products.any?
-        render json: products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } }), status: :ok
+        render json: products.as_json(include: { platforms: { only: :id }, category: { only: %i[id name description] } }),
+               status: :ok
       else
-        render json: { message: "No products found for this category" }, status: :not_found
+        render json: { message: 'No products found for this category' }, status: :not_found
       end
     end
 
@@ -54,10 +54,9 @@ module Api
       # Attempt to update the category with the provided parameters
       if @category.update(category_params)
 
-        # If the category's is_active attribute is set to false, update associated products
-      if @category.is_active == false
-        Product.where(category_id: @category.id).update_all(is_active: false)
-      end
+        # Update associated products' is_active status based on the category's is_active attribute
+        Product.where(category_id: @category.id).update_all(is_active: @category.is_active)
+
         # Return the updated category in JSON format
         render json: @category
       else

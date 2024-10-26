@@ -3,16 +3,16 @@ require 'rails_helper'
 
 RSpec.describe Product, type: :model do
   # Associations
-  it { should belong_to(:category) }
-  it { should belong_to(:product_attribute_category) }
-  it { should have_many(:orders).through(:order_products) }
-  it { should have_many(:carts) }
-  it { should have_many(:promotions).through(:product_promotions) }
+  it { is_expected.to belong_to(:category) }
+  it { is_expected.to belong_to(:product_attribute_category) }
+  it { is_expected.to have_many(:orders).through(:order_products) }
+  it { is_expected.to have_many(:carts) }
+  it { is_expected.to have_many(:promotions).through(:product_promotions) }
 
   # Validations
-  it { should validate_presence_of(:platform) }
-  it { should validate_presence_of(:name) }
-  it { should validate_presence_of(:price) }
+  it { is_expected.to validate_presence_of(:platform) }
+  it { is_expected.to validate_presence_of(:name) }
+  it { is_expected.to validate_presence_of(:price) }
 
   # Scopes
   describe '.by_platform' do

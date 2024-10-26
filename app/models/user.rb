@@ -15,12 +15,8 @@
 #
 # Model for representing users in the application.
 class User < ApplicationRecord
-  devise :two_factor_authenticatable
-  # include Devise::Models::TwoFactorAuthenticatable
-  # include Devise::Models::TwoFactorBackupable
-
-  #add Devise modules
-  devise :database_authenticatable,
+  devise :two_factor_authenticatable,
+         :database_authenticatable,
          :registerable,
          :recoverable,
          :rememberable,
@@ -29,8 +25,6 @@ class User < ApplicationRecord
          :lockable,
          :jwt_authenticatable,
          jwt_revocation_strategy: JwtDenylist
-
-
 
   has_many :user_platforms, dependent: :destroy
   has_many :platforms, through: :user_platforms
@@ -46,7 +40,7 @@ class User < ApplicationRecord
 
   before_validation :set_default_role, on: :create
   # ---------------
-  ROLE_LIST = ["admin", "skillmaster", "customer", "skillcoach", "coach", "dev"].freeze
+  ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev].freeze
 
   # Validations
   # ---------------
@@ -59,23 +53,33 @@ class User < ApplicationRecord
   # Methods
   # ---------------
 
+  # Two-factor authentication configuration
+  # This uses the ROTP gem under the hood (part of devise-two-factor)
+  def need_two_factor_authentication?(_request)
+    otp_required_for_login
+  end
+
+  # Ensure user has a OTP secret
+  def generate_otp_secret_if_missing!
+    return if otp_secret.present?
+
+    self.otp_secret = User.generate_otp_secret
+    save!
+  end
+
   def password_complexity
     return if password.blank?
 
     # Check length
-    if password.length < 8
-      errors.add :password, 'Must be at least 8 characters long.'
-    end
+    errors.add :password, 'Must be at least 8 characters long.' if password.length < 8
 
     # Check for uppercase letter
-    unless password =~ /[A-Z]/
-      errors.add :password, 'Must contain at least one uppercase letter.'
-    end
+    errors.add :password, 'Must contain at least one uppercase letter.' unless password =~ /[A-Z]/
 
     # Check for special character
-    unless password =~ /[!@#$&*]/
-      errors.add :password, 'Must contain at least one special character.'
-    end
+    return if password =~ /[!@#{::Regexp.last_match(0)}*]/
+
+    errors.add :password, 'Must contain at least one special character.'
   end
 
   def valid_password?(password)
@@ -85,31 +89,9 @@ class User < ApplicationRecord
     super(password)
   end
 
-
   def set_default_role
-    self.role ||= "customer"
+    self.role ||= 'customer'
   end
-
-  def timeout_in
-    30.minutes
-  end
-
-  def maximum_attempts
-    if self.failed_attempts >= 3
-      1
-    else
-      3
-    end
-  end
-
-  def unlock_in
-    if self.failed_attempts >= 3
-      10.minutes
-    else
-      5.minutes
-    end
-  end
-
 
   def lock_access!(opts = { send_instructions: true })
     if locked_by_admin
@@ -119,10 +101,19 @@ class User < ApplicationRecord
     end
   end
 
-  def send_unlock_instructions
-    unless locked_by_admin
+  def unlock_access!
+    if locked_by_admin
+      update!(locked_at: nil)
+      update!(locked_by_admin: false)
+    else
       super
     end
+  end
+
+  def send_unlock_instructions
+    return if locked_by_admin
+
+    super
   end
 
   def deleted?

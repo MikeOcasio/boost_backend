@@ -6,15 +6,15 @@ class SecureDataController < ApplicationController
     symmetric_key = SymmetricEncryption.generate_key
 
     # Step 2: Generate asymmetric key pair for key exchange
-    key_pair = AsymmetricEncryption.generate_key_pair
+    AsymmetricEncryption.generate_key_pair
 
     # Step 3: Encrypt data using symmetric key
     plaintext_data = 'Sensitive information'
-    encrypted_data = SymmetricEncryption.encrypt(plaintext_data, symmetric_key)
+    SymmetricEncryption.encrypt(plaintext_data, symmetric_key)
 
     # Step 4: Encrypt symmetric key using recipient's public key
     recipient_public_key = 'recipient_public_key' # Replace with the actual public key received from the recipient
-    encrypted_symmetric_key = AsymmetricEncryption.encrypt(symmetric_key, recipient_public_key)
+    AsymmetricEncryption.encrypt(symmetric_key, recipient_public_key)
 
     # In a real-world scenario, you might store or transmit the encrypted_data and encrypted_symmetric_key as needed.
   end
@@ -52,5 +52,4 @@ class SecureDataController < ApplicationController
 
     render json: { encrypted_symmetric_key: encrypted_symmetric_key }
   end
-  
 end

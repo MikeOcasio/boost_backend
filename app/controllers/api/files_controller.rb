@@ -29,7 +29,7 @@ module Api
         render json: { success: true, url: obj.public_url.to_s }, status: :created
       else
         # Handle cases where no file was uploaded
-        render json: { success: false, message: "No file uploaded" }, status: :unprocessable_entity
+        render json: { success: false, message: 'No file uploaded' }, status: :unprocessable_entity
       end
     end
 
@@ -42,10 +42,10 @@ module Api
 
       # Attempt to delete the file from the bucket
       if obj.delete
-        render json: { success: true, message: "File deleted successfully" }
+        render json: { success: true, message: 'File deleted successfully' }
       else
         # Handle cases where the file could not be deleted
-        render json: { success: false, message: "Failed to delete file" }, status: :unprocessable_entity
+        render json: { success: false, message: 'Failed to delete file' }, status: :unprocessable_entity
       end
     end
 

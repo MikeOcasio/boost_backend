@@ -5,42 +5,44 @@ Rails.application.routes.draw do
   devise_for :users, controllers: {
     sessions: 'users/sessions',
     registrations: 'users/registrations',
-    unlocks: 'users/unlocks'
+    unlocks: 'users/unlocks',
+    passwords: 'users/passwords'
   }
 
-  Rails.application.routes.draw do
-    namespace :users do
-      resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
-        member do
-          get :platforms
-          post :add_platform
-          delete :remove_platform
-          post :lock, to: 'members#lock_user'
-          post :unlock, to: 'members#unlock_user'
-        end
-
-        collection do
-          get :signed_in_user
-          get :skillmasters
-        end
-
-        member do
-          get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
-          delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
-        end
+  namespace :users do
+    resources :members, path: 'member-data', only: %i[index create show update destroy] do
+      member do
+        get :platforms
+        post :add_platform
+        delete :remove_platform
+        post :lock, to: 'members#lock_user'
+        post :unlock, to: 'members#unlock_user'
       end
 
-      # Adding the skillmaster applications routes
-      resources :skillmaster_applications, only: [:show]
+      collection do
+        get :signed_in_user
+        get :skillmasters
+      end
+
+      member do
+        get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
+        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
+      end
     end
+
+    # Change the two_factor_authentication route to 2fa
+    resource :two_factor_authentication, only: [:show], controller: 'two_factor_authentication', path: '2fa' do
+      post 'verify', to: 'two_factor_authentication#verify'
+    end
+
+    # Adding the skillmaster applications routes
+    resources :skillmaster_applications, only: [:show]
   end
 
-
-
   namespace :orders do
-    resources :orders, path: 'info', only: [:index, :show, :create, :update, :destroy] do
+    resources :orders, path: 'info', only: %i[index show create update destroy] do
       member do
-        post 'pick_up_order'  # POST /orders/:id/pick_up_order
+        post 'pick_up_order' # POST /orders/:id/pick_up_order
         get 'download_invoice'  # GET /orders/:id/download_invoice
       end
 
@@ -49,10 +51,6 @@ Rails.application.routes.draw do
       end
     end
   end
-
-
-
-
 
   delete 'users/sign_out', to: 'users/sessions#destroy'
 
@@ -81,7 +79,7 @@ Rails.application.routes.draw do
     # Categories routes
     resources :categories do
       member do
-        get :products  # Get products for a specific category
+        get :products # Get products for a specific category
       end
     end
 
@@ -92,14 +90,20 @@ Rails.application.routes.draw do
       end
     end
     # Resources for categories with limited actions
-    resources :categories, only: [:index, :show, :create, :update, :destroy]
+    resources :categories, only: %i[index show create update destroy]
 
     # Resources for files management
-    resources :files, only: [:index, :create, :destroy]
+    resources :files, only: %i[index create destroy]
 
-    resources :skillmasters, only: [:index, :show]
+    resources :skillmasters, only: %i[index show]
 
-    resources :platform_credentials, only: [:show, :create, :update, :destroy]
+    resources :platform_credentials, only: %i[show create update destroy]
+
+    resources :level_prices
+
+    resources :payments, only: [] do
+      post 'create_checkout_session', on: :collection
+    end
   end
 
   # CSRF token route for frontend usage

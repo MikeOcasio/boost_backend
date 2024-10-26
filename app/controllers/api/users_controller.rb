@@ -1,8 +1,8 @@
 class Api::UsersController < ApplicationController
-
-  before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :enable_two_factor, :disable_two_factor, :verify_two_factor, :generate_backup_codes]
+  before_action :set_user,
+                only: %i[show update destroy add_platform remove_platform enable_two_factor disable_two_factor verify_two_factor
+                         generate_backup_codes]
   before_action :set_default_format
-
 
   # GET /api/users/:id
   def show
@@ -12,7 +12,6 @@ class Api::UsersController < ApplicationController
       render json: { error: 'User not found' }, status: :not_found
     end
   end
-
 
   # GET /api/users
   def index
@@ -112,6 +111,7 @@ class Api::UsersController < ApplicationController
   end
 
   private
+
   def set_default_format
     request.format = :json
   end
@@ -138,7 +138,7 @@ class Api::UsersController < ApplicationController
       # Handle file upload
       obj = S3_BUCKET.object("users/#{image_param.original_filename}")
       obj.upload_file(image_param.tempfile)
-      user.image_url = obj.public_url  # Assuming `image_url` is an attribute of User model
+      user.image_url = obj.public_url # Assuming `image_url` is an attribute of User model
     elsif image_param.is_a?(String) && image_param.start_with?('data:image/')
       # Handle base64 image upload
       base64_data = image_param.split(',')[1]
@@ -155,10 +155,11 @@ class Api::UsersController < ApplicationController
         # Upload to S3
         obj = S3_BUCKET.object(filename)
         obj.upload_file(temp_file)
-        user.image_url = obj.public_url  # Assuming `image_url` is an attribute of User model
+        user.image_url = obj.public_url # Assuming `image_url` is an attribute of User model
       end
     else
-      raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
+      raise ArgumentError,
+            "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
     end
   end
 end

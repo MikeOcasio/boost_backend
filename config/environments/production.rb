@@ -53,7 +53,7 @@ Rails.application.configure do
   config.log_level = :debug
 
   # Prepend all log lines with the following tags.
-  config.log_tags = [ :request_id ]
+  config.log_tags = [:request_id]
 
   # Use a different cache store in production.
   # config.cache_store = :mem_cache_store
@@ -64,17 +64,16 @@ Rails.application.configure do
 
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.smtp_settings = {
-    port:           587,
-    address:        'smtp.mailgun.org',
-    user_name:      'support@bot.ravenboost.com',
-    password:       Rails.application.credentials.mailgun[:smtp_password], # Ensure this matches
-    domain:         'bot.ravenboost.com',
-    authentication: :plain,
+    port: 587,
+    address: 'smtp.mailgun.org',
+    user_name: 'support@bot.ravenboost.com',
+    password: Rails.application.credentials.mailgun[:smtp_password], # Ensure this matches
+    domain: 'bot.ravenboost.com',
+    authentication: :plain
   }
   config.action_mailer.default_url_options = { host: 'bot.ravenboost.com' } # Use your Mailgun domain
   config.action_mailer.perform_caching = false
   config.action_mailer.raise_delivery_errors = true # Enable error reporting
-
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
@@ -94,7 +93,7 @@ Rails.application.configure do
   # require 'syslog/logger'
   # config.logger = ActiveSupport::TaggedLogging.new(Syslog::Logger.new 'app-name')
 
-  if ENV["RAILS_LOG_TO_STDOUT"].present?
+  if ENV['RAILS_LOG_TO_STDOUT'].present?
     logger           = ActiveSupport::Logger.new(STDOUT)
     logger.formatter = config.log_formatter
     config.logger    = ActiveSupport::TaggedLogging.new(logger)

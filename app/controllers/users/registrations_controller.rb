@@ -14,7 +14,8 @@ class Users::RegistrationsController < Devise::RegistrationsController
     if existing_user
       if existing_user.deleted_at.present?
         # Restore the user account if it's marked as deleted
-        existing_user.update(deleted_at: nil, password: sign_up_params[:password], password_confirmation: sign_up_params[:password_confirmation])
+        existing_user.update(deleted_at: nil, password: sign_up_params[:password],
+                             password_confirmation: sign_up_params[:password_confirmation])
         render json: { message: 'Your account has been restored successfully.', user: existing_user }, status: :ok
       else
         # If the user is active, return an error
@@ -34,7 +35,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     end
   end
 
-
   private
 
   def register_success
@@ -42,11 +42,11 @@ class Users::RegistrationsController < Devise::RegistrationsController
   end
 
   def register_failed
-    render json: { message: 'Something went wrong.', errors: resource.errors.full_messages }, status: :unprocessable_entity
+    render json: { message: 'Something went wrong.', errors: resource.errors.full_messages },
+           status: :unprocessable_entity
   end
 
   def sign_up_params
     params.require(:user).permit(:email, :password, :password_confirmation, :role, :first_name, :last_name)
   end
-
 end

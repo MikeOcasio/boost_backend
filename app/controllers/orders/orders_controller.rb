@@ -1,37 +1,38 @@
 module Orders
   class OrdersController < ApplicationController
     before_action :authenticate_user!
-    before_action :set_order, only: [:show, :update, :destroy, :pick_up_order]
+    before_action :set_order, only: %i[show update destroy pick_up_order]
 
     # GET /api/orders
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
       if current_user
         # Fetch orders based on user role
-        if current_user.role == 'admin' || current_user.role == 'dev'
-          orders = Order.all
-        elsif current_user.role == 'skillmaster'
-          orders = Order.where(assigned_skill_master_id: current_user.id, state: ['assigned', 'in_progress', 'delayed', 'disputed', 'complete'])
-        else
-          orders = Order.where(user_id: current_user.id)
-        end
+        orders = if current_user.role == 'admin' || current_user.role == 'dev'
+                   Order.all
+                 elsif current_user.role == 'skillmaster'
+                   Order.where(assigned_skill_master_id: current_user.id,
+                               state: %w[assigned in_progress delayed disputed complete])
+                 else
+                   Order.where(user_id: current_user.id)
+                 end
 
         render json: {
           orders: orders.as_json(
             include: {
               products: {
-                only: [:id, :name, :price, :tax, :image, :quantity]
+                only: %i[id name price tax image quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :assigned_skill_master_id, :internal_id, :platform]
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
             skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
 
             order.merge(
-            platform: { id: platform.id, name: platform.name },
-            skill_master: {
+              platform: { id: platform.id, name: platform.name },
+              skill_master: {
                 id: skill_master_info&.id,
                 gamer_tag: skill_master_info&.gamer_tag
               }
@@ -39,10 +40,9 @@ module Orders
           end
         }
       else
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
-
 
     # GET /api/orders/:id
     # Show details of a specific order.
@@ -58,10 +58,10 @@ module Orders
           order: @order.as_json(
             include: {
               products: {
-                only: [:id, :name, :price]
+                only: %i[id name price]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :internal_id]
+            only: %i[id state created_at total_price internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           platform_credentials: @order.platform_credential,
           skill_master: {
@@ -69,7 +69,7 @@ module Orders
             gamer_tag: skill_master_info&.gamer_tag
           }
         }
-      elsif current_user&.role.in?(['admin', 'dev'])
+      elsif current_user&.role.in?(%w[admin dev])
         # Admins and devs can view all order details
         skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
 
@@ -77,10 +77,10 @@ module Orders
           order: @order.as_json(
             include: {
               products: {
-                only: [:id, :name, :price, :tax, :image, :quantity]
+                only: %i[id name price tax image quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :internal_id]
+            only: %i[id state created_at total_price internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           skill_master: {
             id: skill_master_info&.id,
@@ -95,10 +95,10 @@ module Orders
           order: @order.as_json(
             include: {
               products: {
-                only: [:id, :name, :price, :tax, :image, :quantity]
+                only: %i[id name price tax image quantity]
               }
             },
-            only: [:id, :state, :created_at, :total_price, :internal_id]
+            only: %i[id state created_at total_price internal_id]
           ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
           skill_master: {
             id: skill_master_info&.id,
@@ -107,7 +107,7 @@ module Orders
         }
       else
         # If unauthorized, return forbidden status
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
 
@@ -116,38 +116,66 @@ module Orders
     # Admins and devs can create orders for any user and attach platform credentials.
     # Customers can create their own orders and attach their own platform credentials.
     def create
-      if current_user.role == 'admin' || current_user.role == 'dev'
-        # Admin/Dev creating an order
+      # Accept session_id as a parameter
+      session_id = params[:session_id]
+
+      # Check if the current user is an admin or dev
+      if current_user.role == 'dev'
         @order = Order.new(order_params)
 
-        # Assign the platform credential
-        assign_platform_credentials(@order, params[:platform])
-
-        if @order.save
-          add_products_to_order(@order, params[:product_ids])  # Add products to the order
-          render json: @order, status: :created
-        else
-          render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
-        end
-
-      elsif current_user.role == 'customer'
-        # Customer creating an order
-        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
-
-        # Assign platform credentials and save order
+        @order.platform = params[:platform] if params[:platform].present?
+        # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
-            add_products_to_order(@order, params[:product_ids])  # Add products to the order
-            render json: @order, status: :created
+            add_products_to_order(@order, params[:product_ids]) # Add products to the order
+
+            # Return the order details, including the order ID
+            render json: { success: true, order_id: @order.id }, status: :created
           else
             render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
           end
         else
-          render json: { success: false, message: "Invalid platform credential." }, status: :unprocessable_entity
+          render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
         end
 
+      # If the user is a customer, verify the Checkout session
+      elsif current_user.role == 'customer' || current_user.role == 'skillmaster' || current_user.role == 'admin'
+        if session_id.present?
+          begin
+            # Retrieve the Checkout Session from Stripe
+            session = Stripe::Checkout::Session.retrieve(session_id)
+
+            # Proceed to create the order if payment was successful
+            if session.payment_status == 'paid'
+              @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+
+              @order.platform = params[:platform] if params[:platform].present?
+
+              # Assign platform credentials and save the order
+              if assign_platform_credentials(@order, params[:platform])
+                if @order.save
+                  add_products_to_order(@order, params[:product_ids]) # Add products to the order
+
+                  # Return the order details, including the order ID
+                  render json: { success: true, order_id: @order.id }, status: :created
+                else
+                  render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+                end
+              else
+                render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
+              end
+            else
+              # Payment was not successful
+              render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
+            end
+          rescue Stripe::InvalidRequestError => e
+            render json: { success: false, message: e.message }, status: :unprocessable_entity
+          end
+        else
+          render json: { success: false, message: 'Checkout session ID is required.' }, status: :unprocessable_entity
+        end
       else
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
 
@@ -164,27 +192,30 @@ module Orders
             if @order.may_start_progress?
               @order.start_progress!
             else
-              return render json: { success: false, message: "Order cannot transition to in progress." }, status: :unprocessable_entity
+              return render json: { success: false, message: 'Order cannot transition to in progress.' },
+                            status: :unprocessable_entity
             end
           when 'complete'
             if @order.may_complete_order?
               @order.complete_order!
             else
-              return render json: { success: false, message: "Order cannot be marked as complete." }, status: :unprocessable_entity
+              return render json: { success: false, message: 'Order cannot be marked as complete.' },
+                            status: :unprocessable_entity
             end
           when 'disputed'
             if @order.may_mark_disputed?
               @order.mark_disputed!
             else
-              return render json: { success: false, message: "Order cannot be marked as disputed." }, status: :unprocessable_entity
+              return render json: { success: false, message: 'Order cannot be marked as disputed.' },
+                            status: :unprocessable_entity
             end
           else
-            return render json: { success: false, message: "Invalid state transition." }, status: :unprocessable_entity
+            return render json: { success: false, message: 'Invalid state transition.' }, status: :unprocessable_entity
           end
         end
 
         # Update other order attributes (excluding state)
-        if @order.update(order_params.except(:state))  # Exclude the state parameter from the update
+        if @order.update(order_params.except(:state)) # Exclude the state parameter from the update
           render json: @order
         else
           render json: @order.errors, status: :unprocessable_entity
@@ -199,31 +230,34 @@ module Orders
               @order.start_progress!
               render json: @order
             else
-              render json: { success: false, message: "Order cannot transition to in progress." }, status: :unprocessable_entity
+              render json: { success: false, message: 'Order cannot transition to in progress.' },
+                     status: :unprocessable_entity
             end
           when 'complete'
             if @order.may_complete_order?
               @order.complete_order!
               render json: @order
             else
-              render json: { success: false, message: "Order cannot be marked as complete." }, status: :unprocessable_entity
+              render json: { success: false, message: 'Order cannot be marked as complete.' },
+                     status: :unprocessable_entity
             end
           when 'disputed'
             if @order.may_mark_disputed?
               @order.mark_disputed!
               render json: @order
             else
-              render json: { success: false, message: "Order cannot be marked as disputed." }, status: :unprocessable_entity
+              render json: { success: false, message: 'Order cannot be marked as disputed.' },
+                     status: :unprocessable_entity
             end
           else
-            render json: { success: false, message: "Invalid state transition." }, status: :unprocessable_entity
+            render json: { success: false, message: 'Invalid state transition.' }, status: :unprocessable_entity
           end
         else
-          render json: { success: false, message: "State parameter is required." }, status: :unprocessable_entity
+          render json: { success: false, message: 'State parameter is required.' }, status: :unprocessable_entity
         end
 
       else
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
 
@@ -238,16 +272,16 @@ module Orders
           @order.destroy
           head :no_content
         else
-          render json: { success: false, message: "Order not found." }, status: :not_found
+          render json: { success: false, message: 'Order not found.' }, status: :not_found
         end
       else
-        render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
 
-    #! TODO: Update to include all data as index and show methods
+    # ! TODO: Update to include all data as index and show methods
     # Method to retrieve orders in the graveyard pool (unassigned orders).
-    #GET /orders/info/graveyard_orders
+    # GET /orders/info/graveyard_orders
     def graveyard_orders
       @graveyard_orders = Order.where(assigned_skill_master_id: nil)
 
@@ -255,17 +289,16 @@ module Orders
         orders: @graveyard_orders.as_json(
           include: {
             products: {
-              only: [:id, :name, :price, :tax, :image, :quantity]
+              only: %i[id name price tax image quantity]
             }
           },
-          only: [:id, :state, :created_at, :total_price, :internal_id, :platform]
+          only: %i[id state created_at total_price internal_id platform]
         ).map do |order|
           platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
           order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
         end
       }
     end
-
 
     # POST orders/info/:id/pick_up_order
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
@@ -277,22 +310,23 @@ module Orders
       elsif current_user.role == 'skillmaster'
         skill_master_id = current_user.id
       else
-        return render json: { success: false, message: "Unauthorized action." }, status: :forbidden
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
 
       # Check if the order is in the 'open' state
       unless @order.open?
-        return render json: { success: false, message: "Order is not available for pick up. Current state: #{@order.state}" }, status: :unprocessable_entity
+        return render json: { success: false, message: "Order is not available for pick up. Current state: #{@order.state}" },
+                      status: :unprocessable_entity
       end
-
 
       # Find the skill master and check their platforms if they are a skill master
       if current_user.role == 'skillmaster'
-        skill_master_platforms = current_user.platforms.map(&:id)  # Or `map(&:id)` depending on your platform logic
-        order_platform = @order.platform  # Assuming `@order.platform` is either the platform name or ID
+        skill_master_platforms = current_user.platforms.map(&:id) # Or `map(&:id)` depending on your platform logic
+        order_platform = @order.platform # Assuming `@order.platform` is either the platform name or ID
 
         unless skill_master_platforms.include?(order_platform)
-          return render json: { success: false, message: "Order platform does not match skill master's platforms." }, status: :forbidden
+          return render json: { success: false, message: "Order platform does not match skill master's platforms." },
+                        status: :forbidden
         end
       end
 
@@ -303,10 +337,9 @@ module Orders
       if @order.may_assign? && @order.assign! && @order.save
         render json: { success: true, message: "Order #{@order.id} picked up successfully!" }
       else
-        render json: { success: false, message: "Failed to pick up the order." }, status: :unprocessable_entity
+        render json: { success: false, message: 'Failed to pick up the order.' }, status: :unprocessable_entity
       end
     end
-
 
     # GET /orders/info/:id/download_invoice
     # Download the invoice for a specific order
@@ -323,7 +356,7 @@ module Orders
       pdf.move_down 20
 
       # Add line items and calculate totals
-      pdf.text "Order Details", size: 20, style: :bold
+      pdf.text 'Order Details', size: 20, style: :bold
       pdf.move_down 10
 
       total_price = 0
@@ -350,12 +383,29 @@ module Orders
       pdf.text "Final Total: $#{'%.2f' % final_total}", size: 16, style: :bold
 
       # Send the PDF file as a response
-      send_data pdf.render, filename: "invoice_#{@order.internal_id}.pdf", type: 'application/pdf', disposition: 'attachment'
+      send_data pdf.render, filename: "invoice_#{@order.internal_id}.pdf", type: 'application/pdf',
+                            disposition: 'attachment'
     end
 
     private
 
-    private
+    # Method to handle dynamic pricing based on levels
+    def handle_dynamic_pricing(order, product_id, selected_level)
+      product = Product.find(product_id)
+
+      if product.prod_attr_cats.exists?(name: 'Levels')
+        # Dynamic pricing logic if 'Levels' attribute category is selected
+        selected_level = selected_level.to_i
+        price = product.calculate_price(selected_level)
+
+        # Update the order with dynamic price and selected level
+        order.selected_level = selected_level
+        order.dynamic_price = price
+      else
+        # Use the product's static price for non-level based products
+        order.price = product.price
+      end
+    end
 
     def assign_platform_credentials(order, platform_id)
       # Use the platform set on the order itself
@@ -363,17 +413,18 @@ module Orders
 
       if platform_id.present?
         # Find platform credential by user_id and platform_id
-        platform_credential = PlatformCredential.find_by(user_id: order.user_id || current_user.id, platform_id: platform_id)
+        platform_credential = PlatformCredential.find_by(user_id: order.user_id || current_user.id,
+                                                         platform_id: platform_id)
 
         # Assign platform credential to the order if it exists
         if platform_credential
           order.platform_credential = platform_credential
-          return true
+          true
         else
-          return false
+          false
         end
       else
-        return false
+        false
       end
     end
 
@@ -383,13 +434,13 @@ module Orders
       product_ids.each do |product_id|
         product = Product.find_by(id: product_id)
         if product
-          order.order_products.create(product: product)  # No price or tax here
+          order.order_products.create(product: product) # No price or tax here
         else
           Rails.logger.warn "Product with ID #{product_id} not found"
         end
       end
 
-      order.update_totals  # Update order totals after adding products
+      order.update_totals # Update order totals after adding products
     end
 
     # Set the order for actions that require it
@@ -398,8 +449,22 @@ module Orders
     end
 
     # Strong parameters for order creation and update
+
     def order_params
-      params.require(:order).permit(:user_id, :state, :total_price, :platform, :platform_credential_id, :promotion_id, :assigned_skill_master_id, :price, :tax)
+      params.require(:order).permit(
+        :user_id,
+        :state,
+        :total_price,
+        :platform,
+        :platform_credential_id,
+        :promotion_id,
+        :assigned_skill_master_id,
+        :price,
+        :tax,
+        :dynamic_price,
+        :start_level,     # Added to allow start_level
+        :end_level        # Added to allow end_level
+      )
     end
   end
 end

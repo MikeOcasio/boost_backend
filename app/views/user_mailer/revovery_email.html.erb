@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Recovery</title>
+  <style>
+    /* Global Styles */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background-color: #4B0082; /* RavenBoost Primary Color: Purple */
+      padding: 20px;
+      text-align: center;
+    }
+    .header img {
+      max-width: 150px;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      color: #FFD700; /* RavenBoost Secondary Color: Gold */
+      margin: 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .content {
+      padding: 20px;
+    }
+    .content h2 {
+      color: #4B0082; /* Primary Color */
+      font-size: 22px;
+      margin-top: 0;
+    }
+    .content p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #333;
+    }
+    .button {
+      display: inline-block;
+      background-color: #4B0082; /* Purple */
+      color: #FFD700; /* Gold */
+      padding: 10px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      text-decoration: none;
+      text-align: center;
+      border-radius: 5px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+    .footer {
+      background-color: #4B0082; /* Primary Color */
+      padding: 10px;
+      text-align: center;
+      color: #ffffff;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #FFD700; /* Gold */
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Email Header -->
+    <div class="header">
+      <img src="https://www.ravenboost.com/images/logo.png" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
+      <h1>Password Recovery</h1>
+    </div>
+
+    <!-- Email Content -->
+    <div class="content">
+      <h2>Hello, <%= @user.name %>,</h2>
+      <p>It seems like you've requested a password reset. No worries, we're here to help!</p>
+
+      <p>To reset your password, simply click the button below:</p>
+
+      <a href="<%= @reset_url %>" class="button">Reset Password</a>
+
+      <p>If you didn’t request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+
+      <p>If you need further assistance, feel free to <a href="https://www.ravenboost.com/support">contact our support team</a>.</p>
+
+      <p>Thank you for using RavenBoost!</p>
+
+      <p>Best regards,<br>The RavenBoost Team</p>
+    </div>
+
+    <!-- Footer Section -->
+    <div class="footer">
+      <p>© 2024 RavenBoost. All rights reserved.</p>
+      <p><a href="https://www.ravenboost.com">Visit our website</a> | <a href="https://www.ravenboost.com/support">Contact Support</a></p>
+    </div>
+  </div>
+</body>
+</html>
