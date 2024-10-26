@@ -65,18 +65,16 @@ class Product < ApplicationRecord
         end
       end
 
-      return total_price.round(2)  # Return the rounded total price
+      return total_price.round(2) # Return the rounded total price
     end
 
     # Return a default price (0 or static price) if no level-based pricing applies
-    return 0
+    0
   end
 
-
-private
+  private
 
   def has_at_least_one_platform
-    errors.add(:platforms, "must have at least one platform") if platforms.empty?
+    errors.add(:platforms, 'must have at least one platform') if platforms.empty?
   end
-
 end

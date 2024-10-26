@@ -17,7 +17,8 @@ class Api::PaymentsController < ApplicationController
 
       # Check if currency and products are present
       if currency.nil? || products.empty?
-        return render json: { success: false, error: "Currency and products are required." }, status: :unprocessable_entity
+        return render json: { success: false, error: 'Currency and products are required.' },
+                      status: :unprocessable_entity
       end
 
       # Create line items for the checkout session
@@ -27,23 +28,23 @@ class Api::PaymentsController < ApplicationController
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: [product[:image] || "https://www.ravenboost.com/logo.svg"]
+              images: [product[:image] || 'https://www.ravenboost.com/logo.svg']
             },
-            unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i,
+            unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i
           },
-          quantity: product[:quantity].to_i,
+          quantity: product[:quantity].to_i
         }
       end
 
       # Create the checkout session
       session = Stripe::Checkout::Session.create({
-        payment_method_types: ['card'],
-        line_items: line_items,
-        mode: 'payment',
-        customer_email: current_user.email,
-        success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "#{YOUR_DOMAIN}/checkout",
-      })
+                                                   payment_method_types: ['card'],
+                                                   line_items: line_items,
+                                                   mode: 'payment',
+                                                   customer_email: current_user.email,
+                                                   success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+                                                   cancel_url: "#{YOUR_DOMAIN}/checkout"
+                                                 })
 
       # Return the session ID (which can be used to redirect the customer)
       render json: { success: true, sessionId: session.id }, status: :created
@@ -56,11 +57,9 @@ class Api::PaymentsController < ApplicationController
 
   # Optionally, you can add a method to retrieve the session status
   def session_status
-    begin
-      session = Stripe::Checkout::Session.retrieve(params[:session_id])
-      render json: { status: session.status, customer_email: session.customer_email }, status: :ok
-    rescue Stripe::StripeError => e
-      render json: { success: false, error: e.message }, status: :unprocessable_entity
-    end
+    session = Stripe::Checkout::Session.retrieve(params[:session_id])
+    render json: { status: session.status, customer_email: session.customer_email }, status: :ok
+  rescue Stripe::StripeError => e
+    render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 end

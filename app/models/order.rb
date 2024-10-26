@@ -1,19 +1,19 @@
-  # == Schema Information
-  #
-  # Table name: orders
-  #
-  #  id         :bigint           not null, primary key
-  #  user_id    :bigint           not null
-  #  product_id :bigint           not null
-  #  status     :string
-  #  total_price: decimal
-  #  created_at :datetime         not null
-  #  updated_at :datetime         not null'
-  #  internal_id: string
-  #
-  # Relationships
-  # - belongs_to :user
-  # - belongs_to :product
+# == Schema Information
+#
+# Table name: orders
+#
+#  id         :bigint           not null, primary key
+#  user_id    :bigint           not null
+#  product_id :bigint           not null
+#  status     :string
+#  total_price: decimal
+#  created_at :datetime         not null
+#  updated_at :datetime         not null'
+#  internal_id: string
+#
+# Relationships
+# - belongs_to :user
+# - belongs_to :product
 
 class Order < ApplicationRecord
   include AASM
@@ -48,11 +48,11 @@ class Order < ApplicationRecord
     # Define state transitions
     event :assign do
       # Transition from `open` to `assigned` only if `assigned_skill_master_id` is set
-      transitions from:  [:re_assigned, :open], to: :assigned, guard: :skill_master_assigned?
+      transitions from: %i[re_assigned open], to: :assigned, guard: :skill_master_assigned?
     end
 
     event :start_progress do
-      transitions from: :assigned, to: :in_progress #! Need to add reassign logic
+      transitions from: :assigned, to: :in_progress # ! Need to add reassign logic
     end
 
     event :mark_delayed do
@@ -60,15 +60,15 @@ class Order < ApplicationRecord
     end
 
     event :mark_disputed do
-      transitions from: [:assigned, :in_progress, :delayed], to: :disputed
+      transitions from: %i[assigned in_progress delayed], to: :disputed
     end
 
     event :re_assign do
-      transitions from: [:assigned, :in_progress, :disputed, :delayed], to: :re_assigned
+      transitions from: %i[assigned in_progress disputed delayed], to: :re_assigned
     end
 
     event :complete_order do
-      transitions from: [:in_progress, :delayed], to: :complete
+      transitions from: %i[in_progress delayed], to: :complete
     end
   end
 
@@ -96,13 +96,12 @@ class Order < ApplicationRecord
   end
 
   def assign_platform_credentials
-    if platform_credential.nil? && user.present? && platform.present?
-      self.platform_credential = user.platform_credentials.find_by(platform_id: platform)
-    end
+    return unless platform_credential.nil? && user.present? && platform.present?
+
+    self.platform_credential = user.platform_credentials.find_by(platform_id: platform)
   end
 
   def skill_master_assigned?
     assigned_skill_master_id.present?
   end
-
 end

@@ -1,7 +1,7 @@
 module Users
   class MembersController < ApplicationController
     before_action :authenticate_user!
-    before_action :set_user, only: [:show, :update, :destroy, :add_platform, :remove_platform, :lock_user, :unlock_user]
+    before_action :set_user, only: %i[show update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
     def signed_in_user
@@ -40,7 +40,7 @@ module Users
       user_to_update = current_user
 
       # Allow only 'admin' or 'dev' roles to update other users
-      if ['admin', 'dev'].include?(current_user.role)
+      if %w[admin dev].include?(current_user.role)
         user_to_update = User.find(params[:id]) # Admins/Devs can update other users
       elsif current_user.id != params[:id].to_i
         # Prevent regular users from updating others
@@ -56,9 +56,7 @@ module Users
           # If the new image is a Base64 string, treat it as a new upload regardless of old_image_url
           if user_params[:image_url].start_with?('data:image/')
             # If the old image is an S3 URL, delete it
-            if old_image_url.present? && old_image_url.start_with?('https://')
-              delete_image_from_s3(old_image_url)
-            end
+            delete_image_from_s3(old_image_url) if old_image_url.present? && old_image_url.start_with?('https://')
 
             # Upload the new Base64 image to S3
             s3_image_url = upload_image_to_s3(user_to_update, user_params[:image_url])
@@ -67,9 +65,7 @@ module Users
           # Otherwise, it's a direct URL change (assuming S3 URL), so compare and update
           elsif old_image_url != user_params[:image_url]
             # If the old image is an S3 URL, delete it
-            if old_image_url.present? && old_image_url.start_with?('https://')
-              delete_image_from_s3(old_image_url)
-            end
+            delete_image_from_s3(old_image_url) if old_image_url.present? && old_image_url.start_with?('https://')
 
             # Update the new image URL directly if it's already an S3 URL
             user_to_update.update(image_url: user_params[:image_url])
@@ -81,7 +77,6 @@ module Users
         render json: user_to_update.errors, status: :unprocessable_entity
       end
     end
-
 
     # DELETE /users/member-data/:id
     def destroy
@@ -109,7 +104,6 @@ module Users
         render json: { error: 'You are not authorized to delete this user.' }, status: :forbidden
       end
     end
-
 
     # DELETE /users/members/:id/ban
     def destroy_and_ban
@@ -144,10 +138,6 @@ module Users
       end
     end
 
-
-
-
-
     # POST /users/member-data/:id/platforms
     def add_platform
       current_user = get_user_from_token # Fetch the current user from the token
@@ -165,7 +155,7 @@ module Users
     def remove_platform
       current_user = get_user_from_token # Fetch the current user from the token
 
-      if current_user.id == @user.id || current_user.role.in?(["dev", "admin"])
+      if current_user.id == @user.id || current_user.role.in?(%w[dev admin])
         platform = Platform.find(params[:platform_id])
         @user.platforms.delete(platform)
         head :no_content
@@ -173,7 +163,6 @@ module Users
         render json: { error: 'You are not authorized to remove platforms for this user.' }, status: :forbidden
       end
     end
-
 
     # POST /users/members/:id/lock
     def lock_user
@@ -208,8 +197,6 @@ module Users
         render json: { error: 'You are not authorized to unlock this user.' }, status: :forbidden
       end
     end
-
-
 
     private
 
@@ -247,10 +234,9 @@ module Users
         :bio,           # Add bio
         :gamer_tag,     # Add gamer_tag
         achievements: [], # Add achievements array
-        gameplay_info: [:name, :url] # Add gameplay_info array
+        gameplay_info: %i[name url] # Add gameplay_info array
       )
     end
-
 
     def upload_image_to_s3(user, image_param)
       if image_param.is_a?(ActionDispatch::Http::UploadedFile)
@@ -279,7 +265,8 @@ module Users
           return obj.public_url
         end
       else
-        raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
+        raise ArgumentError,
+              "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{image_param.class.name}"
       end
     end
 
@@ -293,6 +280,5 @@ module Users
       obj = S3_BUCKET.object(object_key)
       obj.delete if obj.exists?
     end
-
   end
 end

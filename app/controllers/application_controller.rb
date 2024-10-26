@@ -4,6 +4,6 @@ class ApplicationController < ActionController::API
 
   # Health check endpoint
   def health_check
-    render plain: "OK", status: :ok
+    render plain: 'OK', status: :ok
   end
 end

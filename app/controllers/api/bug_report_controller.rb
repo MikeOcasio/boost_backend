@@ -1,9 +1,8 @@
 module Api
   class BugReportController < ApplicationController
     before_action :authenticate_user!
-    before_action :authorize_developer!, only: [:index, :show, :update, :destroy]
-    before_action :set_bug_report, only: [:show, :update, :destroy]
-
+    before_action :authorize_developer!, only: %i[index show update destroy]
+    before_action :set_bug_report, only: %i[show update destroy]
 
     def index
       @bug_reports = BugReport.all
@@ -49,9 +48,9 @@ module Api
     end
 
     def authorize_developer!
-      unless current_user.role == 'dev'
-        render json: { error: "Unauthorized" }, status: :unauthorized
-      end
+      return if current_user.role == 'dev'
+
+      render json: { error: 'Unauthorized' }, status: :unauthorized
     end
   end
 end

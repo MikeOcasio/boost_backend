@@ -29,7 +29,7 @@ class Users::SessionsController < Devise::SessionsController
 
       render json: {
         message: '2FA is not set up. Please scan the QR code to set it up.',
-        qr_code: qr_code_svg,
+        qr_code: qr_code_svg
       }, status: :ok
       return
     end
@@ -38,7 +38,12 @@ class Users::SessionsController < Devise::SessionsController
     otp_attempt = params[:user][:otp_attempt]
 
     if otp_attempt.blank?
-      render json: { error: 'OTP required' }, status: :unauthorized
+      render json: {
+        message: 'User requires OTP for login',
+        error: 'OTP required',
+        otp_attempt: params[:user][:otp_attempt],
+        qr_code: nil
+      }, status: :unauthorized
       return
     elsif !user.validate_and_consume_otp!(otp_attempt)
       render json: { error: 'Invalid OTP code' }, status: :unauthorized
@@ -57,7 +62,7 @@ class Users::SessionsController < Devise::SessionsController
     render json: {
       message: 'You are logged in.',
       user: resource,
-      token: token,
+      token: token
     }, status: :ok
   end
 

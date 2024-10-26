@@ -2,11 +2,7 @@ class OrderProduct < ApplicationRecord
   belongs_to :order
   belongs_to :product
 
-    def price
-      product.price
-    end
+  delegate :price, to: :product
 
-    def tax
-      product.tax
-    end
+  delegate :tax, to: :product
 end

@@ -8,7 +8,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def index
-    if current_user.role == "admin" || current_user.role == "dev"
+    if current_user.role == 'admin' || current_user.role == 'dev'
       @applications = SkillmasterApplication.all
       render json: @applications
     elsif current_user.id == params[:id]
@@ -19,7 +19,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
     end
   end
 
-  #! TODO: Implement the create action
+  # ! TODO: Implement the create action
   def create
     @application = SkillmasterApplication.new(application_params)
     @application.user_id = current_user.id
@@ -32,7 +32,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def update
-    if current_user.role == "admin" || current_user.role == "dev"
+    if current_user.role == 'admin' || current_user.role == 'dev'
       # Handle the update
     elsif current_user.id == params[:id]
       # Handle the update

@@ -10,7 +10,7 @@ Rails.application.routes.draw do
   }
 
   namespace :users do
-    resources :members, path: 'member-data', only: [:index, :create, :show, :update, :destroy] do
+    resources :members, path: 'member-data', only: %i[index create show update destroy] do
       member do
         get :platforms
         post :add_platform
@@ -39,9 +39,9 @@ Rails.application.routes.draw do
   end
 
   namespace :orders do
-    resources :orders, path: 'info', only: [:index, :show, :create, :update, :destroy] do
+    resources :orders, path: 'info', only: %i[index show create update destroy] do
       member do
-        post 'pick_up_order'  # POST /orders/:id/pick_up_order
+        post 'pick_up_order' # POST /orders/:id/pick_up_order
         get 'download_invoice'  # GET /orders/:id/download_invoice
       end
 
@@ -78,7 +78,7 @@ Rails.application.routes.draw do
     # Categories routes
     resources :categories do
       member do
-        get :products  # Get products for a specific category
+        get :products # Get products for a specific category
       end
     end
 
@@ -89,23 +89,20 @@ Rails.application.routes.draw do
       end
     end
     # Resources for categories with limited actions
-    resources :categories, only: [:index, :show, :create, :update, :destroy]
+    resources :categories, only: %i[index show create update destroy]
 
     # Resources for files management
-    resources :files, only: [:index, :create, :destroy]
+    resources :files, only: %i[index create destroy]
 
-    resources :skillmasters, only: [:index, :show]
+    resources :skillmasters, only: %i[index show]
 
-    resources :platform_credentials, only: [:show, :create, :update, :destroy]
+    resources :platform_credentials, only: %i[show create update destroy]
 
     resources :level_prices
 
     resources :payments, only: [] do
       post 'create_checkout_session', on: :collection
     end
-
-
-
   end
 
   # CSRF token route for frontend usage

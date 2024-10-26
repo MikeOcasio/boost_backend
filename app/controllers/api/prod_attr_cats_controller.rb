@@ -1,6 +1,6 @@
 module Api
   class ProdAttrCatsController < ApplicationController
-    before_action :set_prod_attr_cat, only: [:show, :update, :destroy, :products]
+    before_action :set_prod_attr_cat, only: %i[show update destroy products]
 
     # GET /api/prod_attr_cats
     def index
@@ -35,19 +35,17 @@ module Api
 
     # DELETE /api/prod_attr_cats/:id
     def destroy
-      begin
-        if @prod_attr_cat.destroy
-          render json: { message: 'Successfully deleted' }, status: :ok
-        else
-          render json: { message: 'Failed to delete due to validation errors' }, status: :unprocessable_entity
-        end
-      rescue => e
-        # Log the error message for debugging purposes
-        Rails.logger.error("Failed to delete product attribute category: #{e.message}")
-
-        # Send the error message back to the frontend
-        render json: { message: "Server error 500: #{e.message}" }, status: :internal_server_error
+      if @prod_attr_cat.destroy
+        render json: { message: 'Successfully deleted' }, status: :ok
+      else
+        render json: { message: 'Failed to delete due to validation errors' }, status: :unprocessable_entity
       end
+    rescue StandardError => e
+      # Log the error message for debugging purposes
+      Rails.logger.error("Failed to delete product attribute category: #{e.message}")
+
+      # Send the error message back to the frontend
+      render json: { message: "Server error 500: #{e.message}" }, status: :internal_server_error
     end
 
     # GET /api/prod_attr_cats/:id/products
@@ -56,10 +54,9 @@ module Api
         products = @prod_attr_cat.products
         render json: products, status: :ok
       else
-        render json: { error: "Product Attribute Category not found" }, status: :not_found
+        render json: { error: 'Product Attribute Category not found' }, status: :not_found
       end
     end
-
 
     private
 

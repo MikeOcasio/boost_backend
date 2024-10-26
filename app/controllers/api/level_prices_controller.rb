@@ -1,8 +1,8 @@
 module Api
   class LevelPricesController < ApplicationController
     before_action :authenticate_user!
-    before_action :set_level_price, only: [:show, :update, :destroy]
-    before_action :authorize_admin_or_dev, only: [:create, :update, :destroy]
+    before_action :set_level_price, only: %i[show update destroy]
+    before_action :authorize_admin_or_dev, only: %i[create update destroy]
 
     # GET /level_prices
     def index
@@ -56,9 +56,9 @@ module Api
     # Authorize only admins or devs for create, update, destroy actions
     def authorize_admin_or_dev
       current_user = get_user_from_token
-      unless current_user.role == 'admin' || current_user.role == 'dev'
-        render json: { error: 'Unauthorized access' }, status: :forbidden
-      end
+      return if current_user.role == 'admin' || current_user.role == 'dev'
+
+      render json: { error: 'Unauthorized access' }, status: :forbidden
     end
 
     # Method to get the current user from JWT token

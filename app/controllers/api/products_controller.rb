@@ -1,18 +1,18 @@
 module Api
   class ProductsController < ApplicationController
-    before_action :set_product, only: [:show, :update, :destroy, :platforms, :add_platform, :remove_platform]
+    before_action :set_product, only: %i[show update destroy platforms add_platform remove_platform]
 
     # GET /products
     def index
-        @products = Product.includes(:category, :platforms, :prod_attr_cats)
-                        .where(categories: { is_active: true })
+      @products = Product.includes(:category, :platforms, :prod_attr_cats)
+                         .where(categories: { is_active: true })
 
       # Render the products that passed the condition (active categories only)
       render json: @products.as_json(
         include: {
-          platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description, :is_active] },
-          prod_attr_cats: { only: [:id, :name] }
+          platforms: { only: %i[id name] },
+          category: { only: %i[id name description is_active] },
+          prod_attr_cats: { only: %i[id name] }
         }
       )
     end
@@ -33,10 +33,10 @@ module Api
 
       render json: @product.as_json(
         include: {
-          platforms: { only: [:id, :name] },
-          category: { only: [:id, :name, :description] },
-          prod_attr_cats: { only: [:id, :name] }
-        },
+          platforms: { only: %i[id name] },
+          category: { only: %i[id name description] },
+          prod_attr_cats: { only: %i[id name] }
+        }
         # methods: :static_price, # This is if you want to include the product's static price as well
         # dynamic_price: dynamic_price
       )
@@ -46,16 +46,14 @@ module Api
       platform_id = params[:platform_id]
       platform = Platform.find_by(id: platform_id)
 
-      unless platform
-        return render json: { message: "Platform not found" }, status: :not_found
-      end
+      return render json: { message: 'Platform not found' }, status: :not_found unless platform
 
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
       if @products.any?
-        render json: @product.as_json(include: { platforms: { only: [:id, :name ] } }), status: :ok
+        render json: @product.as_json(include: { platforms: { only: %i[id name] } }), status: :ok
       else
-        render json: { message: "No products found for this platform" }, status: :not_found
+        render json: { message: 'No products found for this platform' }, status: :not_found
       end
     end
 
@@ -63,18 +61,13 @@ module Api
     def create
       # Handle image upload if provided
       uploaded_image = if params[:product][:image].present? && params[:product][:remove_image] != 'true'
-        upload_to_s3(params[:product][:image])
-      else
-        nil
-      end
+                         upload_to_s3(params[:product][:image])
+                       end
 
-    # Handle background image upload if provided and remove_bg_image flag is false
-    uploaded_bg_image = if params[:product][:bg_image].present? && params[:product][:remove_bg_image] != 'true'
-              upload_to_s3(params[:product][:bg_image])
-            else
-              nil
-            end
-
+      # Handle background image upload if provided and remove_bg_image flag is false
+      uploaded_bg_image = if params[:product][:bg_image].present? && params[:product][:remove_bg_image] != 'true'
+                            upload_to_s3(params[:product][:bg_image])
+                          end
 
       # Create a new product with the provided attributes, excluding platform_ids for now
       @product = Product.new(product_params.except(:platform_ids))
@@ -84,9 +77,7 @@ module Api
       @product.bg_image = uploaded_bg_image if uploaded_bg_image
 
       # Assign platforms if provided
-      if params[:platform_ids].present?
-        @product.platform_ids = params[:platform_ids]
-      end
+      @product.platform_ids = params[:platform_ids] if params[:platform_ids].present?
 
       # Assign prod_attr_cats if provided
       if params[:prod_attr_cat_ids].present?
@@ -100,9 +91,9 @@ module Api
       if @product.save
         render json: @product.as_json(
           include: {
-            platforms: { only: [:id, :name] },
-            category: { only: [:id, :name, :description] },
-            prod_attr_cats: { only: [:id, :name] }
+            platforms: { only: %i[id name] },
+            category: { only: %i[id name description] },
+            prod_attr_cats: { only: %i[id name] }
           }
         ), status: :created
       else
@@ -110,7 +101,7 @@ module Api
       end
     end
 
-    #GET api/products/id
+    # GET api/products/id
     def update
       # Store old image URLs before updating
       old_image_url = @product.image
@@ -125,19 +116,17 @@ module Api
           # If old image is Base64, simply set the new image
           @product.image = upload_to_s3(params[:product][:image])
           @product.save
-        else
+        elsif params[:product][:image].start_with?('data:image/')
           # Handle new image upload
-          if params[:product][:image].start_with?('data:image/')  # Check for Base64
-            # Upload the Base64 image to S3
-            uploaded_image = upload_to_s3(params[:product][:image])
-            delete_from_s3(old_image_url) if old_image_url.present?
-            @product.image = uploaded_image
-          elsif params[:product][:image].present? && params[:product][:image] != old_image_url
-            # If the image is a URL, upload it to S3
-            uploaded_image = upload_to_s3(params[:product][:image])
-            delete_from_s3(old_image_url) if old_image_url.present?
-            @product.image = uploaded_image
-          end
+          uploaded_image = upload_to_s3(params[:product][:image])
+          delete_from_s3(old_image_url) if old_image_url.present?
+          @product.image = uploaded_image # Check for Base64
+        # Upload the Base64 image to S3
+        elsif params[:product][:image].present? && params[:product][:image] != old_image_url
+          # If the image is a URL, upload it to S3
+          uploaded_image = upload_to_s3(params[:product][:image])
+          delete_from_s3(old_image_url) if old_image_url.present?
+          @product.image = uploaded_image
         end
       elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_image]) || params[:product][:image].nil?
         # If the remove_image flag is true, delete the old image
@@ -150,19 +139,17 @@ module Api
         if old_bg_image_url.present? && old_bg_image_url.start_with?('data:image/') # Check if old bg image is Base64
           # If old background image is Base64, simply set the new bg image
           @product.bg_image = upload_to_s3(params[:product][:bg_image])
-        else
+        elsif params[:product][:bg_image].start_with?('data:image/')
           # Handle new background image upload
-          if params[:product][:bg_image].start_with?('data:image/')  # Check for Base64
-            # Upload the Base64 background image to S3
-            uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
-            delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
-            @product.bg_image = uploaded_bg_image
-          elsif params[:product][:bg_image].present? && params[:product][:bg_image] != old_bg_image_url
-            # If the background image is a URL, upload it to S3
-            uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
-            delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
-            @product.bg_image = uploaded_bg_image
-          end
+          uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
+          delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+          @product.bg_image = uploaded_bg_image # Check for Base64
+        # Upload the Base64 background image to S3
+        elsif params[:product][:bg_image].present? && params[:product][:bg_image] != old_bg_image_url
+          # If the background image is a URL, upload it to S3
+          uploaded_bg_image = upload_to_s3(params[:product][:bg_image])
+          delete_from_s3(old_bg_image_url) if old_bg_image_url.present?
+          @product.bg_image = uploaded_bg_image
         end
       elsif ActiveModel::Type::Boolean.new.cast(params[:product][:remove_bg_image]) || params[:product][:bg_image].nil?
         # If the remove_bg_image flag is true, delete the old background image
@@ -176,16 +163,15 @@ module Api
       if @product.update(product_params.except(:image, :bg_image, :platform_ids))
         render json: @product.as_json(
           include: {
-            platforms: { only: [:id, :name] },
-            category: { only: [:id, :name, :description] },
-            prod_attr_cats: { only: [:id, :name] }  # Include both IDs and names of prod_attr_cats
+            platforms: { only: %i[id name] },
+            category: { only: %i[id name description] },
+            prod_attr_cats: { only: %i[id name] } # Include both IDs and names of prod_attr_cats
           }
         ), status: :ok
       else
         render json: @product.errors, status: :unprocessable_entity
       end
     end
-
 
     # DELETE /products/:id
     def destroy
@@ -205,7 +191,7 @@ module Api
       return if file_url.blank?
 
       # Extract the object key from the URL
-      file_key = URI.parse(file_url).path[1..]  # Strip leading "/"
+      file_key = URI.parse(file_url).path[1..] # Strip leading "/"
 
       # Delete the object from S3
       obj = S3_BUCKET.object(file_key)
@@ -236,8 +222,6 @@ module Api
       head :no_content
     end
 
-    private
-
     def set_product
       @product = Product.find_by(id: params[:id])
       render json: { error: 'Product not found' }, status: :not_found if @product.nil?
@@ -260,13 +244,11 @@ module Api
         :primary_color,
         :secondary_color,
         :category_id,
-        features: [],          # Allows an array of features
+        features: [], # Allows an array of features
         platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
       )
     end
-
-
 
     def upload_to_s3(file)
       if file.is_a?(ActionDispatch::Http::UploadedFile)
@@ -295,7 +277,8 @@ module Api
           return obj.public_url
         end
       else
-        raise ArgumentError, "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{file.class.name}"
+        raise ArgumentError,
+              "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{file.class.name}"
       end
     end
   end

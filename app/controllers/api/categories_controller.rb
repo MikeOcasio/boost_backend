@@ -1,8 +1,7 @@
 module Api
   class CategoriesController < ApplicationController
     # Set the category instance variable for actions that require it
-    before_action :set_category, only: [:show, :products, :update, :destroy]
-
+    before_action :set_category, only: %i[show products update destroy]
 
     # GET /categories
     # List all categories.
@@ -20,15 +19,16 @@ module Api
       render json: @category
     end
 
-        # GET /categories/:id/products
+    # GET /categories/:id/products
     # Get all products for a specific category
     def products
       products = @category.products
 
       if products.any?
-        render json: products.as_json(include: { platforms: { only: :id }, category: { only: [:id, :name, :description] } }), status: :ok
+        render json: products.as_json(include: { platforms: { only: :id }, category: { only: %i[id name description] } }),
+               status: :ok
       else
-        render json: { message: "No products found for this category" }, status: :not_found
+        render json: { message: 'No products found for this category' }, status: :not_found
       end
     end
 
@@ -64,7 +64,6 @@ module Api
         render json: @category.errors, status: :unprocessable_entity
       end
     end
-
 
     # DELETE /categories/:id
     # Delete a specific category based on the provided ID.
