@@ -24,7 +24,7 @@ class Users::SessionsController < Devise::SessionsController
     params[:user][:remember_me] = params[:user][:remember_me] if params[:user].key?(:remember_me)
 
     # Check if the user has an OTP secret
-    if user.otp_secret.blank?
+    if user.otp_secret.blank? || !user.otp_required_for_login
       # User does not have OTP set up, generate the OTP secret and QR code
       user.generate_otp_secret_if_missing!
       otp_uri = user.otp_provisioning_uri(user.email, issuer: 'RavenBoost')
