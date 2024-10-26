@@ -15,7 +15,7 @@ class Users::SessionsController < Devise::SessionsController
       return
     end
 
-    if user.present? && user.deleted_at.present?
+    if user.deleted_at.present?
       render json: { error: 'Your account has been deleted. Please re-register.' }, status: :forbidden
       return
     end
@@ -23,39 +23,38 @@ class Users::SessionsController < Devise::SessionsController
     # Remember me functionality if passed
     params[:user][:remember_me] = params[:user][:remember_me] if params[:user].key?(:remember_me)
 
-    # Check if the user has an OTP secret
-    if user.otp_secret.blank? || !user.otp_required_for_login
-      # User does not have OTP set up, generate the OTP secret and QR code
+    # Check if OTP setup is incomplete
+    if user.otp_secret.blank? || !user.otp_setup_complete
+      # User does not have OTP fully set up; generate the OTP secret and QR code
       user.generate_otp_secret_if_missing!
       otp_uri = user.otp_provisioning_uri(user.email, issuer: 'RavenBoost')
       qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
 
-      update_otp_requirement(user) # Ensure OTP requirement is set to true
+      # Set otp_required_for_login to false until setup is complete
+      user.update!(otp_required_for_login: false)
 
       render json: {
-        message: '2FA is not set up. Please scan the QR code to set it up.',
+        message: '2FA is not fully set up. Please scan the QR code to set it up.',
         qr_code: qr_code_svg
       }, status: :ok
       return
     end
 
-    # Now check if OTP is required and validate the OTP attempt
+    # Require OTP if setup is complete
     otp_attempt = params[:user][:otp_attempt]
 
-    if otp_attempt.blank?
-      render json: {
-        message: 'User requires OTP for login',
-        error: 'OTP required',
-        otp_attempt: params[:user][:otp_attempt],
-        qr_code: nil
-      }, status: :unauthorized
+    if user.otp_required_for_login && otp_attempt.blank?
+      render json: { error: 'OTP required' }, status: :unauthorized
       return
-    elsif !user.validate_and_consume_otp!(otp_attempt)
+    elsif user.otp_required_for_login && !user.validate_and_consume_otp!(otp_attempt)
       render json: { error: 'Invalid OTP code' }, status: :unauthorized
       return
     end
 
-    # If OTP is valid, proceed with Devise's standard login process
+    # If OTP is validated, mark setup as complete
+    user.update!(otp_setup_complete: true, otp_required_for_login: true) if user.otp_secret.present?
+
+    # Continue with the login
     super
   end
 
@@ -63,7 +62,6 @@ class Users::SessionsController < Devise::SessionsController
 
   def respond_with(resource, _opts = {})
     token = request.env['warden-jwt_auth.token']
-
     render json: {
       message: 'You are logged in.',
       user: resource,
@@ -81,9 +79,5 @@ class Users::SessionsController < Devise::SessionsController
 
   def log_out_failed
     render json: { message: 'Something went wrong.' }, status: :unprocessable_entity
-  end
-
-  def update_otp_requirement(user)
-    user.update!(otp_required_for_login: true)
   end
 end
