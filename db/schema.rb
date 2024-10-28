@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_26_151834) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_28_193840) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -95,16 +95,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_151834) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylist_on_jti"
-  end
-
-  create_table "level_prices", force: :cascade do |t|
-    t.bigint "category_id", null: false
-    t.integer "min_level", null: false
-    t.integer "max_level", null: false
-    t.decimal "price_per_level", precision: 8, scale: 2, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["category_id"], name: "index_level_prices_on_category_id"
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -243,6 +233,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_151834) do
     t.string "secondary_color"
     t.string "features", default: [], array: true
     t.bigint "category_id"
+    t.boolean "is_dropdown", default: false
+    t.jsonb "dropdown_options", default: []
   end
 
   create_table "promotions", force: :cascade do |t|
@@ -353,7 +345,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_151834) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
-  add_foreign_key "level_prices", "categories"
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"

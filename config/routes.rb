@@ -102,8 +102,6 @@ Rails.application.routes.draw do
 
     resources :platform_credentials, only: %i[show create update destroy]
 
-    resources :level_prices
-
     resources :payments, only: [] do
       post 'create_checkout_session', on: :collection
     end

@@ -20,6 +20,7 @@ class Api::PlatformCredentialsController < ApplicationController
   # POST /api/platform_credentials
   # Create a new platform credential for the current user.
   def create
+    byebug
     # Find the platform and optional sub-platform by IDs
     platform = Platform.find_by(id: params[:platform_id])
     sub_platform = SubPlatform.find_by(id: params[:sub_platform_id])
