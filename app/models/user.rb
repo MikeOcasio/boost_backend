@@ -54,10 +54,16 @@ class User < ApplicationRecord
   # ---------------
 
   def sub_platforms_info
-    platforms_with_subs = platforms.includes(:sub_platforms)
-    platforms_with_subs.map do |platform|
-      platform.sub_platforms.map { |sub| { id: sub.id, name: sub.name } }
-    end.flatten
+    platforms_with_subs = platforms.includes(:sub_platforms, :platform_credentials)
+
+    filtered_sub_platforms = platforms_with_subs.flat_map do |platform|
+      platform.sub_platforms.select do |sub|
+        # Only include sub-platforms that have a matching platform credential for the user
+        platform_credentials.exists?(sub_platform_id: sub.id, user_id: id)
+      end
+    end
+
+    filtered_sub_platforms.map { |sub| { id: sub.id, name: sub.name } }
   end
 
   # Two-factor authentication configuration
