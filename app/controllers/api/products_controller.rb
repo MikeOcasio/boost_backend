@@ -232,6 +232,8 @@ module Api
         :secondary_color,
         :category_id,
         :is_dropdown,
+        :is_slider,
+        slider_range: [], # Allows an array of slider range values
         dropdown_options: [], # Allows an array of dropdown options
         features: [], # Allows an array of features
         platform_ids: [],     # Assuming platform_ids is an array
