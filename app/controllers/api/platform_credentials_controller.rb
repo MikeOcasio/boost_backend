@@ -18,36 +18,33 @@ class Api::PlatformCredentialsController < ApplicationController
   end
 
   # POST /api/platform_credentials
-  # Create a new platform credential for the current user.
   def create
-    byebug
-    # Find the platform and optional sub-platform by IDs
     platform = Platform.find_by(id: params[:platform_id])
-    sub_platform = SubPlatform.find_by(id: params[:sub_platform_id])
-
     return render json: { success: false, message: 'Platform not found.' }, status: :not_found unless platform
 
-    # Check if the user has the platform in their platforms
-    unless current_user.platforms.exists?(platform.id)
-      current_user.platforms << platform # Add platform to user's platforms
+    sub_platform = params[:sub_platform_id].present? ? SubPlatform.find_by(id: params[:sub_platform_id], platform: platform) : nil
+
+    # Enforce that sub-platform credentials can only be created for platforms with `has_sub_platforms: true`
+    if sub_platform && !platform.has_sub_platforms
+      return render json: { success: false, message: 'Sub-platforms are not allowed for this platform.' }, status: :unprocessable_entity
     end
 
-    # Check if the platform credential already exists for the current user and platform (and sub-platform, if provided)
-    existing_credential = current_user.platform_credentials.find_by(platform_id: platform.id, sub_platform_id: sub_platform&.id)
+    unless current_user.platforms.exists?(platform.id)
+      current_user.platforms << platform
+    end
+
+    # Check for existing credential with the same platform/sub-platform combination
+    existing_credential = current_user.platform_credentials.find_by(platform: platform, sub_platform: sub_platform)
 
     if existing_credential
-      # If it exists, update it with the new username and password
-      existing_credential.update(username: params[:username], password: params[:password])
-
-      if existing_credential.errors.any?
-        render json: { success: false, errors: existing_credential.errors.full_messages },
-               status: :unprocessable_entity
-      else
+      if existing_credential.update(username: params[:username], password: params[:password])
         render json: { success: true, message: 'Platform credentials updated successfully.', platform_credential: existing_credential },
                status: :ok
+      else
+        render json: { success: false, errors: existing_credential.errors.full_messages }, status: :unprocessable_entity
       end
     else
-      # Build and save a new platform credential if it doesn't exist
+      # Create new platform credential if it doesn't exist
       platform_credential = current_user.platform_credentials.build(
         platform: platform,
         sub_platform: sub_platform,
@@ -59,23 +56,27 @@ class Api::PlatformCredentialsController < ApplicationController
         render json: { success: true, message: 'Platform credentials added successfully.', platform_credential: platform_credential },
                status: :created
       else
-        render json: { success: false, errors: platform_credential.errors.full_messages },
-               status: :unprocessable_entity
+        render json: { success: false, errors: platform_credential.errors.full_messages }, status: :unprocessable_entity
       end
     end
   end
 
   # PATCH/PUT /api/platform_credentials/:id
-  # Update an existing platform credential.
   def update
     if current_user == @platform_credential.user
-      # Allow updating the optional sub_platform as well
-      if @platform_credential.update(username: params[:username], password: params[:password], sub_platform_id: params[:sub_platform_id])
+      platform = @platform_credential.platform
+      new_sub_platform = params[:sub_platform_id].present? ? SubPlatform.find_by(id: params[:sub_platform_id], platform: platform) : nil
+
+      # Validate that sub-platform changes align with `has_sub_platforms` restrictions
+      if new_sub_platform && !platform.has_sub_platforms
+        return render json: { success: false, message: 'Sub-platforms are not allowed for this platform.' }, status: :unprocessable_entity
+      end
+
+      if @platform_credential.update(username: params[:username], password: params[:password], sub_platform: new_sub_platform)
         render json: { success: true, message: 'Platform credentials updated successfully.', platform_credential: @platform_credential },
-               status: :ok
+                status: :ok
       else
-        render json: { success: false, errors: @platform_credential.errors.full_messages },
-               status: :unprocessable_entity
+        render json: { success: false, errors: @platform_credential.errors.full_messages }, status: :unprocessable_entity
       end
     else
       render json: { success: false, message: 'Unauthorized access.' }, status: :forbidden
