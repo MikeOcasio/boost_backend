@@ -95,6 +95,12 @@ Rails.application.routes.draw do
     # Resources for categories with limited actions
     resources :categories, only: %i[index show create update destroy]
 
+    resources :promotions do
+      member do
+        post :apply_to_order
+      end
+    end
+
     # Resources for files management
     resources :files, only: %i[index create destroy]
 

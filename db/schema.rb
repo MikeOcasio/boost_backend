@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_29_054135) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -114,6 +114,18 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_054135) do
     t.datetime "updated_at", null: false
     t.index ["order_id"], name: "index_order_products_on_order_id"
     t.index ["product_id"], name: "index_order_products_on_product_id"
+  end
+
+  create_table "order_promotions", force: :cascade do |t|
+    t.bigint "order_id", null: false
+    t.bigint "promotion_id", null: false
+    t.datetime "applied_at"
+    t.decimal "discount_amount", precision: 10, scale: 2
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["order_id", "promotion_id"], name: "index_order_promotions_on_order_id_and_promotion_id", unique: true
+    t.index ["order_id"], name: "index_order_promotions_on_order_id"
+    t.index ["promotion_id"], name: "index_order_promotions_on_promotion_id"
   end
 
   create_table "orders", force: :cascade do |t|
@@ -351,6 +363,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_054135) do
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
+  add_foreign_key "order_promotions", "orders"
+  add_foreign_key "order_promotions", "promotions"
   add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
