@@ -53,6 +53,13 @@ class User < ApplicationRecord
   # Methods
   # ---------------
 
+  def sub_platforms_info
+    platforms_with_subs = platforms.includes(:sub_platforms)
+    platforms_with_subs.map do |platform|
+      platform.sub_platforms.map { |sub| { id: sub.id, name: sub.name } }
+    end.flatten
+  end
+
   # Two-factor authentication configuration
   # This uses the ROTP gem under the hood (part of devise-two-factor)
   def need_two_factor_authentication?(_request)

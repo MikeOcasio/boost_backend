@@ -6,7 +6,7 @@ module Users
     # GET /users/member-data/signed_in_user
     def signed_in_user
       user = get_user_from_token
-      render json: user, status: :ok
+      render json: user.as_json.merge({ sub_platforms: user.sub_platforms_info }), status: :ok
     end
 
     # GET /users/members

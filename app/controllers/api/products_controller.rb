@@ -20,25 +20,12 @@ module Api
     # GET /products/:id
     def show
       @product = Product.includes(:platforms, :category, :prod_attr_cats).find(params[:id])
-
-      # Check if the product has 'Levels' attribute and calculate dynamic price if applicable
-      # dynamic_price = nil
-      # if @product.prod_attr_cats.exists?(name: 'Levels')
-      #   # Assuming `selected_level` is coming from the params or set a default
-      #   selected_level = params[:level].to_i || 1  # Default to level 1 if no level is passed
-
-      #   # Calculate dynamic price using the method we defined earlier
-      #   dynamic_price = @product.calculate_price(selected_level)
-      # end
-
       render json: @product.as_json(
         include: {
           platforms: { only: %i[id name] },
           category: { only: %i[id name description] },
           prod_attr_cats: { only: %i[id name] }
         }
-        # methods: :static_price, # This is if you want to include the product's static price as well
-        # dynamic_price: dynamic_price
       )
     end
 
