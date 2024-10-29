@@ -244,6 +244,8 @@ module Api
         :primary_color,
         :secondary_color,
         :category_id,
+        :is_dropdown,
+        dropdown_options: [], # Allows an array of dropdown options
         features: [], # Allows an array of features
         platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
