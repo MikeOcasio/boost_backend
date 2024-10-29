@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
+ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -97,16 +97,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.index ["jti"], name: "index_jwt_denylist_on_jti"
   end
 
-  create_table "level_prices", force: :cascade do |t|
-    t.bigint "category_id", null: false
-    t.integer "min_level", null: false
-    t.integer "max_level", null: false
-    t.decimal "price_per_level", precision: 8, scale: 2, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["category_id"], name: "index_level_prices_on_category_id"
-  end
-
   create_table "notifications", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.text "content"
@@ -124,6 +114,18 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.datetime "updated_at", null: false
     t.index ["order_id"], name: "index_order_products_on_order_id"
     t.index ["product_id"], name: "index_order_products_on_product_id"
+  end
+
+  create_table "order_promotions", force: :cascade do |t|
+    t.bigint "order_id", null: false
+    t.bigint "promotion_id", null: false
+    t.datetime "applied_at"
+    t.decimal "discount_amount", precision: 10, scale: 2
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["order_id", "promotion_id"], name: "index_order_promotions_on_order_id_and_promotion_id", unique: true
+    t.index ["order_id"], name: "index_order_promotions_on_order_id"
+    t.index ["promotion_id"], name: "index_order_promotions_on_promotion_id"
   end
 
   create_table "orders", force: :cascade do |t|
@@ -153,7 +155,9 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.string "username", limit: 1024
     t.string "password", limit: 1024
     t.bigint "platform_id"
+    t.bigint "sub_platform_id"
     t.index ["platform_id"], name: "index_platform_credentials_on_platform_id"
+    t.index ["sub_platform_id"], name: "index_platform_credentials_on_sub_platform_id"
     t.index ["user_id"], name: "index_platform_credentials_on_user_id"
   end
 
@@ -161,6 +165,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "has_sub_platforms", default: false
   end
 
   create_table "platforms_skillmaster_apps", id: false, force: :cascade do |t|
@@ -241,6 +246,10 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.string "secondary_color"
     t.string "features", default: [], array: true
     t.bigint "category_id"
+    t.boolean "is_dropdown", default: false
+    t.jsonb "dropdown_options", default: []
+    t.boolean "is_slider", default: false
+    t.jsonb "slider_range", default: []
   end
 
   create_table "promotions", force: :cascade do |t|
@@ -274,6 +283,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
     t.string "images", default: [], array: true
     t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
+  end
+
+  create_table "sub_platforms", force: :cascade do |t|
+    t.bigint "platform_id", null: false
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
+    t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
   create_table "user_platforms", force: :cascade do |t|
@@ -342,15 +360,17 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
-  add_foreign_key "level_prices", "categories"
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
+  add_foreign_key "order_promotions", "orders"
+  add_foreign_key "order_promotions", "promotions"
   add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
   add_foreign_key "platform_credentials", "platforms"
+  add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
@@ -362,6 +382,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_26_055516) do
   add_foreign_key "product_promotions", "promotions"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
+  add_foreign_key "sub_platforms", "platforms"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
   add_foreign_key "users_categories", "categories"

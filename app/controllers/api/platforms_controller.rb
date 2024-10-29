@@ -73,7 +73,7 @@ module Api
     end
 
     def platform_params
-      params.require(:platform).permit(:name)
+      params.require(:platform).permit(:name, :has_sub_platforms)
     end
   end
 end

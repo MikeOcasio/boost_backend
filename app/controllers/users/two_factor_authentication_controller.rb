@@ -7,7 +7,10 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       render json: { message: '2FA is already set up' }, status: :ok
     else
       current_user.generate_otp_secret_if_missing!
-      otp_uri = current_user.otp_provisioning_uri(current_user.email, issuer: 'RavenBoost')
+
+      logo_url = 'https://www.ravenboost.com/logo.svg'
+
+      otp_uri = current_user.otp_provisioning_uri(current_user.email, issuer: 'RavenBoost', logo: logo_url)
       qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
 
       render json: { qr_code: qr_code_svg }, status: :ok

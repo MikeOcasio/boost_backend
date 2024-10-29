@@ -62,6 +62,9 @@ Rails.application.routes.draw do
         post :add_product
         delete :remove_product
       end
+
+      # Nested routes for sub-platforms under platforms
+      resources :sub_platforms, only: %i[index create show update destroy]
     end
 
     # Products routes
@@ -92,6 +95,12 @@ Rails.application.routes.draw do
     # Resources for categories with limited actions
     resources :categories, only: %i[index show create update destroy]
 
+    resources :promotions do
+      member do
+        post :apply_to_order
+      end
+    end
+
     # Resources for files management
     resources :files, only: %i[index create destroy]
 
@@ -99,19 +108,8 @@ Rails.application.routes.draw do
 
     resources :platform_credentials, only: %i[show create update destroy]
 
-    resources :level_prices
-
     resources :payments, only: [] do
       post 'create_checkout_session', on: :collection
     end
   end
-
-  # CSRF token route for frontend usage
-  get '/csrf_token', to: 'application#csrf_token'
-
-  # Routes for secure data management
-  get '/generate_symmetric_key', to: 'secure_data#generate_symmetric_key'
-  get '/generate_asymmetric_key_pair', to: 'secure_data#generate_asymmetric_key_pair'
-  post '/encrypt_data', to: 'secure_data#encrypt_data'
-  post '/encrypt_symmetric_key', to: 'secure_data#encrypt_symmetric_key'
 end

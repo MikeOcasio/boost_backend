@@ -16,7 +16,6 @@ class Category < ApplicationRecord
   has_many :users, through: :users_categories
 
   has_many :products
-  has_many :level_prices, dependent: :destroy
 
   validates :name, presence: true, uniqueness: true
 

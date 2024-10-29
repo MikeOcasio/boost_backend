@@ -3,8 +3,11 @@ require 'stripe'
 class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
-  STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  YOUR_DOMAIN = 'http://localhost:3001'
+  # STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
+  # YOUR_DOMAIN = 'http://localhost:3001'
+
+  STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
+  DOMAIN_URL = Rails.application.credentials.domain_url
 
   def create_checkout_session
     # Set the Stripe API key
@@ -42,8 +45,8 @@ class Api::PaymentsController < ApplicationController
                                                    line_items: line_items,
                                                    mode: 'payment',
                                                    customer_email: current_user.email,
-                                                   success_url: "#{YOUR_DOMAIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
-                                                   cancel_url: "#{YOUR_DOMAIN}/checkout"
+                                                   success_url: "https://#{DOMAIN_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+                                                   cancel_url: "https://#{DOMAIN_URL}/checkout"
                                                  })
 
       # Return the session ID (which can be used to redirect the customer)

@@ -462,8 +462,8 @@ module Orders
         :price,
         :tax,
         :dynamic_price,
-        :start_level,     # Added to allow start_level
-        :end_level        # Added to allow end_level
+        :start_level,
+        :end_level,
       )
     end
   end
