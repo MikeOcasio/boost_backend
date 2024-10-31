@@ -49,65 +49,14 @@ module Orders
     # Skill masters can only see their own assigned orders with platform credentials.
     # Admins and devs can see all orders.
     def show
-      # Ensure current_user is not nil and check the role or if the order belongs to the current_user
-      if current_user&.role == 'skill_master' && @order.assigned_skill_master_id == current_user.id
-        # Skill masters can view their assigned order with platform credentials
-        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
-
-        render json: {
-          order: @order.as_json(
-            include: {
-              products: {
-                only: %i[id name price]
-              }
-            },
-            only: %i[id state created_at total_price internal_id]
-          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
-          platform_credentials: @order.platform_credential,
-          skill_master: {
-            id: skill_master_info&.id,
-            gamer_tag: skill_master_info&.gamer_tag
-          }
-        }
+      if current_user&.role == 'skillmaster' && @order.assigned_skill_master_id == current_user.id
+        render_skillmaster_order_view
       elsif current_user&.role.in?(%w[admin dev])
-        # Admins and devs can view all order details
-        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
-
-        render json: {
-          order: @order.as_json(
-            include: {
-              products: {
-                only: %i[id name price tax image quantity]
-              }
-            },
-            only: %i[id state created_at total_price internal_id]
-          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
-          skill_master: {
-            id: skill_master_info&.id,
-            gamer_tag: skill_master_info&.gamer_tag
-          }
-        }
+        render_admin_dev_order_view
       elsif current_user&.id == @order.user_id
-        # If the current user is the one who created the order, allow them to view it
-        skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
-
-        render json: {
-          order: @order.as_json(
-            include: {
-              products: {
-                only: %i[id name price tax image quantity]
-              }
-            },
-            only: %i[id state created_at total_price internal_id]
-          ).merge(platform: { id: @order.platform, name: Platform.find(@order.platform).name }),
-          skill_master: {
-            id: skill_master_info&.id,
-            gamer_tag: skill_master_info&.gamer_tag
-          }
-        }
+        render_user_order_view
       else
-        # If unauthorized, return forbidden status
-        render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+        render_unauthorized
       end
     end
 
@@ -388,6 +337,94 @@ module Orders
     end
 
     private
+
+    def render_skillmaster_order_view
+      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+      render json: {
+        order: @order.as_json(
+          include: {
+            products: {
+              only: %i[id name price]
+            }
+          },
+          only: %i[id state created_at total_price internal_id]
+        ).merge(
+          platform: {
+            id: @order.platform,
+            name: Platform.find(@order.platform).name
+          }
+        ),
+        platform_credentials: @order.platform_credential.as_json(
+          only: %i[id user_id created_at updated_at username password platform_id sub_platform_id]
+        ).merge(
+          platform: {
+            id: @order.platform_credential.platform.id,
+            name: @order.platform_credential.platform.name
+          },
+          sub_platform: {
+            id: @order.platform_credential.sub_platform&.id,
+            name: @order.platform_credential.sub_platform&.name
+          }
+        ),
+        skill_master: {
+          id: skill_master_info&.id,
+          gamer_tag: skill_master_info&.gamer_tag
+        }
+      }
+    end
+
+    def render_admin_dev_order_view
+      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+      render json: {
+        order: @order.as_json(
+          include: {
+            products: {
+              only: %i[id name price tax image quantity]
+            }
+          },
+          only: %i[id state created_at total_price internal_id]
+        ).merge(
+          platform: {
+            id: @order.platform,
+            name: Platform.find(@order.platform).name
+          }
+        ),
+        skill_master: {
+          id: skill_master_info&.id,
+          gamer_tag: skill_master_info&.gamer_tag
+        }
+      }
+    end
+
+    def render_user_order_view
+      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+
+      render json: {
+        order: @order.as_json(
+          include: {
+            products: {
+              only: %i[id name price tax image quantity]
+            }
+          },
+          only: %i[id state created_at total_price internal_id]
+        ).merge(
+          platform: {
+            id: @order.platform,
+            name: Platform.find(@order.platform).name
+          }
+        ),
+        skill_master: {
+          id: skill_master_info&.id,
+          gamer_tag: skill_master_info&.gamer_tag
+        }
+      }
+    end
+
+    def render_unauthorized
+      render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+    end
 
     # Method to handle dynamic pricing based on levels
     def handle_dynamic_pricing(order, product_id, selected_level)
