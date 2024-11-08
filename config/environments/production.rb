@@ -67,7 +67,7 @@ Rails.application.configure do
     port: 587,
     address: 'smtp.mailgun.org',
     user_name: 'support@bot.ravenboost.com',
-    password: Rails.application.credentials.mailgun[:smtp_password], # Ensure this matches
+    password: Rails.application.credentials.dig(:mailgun, :smtp_password),    # Ensure this matches
     domain: 'bot.ravenboost.com',
     authentication: :plain
   }
