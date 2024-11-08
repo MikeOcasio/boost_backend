@@ -34,8 +34,8 @@ jobs:
 
             #create soft/symbolic link
             
-            cp /home/ubuntu/boost_backend_shared/master.key /home/ubuntu/boost_backend/config/master.key
-            cp /home/ubuntu/boost_backend_shared/credentials.yml.enc /home/ubuntu/boost_backend/config/credentials.yml.enc
+            ln -s /home/ubuntu/boost_backend_shared/master.key /home/ubuntu/boost_backend/config/master.key
+            ln -s /home/ubuntu/boost_backend_shared/credentials.yml.enc /home/ubuntu/boost_backend/config/credentials.yml.enc
             
             # Install the gems
             bundle install
