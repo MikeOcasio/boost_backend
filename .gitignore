@@ -8,4 +8,5 @@ log/
 
 .byebug_history
 
-/config/credentials/production.key
+/config/credentials.yml.enc
+/config/master.key
