@@ -9,6 +9,12 @@ class Api::PaymentsController < ApplicationController
   STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
   DOMAIN_URL = Rails.application.credentials.domain_url
 
+  if STRIPE_API_KEY.nil?
+    Rails.logger.info('Stripe API Key not found. Please set STRIPE_API_KEY environment variable.')
+  else
+    Rails.logger.info('API Key Loaded')
+  end
+
   def create_checkout_session
     # Set the Stripe API key
     Stripe.api_key = STRIPE_API_KEY
