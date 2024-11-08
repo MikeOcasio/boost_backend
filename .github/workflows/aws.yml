@@ -31,6 +31,12 @@ jobs:
             
             cd /home/ubuntu/boost_backend
             git pull origin production 
+
+            #create soft/symbolic link
+            
+            ln -s /home/ubuntu/boost_backend_shared/master.key /home/ubuntu/boost_backend/config/master.key
+            ln -s /home/ubuntu/boost_backend_shared/credentials.yml.enc /home/ubuntu/boost_backend/config/credentials.yml.enc
+            
             # Install the gems
             bundle install
             # Run database migrations
