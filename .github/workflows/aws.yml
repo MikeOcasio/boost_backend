@@ -30,7 +30,6 @@ jobs:
             source ~/.bashrc
             
             cd /home/ubuntu/boost_backend
-            git config pull.rebase true  # Set rebase behavior
             git pull origin production 
             # Install the gems
             bundle install
