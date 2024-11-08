@@ -26,19 +26,16 @@ jobs:
             # Initialize rbenv and set PATH
             export PATH="$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH"
             eval "$(rbenv init -)"
-
             # Optional: Source your shell profile to ensure any other environment variables are set
             source ~/.bashrc
             
             cd /home/ubuntu/boost_backend
+            git config pull.rebase true  # Set rebase behavior
             git pull origin production 
-
             # Install the gems
             bundle install
-
             # Run database migrations
             RAILS_ENV=production rails db:migrate
-
           EOF
 
 
