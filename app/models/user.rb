@@ -83,6 +83,8 @@ class User < ApplicationRecord
   def password_complexity
     return if password.blank?
 
+    errors.delete(:password)
+
     # Check length
     errors.add :password, 'Must be at least 8 characters long.' if password.length < 8
 

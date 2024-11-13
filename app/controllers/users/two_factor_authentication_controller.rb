@@ -29,4 +29,5 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       render json: { error: 'Invalid OTP' }, status: :unprocessable_entity
     end
   end
+
 end
