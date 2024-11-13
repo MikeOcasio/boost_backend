@@ -74,6 +74,7 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: 'bot.ravenboost.com' } # Use your Mailgun domain
   config.action_mailer.perform_caching = false
   config.action_mailer.raise_delivery_errors = true # Enable error reporting
+  config.action_mailer.default_options = { from: 'no-reply@bot.ravenboost.com' }
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
