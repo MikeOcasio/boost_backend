@@ -1,0 +1,167 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Change Your Password</title>
+  <style>
+    /* Custom styling */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    .header {
+      background-color: #4B0082;
+      padding: 20px;
+      text-align: center;
+    }
+    .header img {
+      max-width: 150px;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      color: #FFD700;
+      margin: 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .content {
+      padding: 20px;
+      text-align: center;
+    }
+    .content h2 {
+      color: #4B0082;
+      font-size: 22px;
+      margin-top: 0;
+    }
+    .field {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .field label {
+      font-size: 16px;
+      color: #333;
+    }
+    .field input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .button {
+      background-color: #4B0082;
+      color: #FFD700;
+      padding: 10px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .footer {
+      background-color: #4B0082;
+      padding: 10px;
+      text-align: center;
+      color: #ffffff;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #FFD700;
+      text-decoration: none;
+    }
+    .requirements {
+      font-size: 14px;
+      color: #4B0082;
+      margin-top: 10px;
+      list-style-type: none;
+      padding: 0;
+      text-align: left;
+    }
+    .requirements li {
+      margin-bottom: 5px;
+    }
+    .error-messages {
+      color: red;
+      margin-top: 15px;
+    }
+  </style>
+  <script>
+    function hideRequirementsOnSubmit() {
+      document.querySelector('.requirements').style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelector('form').addEventListener('submit', hideRequirementsOnSubmit);
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://www.ravenboost.com/logo.svg" alt="RavenBoost Logo">
+      <h1>Change Your Password</h1>
+    </div>
+
+    <div class="content">
+      <h2>Change your password</h2>
+
+      <% if resource.errors.any? %>
+        <div class="error-messages">
+          <h3><%= pluralize(resource.errors.count, "error") %> prohibited this user from being saved:</h3>
+          <ul>
+            <% resource.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <%= form_for(resource, as: resource_name, url: password_path(resource_name), html: { method: :put }) do |f| %>
+        <%= f.hidden_field :reset_password_token %>
+
+        <!-- Password Requirements, hidden if there are errors -->
+        <div class="requirements" style="<%= 'display: none;' if resource.errors.any? %>">
+          <h3>Password Requirements:</h3>
+          <ul>
+            <li>Password must be at least 8 characters long.</li>
+            <li>Password must contain at least one uppercase letter.</li>
+            <li>Password must contain at least one special character.</li>
+          </ul>
+        </div>
+
+        <div class="field">
+          <%= f.label :password, "New password" %><br />
+          <%= f.password_field :password, autofocus: true, autocomplete: "new-password" %>
+        </div>
+
+        <div class="field">
+          <%= f.label :password_confirmation, "Confirm new password" %><br />
+          <%= f.password_field :password_confirmation, autocomplete: "new-password" %>
+        </div>
+
+        <div class="actions">
+          <%= f.submit "Change my password", class: 'button' %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="footer">
+      <p>© 2024 RavenBoost. All rights reserved.</p>
+      <p><a href="https://www.ravenboost.com">Visit our website</a> | <a href="https://www.ravenboost.com/support">Contact Support</a></p>
+    </div>
+  </div>
+</body>
+</html>
