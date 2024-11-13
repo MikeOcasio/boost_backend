@@ -7,7 +7,7 @@ module Users
 
     # Redirect to the frontend URL after password change
     def after_resetting_password_path_for(_)
-      Rails.env.development? ? 'http://127.0.0.1:3001/login' : 'https://www.ravenboost.com/login'
+      Rails.env.development? ? 'http://localhost:3001/login' : 'https://www.ravenboost.com/login'
     end
   end
 end
