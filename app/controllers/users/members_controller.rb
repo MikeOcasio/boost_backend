@@ -1,6 +1,6 @@
 module Users
   class MembersController < ApplicationController
-    before_action :authenticate_user!
+    before_action :authenticate_user!, except: [:check_email]
     before_action :set_user, only: %i[show update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
@@ -14,6 +14,22 @@ module Users
     def index
       @users = User.all
       render json: @users, status: :ok
+    end
+
+    def check_email
+      # Get the email from the request
+      email = params[:email]
+
+      # Check if the email exists in the database
+      user = User.find_by(email: email)
+
+      if user
+        # If the user exists, return a success status
+        render json: { message: 'User found.' }, status: :ok
+      else
+        # If no user is found, return a not found error
+        render json: { error: 'User not found.' }, status: :not_found
+      end
     end
 
     # GET /users/members/skillmasters
