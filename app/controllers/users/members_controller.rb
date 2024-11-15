@@ -39,9 +39,11 @@ module Users
       # Access the token from params, assuming the request body contains the token
       reset_password_token = params[:reset_password_token]
 
+      # Find the user with the reset password token
       user = User.find_by(reset_password_token: reset_password_token)
 
-      if user && user.reset_password_token_expires_at > Time.current
+      # Use safe navigation to check if the user exists and if the token is still valid
+      if user&.reset_password_sent_at && user.reset_password_sent_at > 2.hours.ago
         if user.update(password: params[:password])
           render json: { message: 'Password updated successfully.' }, status: :ok
         else
