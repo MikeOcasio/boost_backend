@@ -17,12 +17,12 @@ Rails.application.routes.draw do
         delete :remove_platform
         post :lock, to: 'members#lock_user'
         post :unlock, to: 'members#unlock_user'
-        patch :update_password, to: 'members#update_password'
       end
 
       collection do
         get :signed_in_user
         get :skillmasters
+        patch 'update_password', to: 'members#update_password'
       end
 
       member do

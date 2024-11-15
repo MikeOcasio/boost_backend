@@ -1,6 +1,7 @@
 module Users
   class MembersController < ApplicationController
     before_action :authenticate_user!, except: [:update_password]
+    skip_before_action :authenticate_user!, only: [:update_password]
     before_action :set_user, only: %i[update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
@@ -35,18 +36,18 @@ module Users
     end
 
     def update_password
-      # Find user by reset token
-      user = User.find_by(reset_password_token: params[:reset_password_token])
+      # Access the token from params, assuming the request body contains the token
+      reset_password_token = params[:reset_password_token]
+
+      user = User.find_by(reset_password_token: reset_password_token)
 
       if user && user.reset_password_token_expires_at > Time.current
-        # Token is valid, update the password
         if user.update(password: params[:password])
           render json: { message: 'Password updated successfully.' }, status: :ok
         else
           render json: { error: 'Failed to update password.', details: user.errors.full_messages }, status: :unprocessable_entity
         end
       else
-        # User not found or token expired
         render json: { error: 'Invalid or expired token.' }, status: :not_found
       end
     end
