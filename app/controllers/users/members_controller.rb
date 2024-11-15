@@ -1,7 +1,7 @@
 module Users
   class MembersController < ApplicationController
-    before_action :authenticate_user!, except: [:update_password]
-    skip_before_action :authenticate_user!, only: [:update_password]
+    before_action :authenticate_user!, except: %i[update_password user_exists]
+    skip_before_action :authenticate_user!, only: %i[update_password user_exists]
     before_action :set_user, only: %i[update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
@@ -21,6 +21,17 @@ module Users
     def skillmasters
       @users = User.where(role: 'skillmaster')
       render json: @users
+    end
+
+    # GET /users/members/user_exists
+    def user_exists
+      user = User.find_by(email: params[:email])
+
+      if user
+        render json: { message: 'User found.', user_id: user.id }, status: :ok
+      else
+        render json: { error: 'User not found.' }, status: :not_found
+      end
     end
 
     # GET /users/members/skillmasters/:id
