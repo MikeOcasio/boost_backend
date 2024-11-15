@@ -1,6 +1,6 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins 'http://localhost:3006', 'http://18.222.197.122:3000' # Add trusted origins (Next.js frontend and Rails server)
+    origins 'http://localhost:3006', 'http://18.225.8.157:3000/' # Add trusted origins (Next.js frontend and Rails server)
 
     resource '*',
              headers: :any,

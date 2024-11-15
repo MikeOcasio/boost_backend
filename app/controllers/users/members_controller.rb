@@ -1,7 +1,8 @@
 module Users
   class MembersController < ApplicationController
-    before_action :authenticate_user!, except: [:check_email]
-    before_action :set_user, only: %i[show update destroy add_platform remove_platform lock_user unlock_user]
+    before_action :authenticate_user!, except: %i[update_password user_exists]
+    skip_before_action :authenticate_user!, only: %i[update_password user_exists]
+    before_action :set_user, only: %i[update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
     def signed_in_user
@@ -16,26 +17,21 @@ module Users
       render json: @users, status: :ok
     end
 
-    def check_email
-      # Get the email from the request
-      email = params[:email]
-
-      # Check if the email exists in the database
-      user = User.find_by(email: email)
-
-      if user
-        # If the user exists, return a success status
-        render json: { message: 'User found.' }, status: :ok
-      else
-        # If no user is found, return a not found error
-        render json: { error: 'User not found.' }, status: :not_found
-      end
-    end
-
     # GET /users/members/skillmasters
     def skillmasters
       @users = User.where(role: 'skillmaster')
       render json: @users
+    end
+
+    # GET /users/members/user_exists
+    def user_exists
+      user = User.find_by(email: params[:email])
+
+      if user
+        render json: { message: 'User found.', user_id: user.id }, status: :ok
+      else
+        render json: { error: 'User not found.' }, status: :not_found
+      end
     end
 
     # GET /users/members/skillmasters/:id
@@ -47,6 +43,25 @@ module Users
         render json: @skillmaster, status: :ok
       else
         render json: { error: 'Skillmaster not found.' }, status: :not_found
+      end
+    end
+
+    def update_password
+      # Access the token from params, assuming the request body contains the token
+      reset_password_token = params[:reset_password_token]
+
+      # Find the user with the reset password token
+      user = User.find_by(reset_password_token: reset_password_token)
+
+      # Use safe navigation to check if the user exists and if the token is still valid
+      if user&.reset_password_sent_at && user.reset_password_sent_at > 2.hours.ago
+        if user.update(password: params[:password])
+          render json: { message: 'Password updated successfully.' }, status: :ok
+        else
+          render json: { error: 'Failed to update password.', details: user.errors.full_messages }, status: :unprocessable_entity
+        end
+      else
+        render json: { error: 'Invalid or expired token.' }, status: :not_found
       end
     end
 

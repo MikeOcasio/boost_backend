@@ -22,6 +22,8 @@ Rails.application.routes.draw do
       collection do
         get :signed_in_user
         get :skillmasters
+        patch 'update_password', to: 'members#update_password'
+        get 'user_exists', to: 'members#user_exists'
       end
 
       member do
