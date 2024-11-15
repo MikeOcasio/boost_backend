@@ -4,46 +4,40 @@ module Api
 
     # GET /products
     def index
-      @products = Product.includes(:category, :platforms, :prod_attr_cats)
-                         .where(categories: { is_active: true })
+      @products = Product
+                  .joins(:category) # Ensures the `categories` table is joined
+                  .includes(:children) # Preloads children for N+1 prevention
+                  .where(categories: { is_active: true }) # Filters on the `is_active` attribute
 
-      # Render the products that passed the condition (active categories only)
-      render json: @products.as_json(
-        include: {
-          platforms: { only: %i[id name] },
-          category: { only: %i[id name description is_active] },
-          prod_attr_cats: { only: %i[id name] }
-        }
-      )
+      render json: @products.map { |product| recursive_json(product) }, status: :ok
     end
 
     # GET /products/:id
     def show
-      @product = Product.includes(:platforms, :category, :prod_attr_cats).find(params[:id])
-      render json: @product.as_json(
-        include: {
-          platforms: { only: %i[id name] },
-          category: { only: %i[id name description] },
-          prod_attr_cats: { only: %i[id name] }
-        }
-      )
+      @product = Product.includes(:platforms, :category, :prod_attr_cats, :children).find(params[:id])
+
+      render json: recursive_json(@product)
     end
 
     def by_platform
       platform_id = params[:platform_id]
       platform = Platform.find_by(id: platform_id)
 
+      # Return an error if the platform doesn't exist
       return render json: { message: 'Platform not found' }, status: :not_found unless platform
 
+      # Find products that are associated with the given platform
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
+      # If products are found, render them using the recursive_json method
       if @products.any?
-        render json: @product.as_json(include: { platforms: { only: %i[id name] } }), status: :ok
+        render json: @products.map { |product| recursive_json(product) }, status: :ok
       else
+        # If no products found, return a not found message
         render json: { message: 'No products found for this platform' }, status: :not_found
       end
     end
-
+ 
     # POST /products
     def create
       # Handle image upload if provided
@@ -173,6 +167,17 @@ module Api
 
     # Helper method to delete from S3
     private
+
+    def recursive_json(product)
+      {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        children: product.children.map { |child| recursive_json(child) }
+      }
+    end
+
 
     def delete_from_s3(file_url)
       return if file_url.blank?

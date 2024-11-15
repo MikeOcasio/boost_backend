@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -250,6 +250,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
+    t.bigint "parent_id"
+    t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
   create_table "promotions", force: :cascade do |t|
@@ -380,6 +382,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
   add_foreign_key "product_platforms", "products"
   add_foreign_key "product_promotions", "products"
   add_foreign_key "product_promotions", "promotions"
+  add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "sub_platforms", "platforms"

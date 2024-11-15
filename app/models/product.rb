@@ -34,10 +34,31 @@ class Product < ApplicationRecord
   has_many :product_promotions
   has_many :promotions, through: :product_promotions
 
+  belongs_to :parent, class_name: 'Product', optional: true
+  has_many :children, class_name: 'Product', foreign_key: 'parent_id'
+
   validates :name, presence: true
   validates :price, presence: true
 
   validate :has_at_least_one_platform
+
+  # Optional method to inherit attributes from the parent
+  def inherit_attributes_from_parent
+    return unless parent
+
+    self.price ||= parent.price
+    self.category_id ||= parent.category_id
+    self.prod_attr_cat_id ||= parent.prod_attr_cat_id
+    self.is_priority ||= parent.is_priority
+    self.tax ||= parent.tax
+    self.is_active ||= parent.is_active
+    self.most_popular ||= parent.most_popular
+    self.tag_line ||= parent.tag_line
+    self.bg_image ||= parent.bg_image
+    self.primary_color ||= parent.primary_color
+    self.secondary_color ||= parent.secondary_color
+    self.features ||= parent.features
+  end
 
   # Scope to find products by platform
   scope :by_platform, ->(platform_id) { joins(:platforms).where(platforms: { id: platform_id }) }
