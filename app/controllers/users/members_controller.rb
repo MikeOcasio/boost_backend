@@ -1,7 +1,7 @@
 module Users
   class MembersController < ApplicationController
-    before_action :authenticate_user!, except: [:check_email]
-    before_action :set_user, only: %i[show update destroy add_platform remove_platform lock_user unlock_user]
+    before_action :authenticate_user!
+    before_action :set_user, only: %i[update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user
     def signed_in_user
@@ -14,22 +14,6 @@ module Users
     def index
       @users = User.all
       render json: @users, status: :ok
-    end
-
-    def check_email
-      # Get the email from the request
-      email = params[:email]
-
-      # Check if the email exists in the database
-      user = User.find_by(email: email)
-
-      if user
-        # If the user exists, return a success status
-        render json: { message: 'User found.' }, status: :ok
-      else
-        # If no user is found, return a not found error
-        render json: { error: 'User not found.' }, status: :not_found
-      end
     end
 
     # GET /users/members/skillmasters
@@ -47,6 +31,23 @@ module Users
         render json: @skillmaster, status: :ok
       else
         render json: { error: 'Skillmaster not found.' }, status: :not_found
+      end
+    end
+
+    def update_password
+      # Find user by reset token
+      user = User.find_by(reset_password_token: params[:reset_password_token])
+
+      if user && user.reset_password_token_expires_at > Time.current
+        # Token is valid, update the password
+        if user.update(password: params[:password])
+          render json: { message: 'Password updated successfully.' }, status: :ok
+        else
+          render json: { error: 'Failed to update password.', details: user.errors.full_messages }, status: :unprocessable_entity
+        end
+      else
+        # User not found or token expired
+        render json: { error: 'Invalid or expired token.' }, status: :not_found
       end
     end
 
