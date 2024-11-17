@@ -40,6 +40,7 @@ module Api
 
     # POST /products
     def create
+      byebug
       # Handle image upload if provided
       uploaded_image = if params[:product][:image].present? && params[:product][:remove_image] != 'true'
                          upload_to_s3(params[:product][:image])
@@ -260,6 +261,7 @@ module Api
         :tag_line,
         :primary_color,
         :secondary_color,
+        :parent_id,
         :category_id,
         :is_dropdown,
         :is_slider,
@@ -268,7 +270,7 @@ module Api
         features: [], # Allows an array of features
         platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
-      )
+        )
     end
 
     def upload_to_s3(file)
