@@ -23,7 +23,7 @@ class Product < ApplicationRecord
   belongs_to :category
   has_and_belongs_to_many :prod_attr_cats
 
-  has_many :order_products
+  has_many :order_products, dependent: :nullify
   has_many :orders, through: :order_products
 
   has_many :carts
@@ -31,11 +31,11 @@ class Product < ApplicationRecord
   has_many :product_platforms, dependent: :destroy
   has_many :platforms, through: :product_platforms
 
-  has_many :product_promotions
+  has_many :product_platforms, dependent: :nullify
   has_many :promotions, through: :product_promotions
 
-  belongs_to :parent, class_name: 'Product', optional: true
-  has_many :children, class_name: 'Product', foreign_key: 'parent_id'
+  belongs_to :parent, class_name: 'Product', optional: true, inverse_of: :children
+  has_many :children, class_name: 'Product', foreign_key: 'parent_id', dependent: :nullify, inverse_of: :parent
 
   validates :name, presence: true
   validates :price, presence: true

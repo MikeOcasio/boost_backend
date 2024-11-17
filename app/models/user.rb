@@ -29,14 +29,13 @@ class User < ApplicationRecord
   has_many :user_platforms, dependent: :destroy
   has_many :platforms, through: :user_platforms
   has_many :bug_reports, dependent: :destroy
-  has_many :orders
-  has_many :carts
-  has_many :notifications
-  has_many :preferred_skill_masters
-  has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user
+  has_many :orders, dependent: :nullify
+  has_many :notifications, dependent: :nullify
+  has_many :preferred_skill_masters, dependent: :nullify
+  has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user, dependent: :nullify  # Add dependent: :nullify here
   has_many :platform_credentials, dependent: :destroy
-  has_many :users_categories
-  has_many :categories, through: :users_categories
+  has_many :users_categories, dependent: :nullify
+  has_many :categories, through: :users_categories, dependent: :nullify
 
   before_validation :set_default_role, on: :create
   # ---------------
