@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_17_163420) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -157,6 +157,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_17_163420) do
     t.bigint "platform_id"
     t.bigint "sub_platform_id"
     t.index ["platform_id"], name: "index_platform_credentials_on_platform_id"
+    t.index ["sub_platform_id"], name: "index_platform_credentials_on_sub_platform_id"
     t.index ["user_id"], name: "index_platform_credentials_on_user_id"
   end
 
@@ -286,6 +287,14 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_17_163420) do
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
 
+  create_table "sub_platforms", force: :cascade do |t|
+    t.string "name", null: false
+    t.bigint "platform_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
+  end
+
   create_table "user_platforms", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "platform_id", null: false
@@ -362,6 +371,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_17_163420) do
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
   add_foreign_key "platform_credentials", "platforms"
+  add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
@@ -374,6 +384,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_17_163420) do
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
+  add_foreign_key "sub_platforms", "platforms"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
   add_foreign_key "users_categories", "categories"
