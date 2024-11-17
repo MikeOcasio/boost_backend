@@ -4,13 +4,13 @@ module Api
 
     # GET /products
     def index
-      @products = Product
-                  .joins(:category) # Ensures the `categories` table is joined
-                  .includes(:children) # Preloads children for N+1 prevention
-                  .where(categories: { is_active: true }) # Filters on the `is_active` attribute
+      @products = Product.includes(:category, :platforms, :prod_attr_cats, :children) # Preload necessary associations
+                        .where(categories: { is_active: true }) # Filter products where category is active
 
+      # Render the products in the format with necessary details
       render json: @products.map { |product| recursive_json(product) }, status: :ok
     end
+
 
     # GET /products/:id
     def show
@@ -37,7 +37,7 @@ module Api
         render json: { message: 'No products found for this platform' }, status: :not_found
       end
     end
- 
+
     # POST /products
     def create
       # Handle image upload if provided
@@ -174,6 +174,31 @@ module Api
         name: product.name,
         description: product.description,
         price: product.price,
+        image: product.image, # Include image if necessary
+        created_at: product.created_at,
+        updated_at: product.updated_at,
+        is_priority: product.is_priority,
+        tax: product.tax,
+        is_active: product.is_active,
+        most_popular: product.most_popular,
+        tag_line: product.tag_line,
+        bg_image: product.bg_image,
+        primary_color: product.primary_color,
+        secondary_color: product.secondary_color,
+        features: product.features,
+        category_id: product.category_id,
+        is_dropdown: product.is_dropdown,
+        dropdown_options: product.dropdown_options,
+        is_slider: product.is_slider,
+        slider_range: product.slider_range,
+        parent_id: product.parent_id,
+
+        # Include associated platforms, categories, and prod_attr_cats
+        platforms: product.platforms.as_json(only: %i[id name]),
+        category: product.category.as_json(only: %i[id name description is_active]),
+        prod_attr_cats: product.prod_attr_cats.as_json(only: %i[id name]),
+
+        # Recursively include children (if any)
         children: product.children.map { |child| recursive_json(child) }
       }
     end
