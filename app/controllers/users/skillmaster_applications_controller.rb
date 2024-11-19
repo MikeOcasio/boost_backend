@@ -90,7 +90,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def application_params
-    params.require(:skillmaster_application).permit(:gamer_tag, :reasons, :reviewer_id, category_ids: [], platform_ids: [], images: [], channels: []) 
+    params.require(:skillmaster_application).permit(:gamer_tag, :reasons, :reviewer_id, category_ids: [], platform_ids: [], images: [], channels: [])
   end
 
   def upload_to_s3(file)
@@ -119,24 +119,3 @@ class Users::SkillmasterApplicationsController < ApplicationController
     end
   end
 end
-
-
-Unpermitted parameter: :reviewer_id. Context: { controller: Users::SkillmasterApplicationsController, action: update, request: #<ActionDispatch::Request:0x00000001184f8e90>, params: {"reviewer_id"=>3, "controller"=>"users/skillmaster_applications", "action"=>"update", "id"=>"1", "skillmaster_application"=>{"reviewer_id"=>3}} }
-  TRANSACTION (3.6ms)  BEGIN
-  ↳ app/controllers/users/skillmaster_applications_controller.rb:51:in update'
-  User Load (3.0ms)  SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2  [["id", 46], ["LIMIT", 1]]
-  ↳ app/controllers/users/skillmaster_applications_controller.rb:51:in update'
-  TRANSACTION (1.5ms)  COMMIT
-  ↳ app/controllers/users/skillmaster_applications_controller.rb:51:in `update'
-
-[47, 56] in /Users/nikhil/Code/Job/raven boost/boost-backend/app/controllers/users/skillmaster_applications_controller.rb
-   47:
-   48:   # PATCH/PUT /users/skillmaster_applications/:id
-   49:   def update
-   50:     byebug
-   51:     if @application.update(application_params)
-=> 52:       render json: @application
-   53:     else
-   54:       render json: @application.errors, status: :unprocessable_entity
-   55:     end
-   56:   end
