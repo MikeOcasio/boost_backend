@@ -13,8 +13,7 @@ class SkillmasterApplication < ApplicationRecord
   aasm column: 'status' do
     state :submitted, initial: true
     state :under_review
-    state :appro
-ved
+    state :approved
     state :denied
     event :submit do
       transitions from: :submitted, to: :under_review
