@@ -28,7 +28,7 @@ class SkillmasterApplication < ApplicationRecord
     end
 
     event :reopen do
-      transitions from: [:denied, :approved], to: :submitted, guard: :reapply_allowed?
+      transitions from: %i[denied approved], to: :submitted, guard: :reapply_allowed?
     end
   end
 
