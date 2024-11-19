@@ -28,7 +28,7 @@ class Product < ApplicationRecord
 
   has_many :carts
 
-  has_many :product_platforms, dependent: :nullify
+  has_many :product_platforms, dependent: :destroy
   has_many :platforms, through: :product_platforms
 
   has_many :promotions, through: :product_promotions
