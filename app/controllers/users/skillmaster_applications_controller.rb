@@ -26,7 +26,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
 
   # POST /users/skillmaster_applications
   def create
-    if SkillmasterApplication.exists?(user_id: current_user.id, status: 'pending')
+    if SkillmasterApplication.exists?(user_id: current_user.id)
       return render json: { error: 'You can only have one active application at a time' }, status: :unprocessable_entity
     end
 
