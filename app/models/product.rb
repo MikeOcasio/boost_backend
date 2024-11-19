@@ -37,7 +37,6 @@ class Product < ApplicationRecord
   has_many :children, class_name: 'Product', foreign_key: 'parent_id', dependent: :nullify, inverse_of: :parent
 
   validates :name, presence: true
-  validates :price, presence: true
 
   validate :has_at_least_one_platform
 
