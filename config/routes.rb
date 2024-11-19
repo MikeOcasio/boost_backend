@@ -38,7 +38,7 @@ Rails.application.routes.draw do
     end
 
     # Adding the skillmaster applications routes
-    resources :skillmaster_applications, only: [:show]
+    resources :skillmaster_applications
 
     resources :banned_emails, only: [:index]
   end
