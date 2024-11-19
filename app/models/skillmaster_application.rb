@@ -15,6 +15,7 @@ class SkillmasterApplication < ApplicationRecord
     state :under_review
     state :approved
     state :denied
+
     event :submit do
       transitions from: :submitted, to: :under_review
     end
@@ -22,6 +23,7 @@ class SkillmasterApplication < ApplicationRecord
     event :review do
       transitions from: :under_review, to: :approved
       transitions from: :under_review, to: :denied
+    end
 
     event :reopen do
       transitions from: [:denied, :approved], to: :submitted, guard: :reapply_allowed?
