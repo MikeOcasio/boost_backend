@@ -76,7 +76,10 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def recently_denied?
-    last_denied = current_user.skillmaster_applications.where(status: 'denied').order(:reviewed_at).last
+    # Find the last denied SkillmasterApplication where the current_user's id is present
+    last_denied = SkillmasterApplication.where(user_id: current_user.id, status: 'denied').order(:reviewed_at).last
+
+    # Check if there's a denied application and if the reviewed_at date is within the last 30 days
     last_denied.present? && last_denied.reviewed_at > 30.days.ago
   end
 
