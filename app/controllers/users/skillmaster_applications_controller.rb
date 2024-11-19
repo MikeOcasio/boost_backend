@@ -34,7 +34,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
       return render json: { error: 'You cannot apply at this time' }, status: :forbidden
     end
 
-    @application = current_user.skillmaster_applications.new(application_params)
+    @application = SkillmasterApplication.new(application_params.merge(user_id: current_user.id))
     handle_image_uploads if params[:images]
 
     if @application.save
