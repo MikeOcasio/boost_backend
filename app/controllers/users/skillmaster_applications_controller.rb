@@ -36,6 +36,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
 
     @application = SkillmasterApplication.new(application_params.merge(user_id: current_user.id))
     handle_image_uploads if params[:images]
+    @application.status = 'submitted'
 
     if @application.save
       render json: @application, status: :created
