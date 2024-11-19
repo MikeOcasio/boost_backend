@@ -62,7 +62,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def ensure_customer_role
-    render json: { error: 'Only customers can create applications' }, status: :forbidden unless current_user.customer?
+    render json: { error: 'Only customers can create applications' }, status: :forbidden unless current_user.role == 'customer'
   end
 
   def check_application_editability
