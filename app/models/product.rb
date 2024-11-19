@@ -31,8 +31,6 @@ class Product < ApplicationRecord
   has_many :product_platforms, dependent: :destroy
   has_many :platforms, through: :product_platforms
 
-  has_many :promotions, through: :product_promotions
-
   belongs_to :parent, class_name: 'Product', optional: true, inverse_of: :children
   has_many :children, class_name: 'Product', foreign_key: 'parent_id', dependent: :nullify, inverse_of: :parent
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_19_174744) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -116,18 +116,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
     t.index ["product_id"], name: "index_order_products_on_product_id"
   end
 
-  create_table "order_promotions", force: :cascade do |t|
-    t.bigint "order_id", null: false
-    t.bigint "promotion_id", null: false
-    t.datetime "applied_at"
-    t.decimal "discount_amount", precision: 10, scale: 2
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["order_id", "promotion_id"], name: "index_order_promotions_on_order_id_and_promotion_id", unique: true
-    t.index ["order_id"], name: "index_order_promotions_on_order_id"
-    t.index ["promotion_id"], name: "index_order_promotions_on_promotion_id"
-  end
-
   create_table "orders", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "state"
@@ -218,15 +206,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
     t.datetime "updated_at", null: false
     t.index ["platform_id"], name: "index_product_platforms_on_platform_id"
     t.index ["product_id"], name: "index_product_platforms_on_product_id"
-  end
-
-  create_table "product_promotions", force: :cascade do |t|
-    t.bigint "product_id", null: false
-    t.bigint "promotion_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["product_id"], name: "index_product_promotions_on_product_id"
-    t.index ["promotion_id"], name: "index_product_promotions_on_promotion_id"
   end
 
   create_table "products", force: :cascade do |t|
@@ -364,8 +343,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
-  add_foreign_key "order_promotions", "orders"
-  add_foreign_key "order_promotions", "promotions"
   add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
@@ -379,8 +356,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_15_212048) do
   add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
-  add_foreign_key "product_promotions", "products"
-  add_foreign_key "product_promotions", "promotions"
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"

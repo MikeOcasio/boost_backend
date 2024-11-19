@@ -24,8 +24,6 @@ class Order < ApplicationRecord
   belongs_to :platform_credential
   has_many :order_products, dependent: :destroy
   has_many :products, through: :order_products
-  has_many :order_promotions
-  has_many :promotions, through: :order_promotions
 
   before_create :generate_internal_id
   after_touch :update_totals
