@@ -40,7 +40,6 @@ module Api
 
     # POST /products
     def create
-      byebug
       # Handle image upload if provided
       uploaded_image = if params[:product][:image].present? && params[:product][:remove_image] != 'true'
                          upload_to_s3(params[:product][:image])
@@ -204,7 +203,6 @@ module Api
       }
     end
 
-
     def delete_from_s3(file_url)
       return if file_url.blank?
 
@@ -270,10 +268,15 @@ module Api
         features: [], # Allows an array of features
         platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
-        )
+      )
     end
 
     def upload_to_s3(file)
+      # If the file is already a valid S3 URL, return it directly
+      if file.is_a?(String) && file.match?(%r{^https?://.*\.amazonaws\.com/})
+        return file
+      end
+
       if file.is_a?(ActionDispatch::Http::UploadedFile)
         obj = S3_BUCKET.object("products/#{file.original_filename}")
         obj.upload_file(file.tempfile, content_type: 'image/jpeg')
@@ -301,7 +304,7 @@ module Api
         end
       else
         raise ArgumentError,
-              "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{file.class.name}"
+              "Expected an instance of ActionDispatch::Http::UploadedFile, a base64 string, or an S3 URL, got #{file.class.name}"
       end
     end
   end
