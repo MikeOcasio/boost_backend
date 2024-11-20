@@ -94,7 +94,7 @@ class Users::SkillmasterApplicationsController < ApplicationController
   end
 
   def application_params
-    params.require(:skillmaster_application).permit(:gamer_tag, :status, :reasons, :reviewer_id, category_ids: [], platform_ids: [], images: [], channels: [])
+    params.require(:skillmaster_application).permit(:gamer_tag, :status, :reasons, :reviewer_id, :reviewed_at, category_ids: [], platform_ids: [], images: [], channels: [])
   end
 
   def upload_to_s3(file)
