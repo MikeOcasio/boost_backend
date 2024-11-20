@@ -26,12 +26,16 @@ class Users::SkillmasterApplicationsController < ApplicationController
 
   # POST /users/skillmaster_applications
   def create
-    if SkillmasterApplication.exists?(user_id: current_user.id)
-      return render json: { error: 'You can only have one active application at a time' }, status: :unprocessable_entity
-    end
+    existing_application = SkillmasterApplication.find_by(user_id: current_user.id)
 
-    if current_user.role == 'skillmaster' || recently_denied?
-      return render json: { error: 'You cannot apply at this time' }, status: :forbidden
+    if existing_application
+      if current_user.role == 'skillmaster'
+        return render json: { error: 'You cannot apply at this time as you are already a Skillmaster.' }, status: :forbidden
+      elsif recently_denied?
+        return render json: { error: 'You cannot apply at this time. Please wait 30 days after your last denial.' }, status: :forbidden
+      else
+        return render json: { error: 'You can only have one active application at a time.' }, status: :unprocessable_entity
+      end
     end
 
     @application = SkillmasterApplication.new(application_params.merge(user_id: current_user.id))
