@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_19_195711) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_20_132837) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -263,6 +263,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_19_195711) do
     t.text "reasons"
     t.string "images", default: [], array: true
     t.string "channels", default: [], array: true
+    t.string "platforms", default: [], array: true
+    t.string "games", default: [], array: true
     t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
