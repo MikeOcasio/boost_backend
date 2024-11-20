@@ -16,7 +16,6 @@ module Api
     end
 
     # GET /promotions/by_code
-
     def show_by_code
       @promotion = Promotion.find_by(code: params[:code])
       return render json: { error: 'Promotion not found' }, status: :not_found if @promotion.nil?

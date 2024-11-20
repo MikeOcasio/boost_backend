@@ -99,7 +99,11 @@ Rails.application.routes.draw do
     # Resources for categories with limited actions
     resources :categories, only: %i[index show create update destroy]
 
-    resources :promotions
+    resources :promotions do
+      collection do
+        get 'by_code', to: 'promotions#show_by_code'
+      end
+    end
 
     resources :skillmasters, only: %i[index show]
 
