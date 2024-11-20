@@ -1,6 +1,8 @@
 module Api
   class PromotionsController < ApplicationController
-    before_action :set_promotion, only: [:show, :update, :destroy, :apply_to_order]
+    before_action :set_promotion, only: %i[show update destroy]
+    before_action :authenticate_user!
+    before_action :authorize_admin!, only: %i[create update destroy index]
 
     # GET /promotions
     def index
@@ -35,20 +37,32 @@ module Api
 
     # DELETE /promotions/:id
     def destroy
+      if @promotion.nil?
+        return render json: { error: 'Promotion not found or already deleted.' }, status: :not_found
+      end
+
       @promotion.destroy
       head :no_content
     end
 
     private
 
-    # Set promotion for actions that require it
-    def set_promotion
-      @promotion = Promotion.find(params[:id])
+    # Ensure the user is an admin or dev
+    def authorize_admin!
+      return render json: { error: 'Access denied' }, status: :forbidden unless admin?
     end
 
-    # Strong parameters for creating and updating promotions
+    def set_promotion
+      @promotion = Promotion.find_by(id: params[:id])
+      render json: { error: 'Promotion not found' }, status: :not_found if @promotion.nil?
+    end
+
     def promotion_params
       params.require(:promotion).permit(:code, :discount_percentage, :start_date, :end_date)
+    end
+
+    def admin?
+      current_user.role == 'admin' || current_user.role == 'dev'
     end
   end
 end
