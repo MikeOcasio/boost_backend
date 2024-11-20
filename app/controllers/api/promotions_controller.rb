@@ -2,7 +2,7 @@ module Api
   class PromotionsController < ApplicationController
     before_action :set_promotion, only: %i[show update destroy]
     before_action :authenticate_user!
-    before_action :authorize_admin!, only: %i[create update destroy index]
+    before_action :authorize_admin!, only: %i[show create update destroy index]
 
     # GET /promotions
     def index
@@ -12,6 +12,15 @@ module Api
 
     # GET /promotions/:id
     def show
+      render json: @promotion
+    end
+
+    # GET /promotions/by_code
+
+    def show_by_code
+      @promotion = Promotion.find_by(code: params[:code])
+      return render json: { error: 'Promotion not found' }, status: :not_found if @promotion.nil?
+
       render json: @promotion
     end
 
