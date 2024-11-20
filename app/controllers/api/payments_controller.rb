@@ -32,12 +32,17 @@ class Api::PaymentsController < ApplicationController
 
       # Create line items for the checkout session
       line_items = products.map do |product|
+        image_url = product[:image] || 'https://www.ravenboost.com/logo.svg'
+        if image_url.match?(/\.webp$/)
+          image_url = 'https://www.ravenboost.com/logo.svg'
+        end
+
         {
           price_data: {
             currency: currency,
             product_data: {
               name: product[:name] || 'Product Name',
-              images: [product[:image] || 'https://www.ravenboost.com/logo.svg']
+              images: [image_url]
             },
             unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i
           },
