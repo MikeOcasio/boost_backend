@@ -48,6 +48,13 @@ class Api::PaymentsController < ApplicationController
         }
       end
 
+      discounts = []
+      if promotion.present? && promotion[:discount_percentage].to_f.positive?
+        discounts << {
+          coupon: create_coupon_for_discount(promotion)
+        }
+      end
+
       # Create the checkout session
       session = Stripe::Checkout::Session.create({
                                                    payment_method_types: ['card'],
@@ -56,7 +63,7 @@ class Api::PaymentsController < ApplicationController
                                                    customer_email: current_user.email,
                                                    success_url: "https://#{DOMAIN_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
                                                    cancel_url: "https://#{DOMAIN_URL}/checkout",
-                                                   promotion_code: promotion
+                                                   discounts: discounts
                                                  })
 
       # Return the session ID (which can be used to redirect the customer)
@@ -66,6 +73,19 @@ class Api::PaymentsController < ApplicationController
     rescue StandardError => e
       render json: { success: false, error: e.message }, status: :internal_server_error
     end
+  end
+
+  # Helper method to create a coupon in Stripe for the discount
+  def create_coupon_for_discount(promotion)
+    # Assuming promotion contains discount_amount (in the smallest unit of the currency, e.g., cents)
+    # and promotion_code (promo code the user applied)
+    coupon = Stripe::Coupon.create(
+      amount_off: (promotion[:discount_amount].to_f * 100).to_i, # Amount should be in the smallest currency unit (e.g., cents)
+      currency: 'usd', # Assuming USD, change this as needed
+      duration: 'once', # Assuming a one-time discount
+      id: promotion[:promotion_code] # Use the promo code as the coupon ID
+    )
+    coupon.id
   end
 
   # Optionally, you can add a method to retrieve the session status
