@@ -23,6 +23,7 @@ class Api::PaymentsController < ApplicationController
       # Extract parameters directly from params
       currency = params[:currency]
       products = params[:products] || []
+      promotion = params[:promotion]
 
       # Check if currency and products are present
       if currency.nil? || products.empty?
@@ -32,10 +33,7 @@ class Api::PaymentsController < ApplicationController
 
       # Create line items for the checkout session
       line_items = products.map do |product|
-        image_url = product[:image] || 'https://www.ravenboost.com/logo.svg'
-        if image_url.match?(/\.webp$/)
-          image_url = 'https://www.ravenboost.com/logo.svg'
-        end
+        image_url = product[:image] && !product[:image].match?(/\.webp$/) ? product[:image] : 'https://www.ravenboost.com/logo.svg'
 
         {
           price_data: {
@@ -57,7 +55,8 @@ class Api::PaymentsController < ApplicationController
                                                    mode: 'payment',
                                                    customer_email: current_user.email,
                                                    success_url: "https://#{DOMAIN_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
-                                                   cancel_url: "https://#{DOMAIN_URL}/checkout"
+                                                   cancel_url: "https://#{DOMAIN_URL}/checkout",
+                                                   promotion_code: promotion
                                                  })
 
       # Return the session ID (which can be used to redirect the customer)
