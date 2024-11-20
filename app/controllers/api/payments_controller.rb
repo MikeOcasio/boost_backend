@@ -80,10 +80,10 @@ class Api::PaymentsController < ApplicationController
     # Assuming promotion contains discount_amount (in the smallest unit of the currency, e.g., cents)
     # and promotion_code (promo code the user applied)
     coupon = Stripe::Coupon.create(
-      amount_off: (promotion[:discount_amount].to_f * 100).to_i, # Amount should be in the smallest currency unit (e.g., cents)
+      amount_off: (promotion[:discount_percentage].to_f * 100).to_i, # Amount should be in the smallest currency unit (e.g., cents)
       currency: 'usd', # Assuming USD, change this as needed
       duration: 'once', # Assuming a one-time discount
-      id: promotion[:promotion_code] # Use the promo code as the coupon ID
+      id: promotion[:code] # Use the promo code as the coupon ID
     )
     coupon.id
   end
