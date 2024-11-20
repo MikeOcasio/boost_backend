@@ -4,7 +4,7 @@ class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
   # STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  # YOUR_DOMAIN = 'http://localhost:3001'
+  # DOMAIN_URL = 'http://localhost:3001'
 
   STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
   DOMAIN_URL = Rails.application.credentials.domain_url
@@ -51,7 +51,7 @@ class Api::PaymentsController < ApplicationController
       discounts = []
       if promotion.present? && promotion[:discount_percentage].to_f.positive?
         discounts << {
-          coupon: create_coupon_for_discount(promotion)
+          coupon: find_or_create_coupon_for_discount(promotion)
         }
       end
 
@@ -75,18 +75,24 @@ class Api::PaymentsController < ApplicationController
     end
   end
 
-  # Helper method to create a coupon in Stripe for the discount
-  def create_coupon_for_discount(promotion)
-    # Assuming promotion contains discount_amount (in the smallest unit of the currency, e.g., cents)
-    # and promotion_code (promo code the user applied)
-    coupon = Stripe::Coupon.create(
-      amount_off: (promotion[:discount_percentage].to_f * 100).to_i, # Amount should be in the smallest currency unit (e.g., cents)
-      currency: 'usd', # Assuming USD, change this as needed
-      duration: 'repeating', # Assuming a one-time discount
-      id: promotion[:code], # Use the promo code as the coupon ID
-      max_redemptions: 3
-    )
-    coupon.id
+  def find_or_create_coupon_for_discount(promotion)
+    # Check if the coupon already exists by ID or code (depending on your preference)
+    existing_coupon = Stripe::Coupon.list(limit: 100).data.find { |coupon| coupon.id == promotion[:code] }
+
+    if existing_coupon
+      # If the coupon exists, return its ID
+      existing_coupon.id
+    else
+      # If the coupon doesn't exist, create a new one
+      coupon = Stripe::Coupon.create(
+        amount_off: (promotion[:discount_percentage].to_f * 100).to_i, # Discount in the smallest currency unit (e.g., cents)
+        currency: 'usd', # Change as needed
+        duration: 'repeating', # Coupon can be used multiple times, but limited by max_redemptions
+        id: promotion[:code], # Promo code as coupon ID
+        max_redemptions: 3 # Allow the coupon to be used only 3 times in total
+      )
+      coupon.id
+    end
   end
 
   # Optionally, you can add a method to retrieve the session status
