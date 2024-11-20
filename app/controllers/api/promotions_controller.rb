@@ -39,17 +39,6 @@ module Api
       head :no_content
     end
 
-    # POST /promotions/:id/apply_to_order
-    def apply_to_order
-      order = Order.find(params[:order_id])
-
-      if @promotion.active? && order.apply_promotion(@promotion)
-        render json: { message: "Promotion applied successfully!" }, status: :ok
-      else
-        render json: { error: "Unable to apply promotion. It may be inactive or already applied to this order." }, status: :unprocessable_entity
-      end
-    end
-
     private
 
     # Set promotion for actions that require it
