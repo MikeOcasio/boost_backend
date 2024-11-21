@@ -3,16 +3,6 @@ require 'stripe'
 class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
-  USE_DEV_CREDENTIALS = false # Set this to `false` for production
-
-  if USE_DEV_CREDENTIALS
-    STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-    DOMAIN_URL = 'localhost:3001'
-  else
-    STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
-    DOMAIN_URL = Rails.application.credentials.domain_url
-  end
-
   if STRIPE_API_KEY.nil?
     Rails.logger.info('Stripe API Key not found. Please set STRIPE_API_KEY environment variable.')
   else
@@ -65,8 +55,8 @@ class Api::PaymentsController < ApplicationController
                                                    line_items: line_items,
                                                    mode: 'payment',
                                                    customer_email: current_user.email,
-                                                   success_url: "https://#{DOMAIN_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}",
-                                                   cancel_url: "https://#{DOMAIN_URL}/checkout",
+                                                   success_url: 'https://www.ravenboost.com/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+                                                   cancel_url: 'https://www.ravenboost.com/checkout',
                                                    discounts: discounts
                                                  })
 

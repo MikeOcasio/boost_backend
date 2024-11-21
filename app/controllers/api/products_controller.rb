@@ -5,12 +5,11 @@ module Api
     # GET /products
     def index
       @products = Product.includes(:category, :platforms, :prod_attr_cats, :children) # Preload necessary associations
-                        .where(categories: { is_active: true }) # Filter products where category is active
+                         .where(categories: { is_active: true }) # Filter products where category is active
 
       # Render the products in the format with necessary details
       render json: @products.map { |product| recursive_json(product) }, status: :ok
     end
-
 
     # GET /products/:id
     def show
