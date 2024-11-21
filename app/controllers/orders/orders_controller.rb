@@ -100,6 +100,8 @@ module Orders
 
               @order.platform = params[:platform] if params[:platform].present?
 
+              @order.promo_data = params[:promo_data] if params[:promo_data].present?
+
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
                 if @order.save
