@@ -8,9 +8,7 @@ class Users::TwoFactorAuthenticationController < ApplicationController
     else
       current_user.generate_otp_secret_if_missing!
 
-      logo_url = 'https://www.ravenboost.com/logo.svg'
-
-      otp_uri = current_user.otp_provisioning_uri(current_user.email, issuer: 'RavenBoost', logo: logo_url)
+      otp_uri = current_user.otp_provisioning_uri(current_user.email, issuer: 'RavenBoost')
       qr_code_svg = RQRCode::QRCode.new(otp_uri).as_svg
 
       render json: {
@@ -29,5 +27,4 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       render json: { error: 'Invalid OTP' }, status: :unprocessable_entity
     end
   end
-
 end

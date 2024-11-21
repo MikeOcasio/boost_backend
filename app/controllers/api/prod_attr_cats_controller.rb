@@ -41,8 +41,6 @@ module Api
         render json: { message: 'Failed to delete due to validation errors' }, status: :unprocessable_entity
       end
     rescue StandardError => e
-      # Log the error message for debugging purposes
-      Rails.logger.error("Failed to delete product attribute category: #{e.message}")
 
       # Send the error message back to the frontend
       render json: { message: "Server error 500: #{e.message}" }, status: :internal_server_error

@@ -24,7 +24,7 @@ module Orders
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform]
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
@@ -73,10 +73,14 @@ module Orders
         @order = Order.new(order_params)
 
         @order.platform = params[:platform] if params[:platform].present?
+
+        @order.promo_data = params[:promo_data] if params[:promo_data].present?
+        
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
-            add_products_to_order(@order, params[:product_ids]) # Add products to the order
+            add_products_to_order(@order, params[:product_ids])
+            # Add products to the order
 
             # Return the order details, including the order ID
             render json: { success: true, order_id: @order.id }, status: :created
@@ -99,6 +103,8 @@ module Orders
               @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
 
               @order.platform = params[:platform] if params[:platform].present?
+
+              @order.promo_data = params[:promo_data] if params[:promo_data].present?
 
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
@@ -348,7 +354,7 @@ module Orders
               only: %i[id name price]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -384,7 +390,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -408,7 +414,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,

@@ -11,9 +11,6 @@
 #  updated_at         :datetime         not null
 
 class Promotion < ApplicationRecord
-  has_many :order_promotions
-  has_many :orders, through: :order_promotions
-
   # Ensure the promotion is active before allowing use
   def active?
     start_date <= Time.current && end_date >= Time.current
