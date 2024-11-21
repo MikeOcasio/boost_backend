@@ -73,10 +73,14 @@ module Orders
         @order = Order.new(order_params)
 
         @order.platform = params[:platform] if params[:platform].present?
+
+        @order.promo_data = params[:promo_data] if params[:promo_data].present?
+        
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
-            add_products_to_order(@order, params[:product_ids]) # Add products to the order
+            add_products_to_order(@order, params[:product_ids])
+            # Add products to the order
 
             # Return the order details, including the order ID
             render json: { success: true, order_id: @order.id }, status: :created
