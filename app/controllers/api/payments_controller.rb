@@ -4,7 +4,7 @@ class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
   # STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  # DOMAIN_URL = 'http://localhost:3001'
+  # DOMAIN_URL = 'localhost:3001'
 
   STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
   DOMAIN_URL = Rails.application.credentials.domain_url

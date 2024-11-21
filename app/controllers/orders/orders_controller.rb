@@ -24,7 +24,7 @@ module Orders
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform]
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
@@ -348,7 +348,7 @@ module Orders
               only: %i[id name price]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -384,7 +384,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -408,7 +408,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id]
+          only: %i[id state created_at total_price internal_id promo_data]
         ).merge(
           platform: {
             id: @order.platform,
