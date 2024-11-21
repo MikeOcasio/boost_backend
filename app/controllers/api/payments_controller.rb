@@ -85,11 +85,11 @@ class Api::PaymentsController < ApplicationController
     else
       # If the coupon doesn't exist, create a new one
       coupon = Stripe::Coupon.create(
-        amount_off: (promotion[:discount_percentage].to_f * 100).to_i, # Discount in the smallest currency unit (e.g., cents)
-        currency: 'usd', # Change as needed
-        duration: 'repeating', # Coupon can be used multiple times, but limited by max_redemptions
-        id: promotion[:code], # Promo code as coupon ID
-        max_redemptions: 3 # Allow the coupon to be used only 3 times in total
+        percent_off: promotion[:discount_percentage].to_f,
+        currency: 'usd',
+        duration: 'repeating',
+        id: promotion[:code],
+        max_redemptions: 3
       )
       coupon.id
     end
