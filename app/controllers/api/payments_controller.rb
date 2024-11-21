@@ -3,11 +3,15 @@ require 'stripe'
 class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
-  # STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
-  # DOMAIN_URL = 'localhost:3001'
+  USE_DEV_CREDENTIALS = false # Set this to `false` for production
 
-  STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
-  DOMAIN_URL = Rails.application.credentials.domain_url
+  if USE_DEV_CREDENTIALS
+    STRIPE_API_KEY = 'sk_test_51Q9rdFKtclhwv0vlAZIfMiBATbFSnHTOOGN7qemvPUeFyn6lKAEFyuiSnotPId8EIF9o0bICY5JrVY39gTK4qvAt00ksBff9a6'
+    DOMAIN_URL = 'localhost:3001'
+  else
+    STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
+    DOMAIN_URL = Rails.application.credentials.domain_url
+  end
 
   if STRIPE_API_KEY.nil?
     Rails.logger.info('Stripe API Key not found. Please set STRIPE_API_KEY environment variable.')
@@ -87,9 +91,8 @@ class Api::PaymentsController < ApplicationController
       coupon = Stripe::Coupon.create(
         percent_off: promotion[:discount_percentage].to_f,
         currency: 'usd',
-        duration: 'repeating',
-        id: promotion[:code],
-        max_redemptions: 3
+        duration: 'once',
+        id: promotion[:code]
       )
       coupon.id
     end
