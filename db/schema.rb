@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_21_000719) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -116,18 +116,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.index ["product_id"], name: "index_order_products_on_product_id"
   end
 
-  create_table "order_promotions", force: :cascade do |t|
-    t.bigint "order_id", null: false
-    t.bigint "promotion_id", null: false
-    t.datetime "applied_at"
-    t.decimal "discount_amount", precision: 10, scale: 2
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["order_id", "promotion_id"], name: "index_order_promotions_on_order_id_and_promotion_id", unique: true
-    t.index ["order_id"], name: "index_order_promotions_on_order_id"
-    t.index ["promotion_id"], name: "index_order_promotions_on_promotion_id"
-  end
-
   create_table "orders", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "state"
@@ -143,6 +131,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.integer "platform_credential_id"
     t.integer "selected_level"
     t.decimal "dynamic_price", precision: 8, scale: 2
+    t.string "promo_data"
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
@@ -220,15 +209,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.index ["product_id"], name: "index_product_platforms_on_product_id"
   end
 
-  create_table "product_promotions", force: :cascade do |t|
-    t.bigint "product_id", null: false
-    t.bigint "promotion_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["product_id"], name: "index_product_promotions_on_product_id"
-    t.index ["promotion_id"], name: "index_product_promotions_on_promotion_id"
-  end
-
   create_table "products", force: :cascade do |t|
     t.string "name"
     t.text "description"
@@ -250,6 +230,8 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
+    t.bigint "parent_id"
+    t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
   create_table "promotions", force: :cascade do |t|
@@ -259,6 +241,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.datetime "end_date", precision: nil
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_promotions_on_code", unique: true
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -281,16 +264,18 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
     t.string "gamer_tag"
     t.text "reasons"
     t.string "images", default: [], array: true
+    t.string "channels", default: [], array: true
+    t.string "platforms", default: [], array: true
+    t.string "games", default: [], array: true
     t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
 
   create_table "sub_platforms", force: :cascade do |t|
-    t.bigint "platform_id", null: false
     t.string "name", null: false
+    t.bigint "platform_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
     t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
@@ -363,8 +348,6 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
-  add_foreign_key "order_promotions", "orders"
-  add_foreign_key "order_promotions", "promotions"
   add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
@@ -378,8 +361,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_10_29_191213) do
   add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
-  add_foreign_key "product_promotions", "products"
-  add_foreign_key "product_promotions", "promotions"
+  add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "sub_platforms", "platforms"

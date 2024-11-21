@@ -4,42 +4,36 @@ module Api
 
     # GET /products
     def index
-      @products = Product.includes(:category, :platforms, :prod_attr_cats)
-                         .where(categories: { is_active: true })
+      @products = Product.includes(:category, :platforms, :prod_attr_cats, :children) # Preload necessary associations
+                        .where(categories: { is_active: true }) # Filter products where category is active
 
-      # Render the products that passed the condition (active categories only)
-      render json: @products.as_json(
-        include: {
-          platforms: { only: %i[id name] },
-          category: { only: %i[id name description is_active] },
-          prod_attr_cats: { only: %i[id name] }
-        }
-      )
+      # Render the products in the format with necessary details
+      render json: @products.map { |product| recursive_json(product) }, status: :ok
     end
+
 
     # GET /products/:id
     def show
-      @product = Product.includes(:platforms, :category, :prod_attr_cats).find(params[:id])
-      render json: @product.as_json(
-        include: {
-          platforms: { only: %i[id name] },
-          category: { only: %i[id name description] },
-          prod_attr_cats: { only: %i[id name] }
-        }
-      )
+      @product = Product.includes(:platforms, :category, :prod_attr_cats, :children).find(params[:id])
+
+      render json: recursive_json(@product)
     end
 
     def by_platform
       platform_id = params[:platform_id]
       platform = Platform.find_by(id: platform_id)
 
+      # Return an error if the platform doesn't exist
       return render json: { message: 'Platform not found' }, status: :not_found unless platform
 
+      # Find products that are associated with the given platform
       @products = Product.joins(:platforms).where(platforms: { id: platform_id })
 
+      # If products are found, render them using the recursive_json method
       if @products.any?
-        render json: @product.as_json(include: { platforms: { only: %i[id name] } }), status: :ok
+        render json: @products.map { |product| recursive_json(product) }, status: :ok
       else
+        # If no products found, return a not found message
         render json: { message: 'No products found for this platform' }, status: :not_found
       end
     end
@@ -174,6 +168,41 @@ module Api
     # Helper method to delete from S3
     private
 
+    def recursive_json(product)
+      {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        image: product.image, # Include image if necessary
+        created_at: product.created_at,
+        updated_at: product.updated_at,
+        is_priority: product.is_priority,
+        tax: product.tax,
+        is_active: product.is_active,
+        most_popular: product.most_popular,
+        tag_line: product.tag_line,
+        bg_image: product.bg_image,
+        primary_color: product.primary_color,
+        secondary_color: product.secondary_color,
+        features: product.features,
+        category_id: product.category_id,
+        is_dropdown: product.is_dropdown,
+        dropdown_options: product.dropdown_options,
+        is_slider: product.is_slider,
+        slider_range: product.slider_range,
+        parent_id: product.parent_id,
+
+        # Include associated platforms, categories, and prod_attr_cats
+        platforms: product.platforms.as_json(only: %i[id name]),
+        category: product.category.as_json(only: %i[id name description is_active]),
+        prod_attr_cats: product.prod_attr_cats.as_json(only: %i[id name]),
+
+        # Recursively include children (if any)
+        children: product.children.map { |child| recursive_json(child) }
+      }
+    end
+
     def delete_from_s3(file_url)
       return if file_url.blank?
 
@@ -230,6 +259,7 @@ module Api
         :tag_line,
         :primary_color,
         :secondary_color,
+        :parent_id,
         :category_id,
         :is_dropdown,
         :is_slider,
@@ -242,6 +272,11 @@ module Api
     end
 
     def upload_to_s3(file)
+      # If the file is already a valid S3 URL, return it directly
+      if file.is_a?(String) && file.match?(%r{^https?://.*\.amazonaws\.com/})
+        return file
+      end
+
       if file.is_a?(ActionDispatch::Http::UploadedFile)
         obj = S3_BUCKET.object("products/#{file.original_filename}")
         obj.upload_file(file.tempfile, content_type: 'image/jpeg')
@@ -269,7 +304,7 @@ module Api
         end
       else
         raise ArgumentError,
-              "Expected an instance of ActionDispatch::Http::UploadedFile or a base64 string, got #{file.class.name}"
+              "Expected an instance of ActionDispatch::Http::UploadedFile, a base64 string, or an S3 URL, got #{file.class.name}"
       end
     end
   end

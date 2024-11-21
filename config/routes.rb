@@ -38,7 +38,7 @@ Rails.application.routes.draw do
     end
 
     # Adding the skillmaster applications routes
-    resources :skillmaster_applications, only: [:show]
+    resources :skillmaster_applications
 
     resources :banned_emails, only: [:index]
   end
@@ -100,13 +100,10 @@ Rails.application.routes.draw do
     resources :categories, only: %i[index show create update destroy]
 
     resources :promotions do
-      member do
-        post :apply_to_order
+      collection do
+        get 'by_code', to: 'promotions#show_by_code'
       end
     end
-
-    # Resources for files management
-    resources :files, only: %i[index create destroy]
 
     resources :skillmasters, only: %i[index show]
 
