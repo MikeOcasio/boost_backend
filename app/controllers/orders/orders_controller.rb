@@ -49,12 +49,11 @@ module Orders
     # Skill masters can only see their own assigned orders with platform credentials.
     # Admins and devs can see all orders.
     def show
-      if current_user&.role == 'skillmaster' && @order.assigned_skill_master_id == current_user.id
-        render_skillmaster_order_view
-      elsif current_user&.role.in?(%w[admin dev])
-        render_admin_dev_order_view
-      elsif current_user&.id == @order.user_id
+      if current_user&.id == @order.user_id
         render_user_order_view
+      elsif current_user&.id == @order.assigned_skill_master_id &&
+            (current_user&.role == 'skillmaster' || current_user&.role.in?(%w[admin dev]))
+        render_view
       else
         render_unauthorized
       end
@@ -75,7 +74,7 @@ module Orders
         @order.platform = params[:platform] if params[:platform].present?
 
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
-        
+
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
@@ -344,7 +343,7 @@ module Orders
 
     private
 
-    def render_skillmaster_order_view
+    def render_view
       skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
 
       render json: {
@@ -371,30 +370,6 @@ module Orders
           sub_platform: {
             id: @order.platform_credential.sub_platform&.id,
             name: @order.platform_credential.sub_platform&.name
-          }
-        ),
-        skill_master: {
-          id: skill_master_info&.id,
-          gamer_tag: skill_master_info&.gamer_tag
-        }
-      }
-    end
-
-    def render_admin_dev_order_view
-      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
-
-      render json: {
-        order: @order.as_json(
-          include: {
-            products: {
-              only: %i[id name price tax image quantity]
-            }
-          },
-          only: %i[id state created_at total_price internal_id promo_data]
-        ).merge(
-          platform: {
-            id: @order.platform,
-            name: Platform.find(@order.platform).name
           }
         ),
         skill_master: {
