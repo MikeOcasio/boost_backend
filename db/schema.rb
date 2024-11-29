@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_21_000719) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_29_153818) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -132,6 +132,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_21_000719) do
     t.integer "selected_level"
     t.decimal "dynamic_price", precision: 8, scale: 2
     t.string "promo_data"
+    t.string "order_data", default: [], array: true
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["user_id"], name: "index_orders_on_user_id"

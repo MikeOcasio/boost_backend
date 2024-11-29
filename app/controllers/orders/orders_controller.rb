@@ -24,7 +24,7 @@ module Orders
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data]
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data order_data]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
@@ -50,7 +50,7 @@ module Orders
     # Admins and devs can see all orders.
     def show
       if current_user&.id == @order.user_id
-        render_user_order_view
+        render_view
       elsif current_user&.id == @order.assigned_skill_master_id &&
             (current_user&.role == 'skillmaster' || current_user&.role.in?(%w[admin dev]))
         render_view
@@ -104,6 +104,8 @@ module Orders
               @order.platform = params[:platform] if params[:platform].present?
 
               @order.promo_data = params[:promo_data] if params[:promo_data].present?
+
+              @order.order_data = params[:order_data] if params[:order_data].present?
 
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
