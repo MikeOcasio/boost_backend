@@ -75,6 +75,8 @@ module Orders
 
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
 
+        @order.order_data = params[:order_data] if params[:order_data].present?
+
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
@@ -355,7 +357,7 @@ module Orders
               only: %i[id name price]
             }
           },
-          only: %i[id state created_at total_price internal_id promo_data]
+          only: %i[id state created_at total_price internal_id promo_data order_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -391,7 +393,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id promo_data]
+          only: %i[id state created_at total_price internal_id promo_data order_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -407,24 +409,6 @@ module Orders
 
     def render_unauthorized
       render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
-    end
-
-    # Method to handle dynamic pricing based on levels
-    def handle_dynamic_pricing(order, product_id, selected_level)
-      product = Product.find(product_id)
-
-      if product.prod_attr_cats.exists?(name: 'Levels')
-        # Dynamic pricing logic if 'Levels' attribute category is selected
-        selected_level = selected_level.to_i
-        price = product.calculate_price(selected_level)
-
-        # Update the order with dynamic price and selected level
-        order.selected_level = selected_level
-        order.dynamic_price = price
-      else
-        # Use the product's static price for non-level based products
-        order.price = product.price
-      end
     end
 
     def assign_platform_credentials(order, platform_id)
