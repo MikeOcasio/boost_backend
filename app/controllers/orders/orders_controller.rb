@@ -3,7 +3,7 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order, only: %i[show update destroy pick_up_order]
 
-    # GET /api/orders
+    # GET /orders/info
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
       if current_user
@@ -60,9 +60,6 @@ module Orders
     end
 
     # POST orders/info
-    # Create a new order.
-    # Admins and devs can create orders for any user and attach platform credentials.
-    # Customers can create their own orders and attach their own platform credentials.
     def create
       # Accept session_id as a parameter
       session_id = params[:session_id]
@@ -72,10 +69,9 @@ module Orders
         @order = Order.new(order_params)
 
         @order.platform = params[:platform] if params[:platform].present?
-
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
-
         @order.order_data = params[:order_data] if params[:order_data].present?
+        @order.total_price = calculate_total_price(params[:order_data])
 
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
@@ -104,10 +100,9 @@ module Orders
               @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
 
               @order.platform = params[:platform] if params[:platform].present?
-
               @order.promo_data = params[:promo_data] if params[:promo_data].present?
-
               @order.order_data = params[:order_data] if params[:order_data].present?
+              @order.total_price = calculate_total_price(params[:order_data])
 
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
@@ -430,6 +425,38 @@ module Orders
       else
         false
       end
+    end
+
+    def calculate_total_price(order_data)
+      return 0 unless order_data.blank?
+
+      total_price = 0
+
+      # Parse the order_data (assuming it's an array of JSON strings)
+      parsed_order_data = order_data.map { |data| JSON.parse(data) }
+
+      parsed_order_data.each do |product|
+        quantity = product['item_qty'] || 1
+        price = 0
+
+        if product['is_slider']
+          # Sum the prices from the slider range
+          price = product['slider_range'].sum { |slider| slider['price'].to_f }
+        elsif product['is_dropdown']
+          # Use the starting and ending points for dropdowns
+          starting_price = product.dig('starting_point', 'price').to_f || 0
+          ending_price = product.dig('ending_point', 'price').to_f || 0
+          price = (starting_price + ending_price)
+        else
+          # Base product price
+          price = product['price'].to_f
+        end
+
+        # Multiply price by quantity
+        total_price += price * quantity
+      end
+
+      total_price
     end
 
     def add_products_to_order(order, product_ids)
