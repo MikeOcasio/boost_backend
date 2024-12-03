@@ -61,25 +61,21 @@ module Orders
 
     # POST orders/info
     def create
-      # Accept session_id as a parameter
       session_id = params[:session_id]
 
-      # Check if the current user is an admin or dev
       if current_user.role == 'dev'
         @order = Order.new(order_params)
-
         @order.platform = params[:platform] if params[:platform].present?
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
         @order.order_data = params[:order_data] if params[:order_data].present?
 
-        # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
-            add_products_to_order(@order, params[:product_ids])
-            @order.total_price = calculate_total_price(params[:order_data])
             # Add products to the order
+            add_products_to_order(@order, params[:product_ids])
+            # Calculate and update the total price
+            @order.update(total_price: calculate_total_price(params[:order_data]))
 
-            # Return the order details, including the order ID
             render json: { success: true, order_id: @order.id }, status: :created
           else
             render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
@@ -87,50 +83,13 @@ module Orders
         else
           render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
         end
-
-      # If the user is a customer, verify the Checkout session
-      elsif current_user.role == 'customer' || current_user.role == 'skillmaster' || current_user.role == 'admin'
-        if session_id.present?
-          begin
-            # Retrieve the Checkout Session from Stripe
-            session = Stripe::Checkout::Session.retrieve(session_id)
-
-            # Proceed to create the order if payment was successful
-            if session.payment_status == 'paid'
-              @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
-
-              @order.platform = params[:platform] if params[:platform].present?
-              @order.promo_data = params[:promo_data] if params[:promo_data].present?
-              @order.order_data = params[:order_data] if params[:order_data].present?
-
-              # Assign platform credentials and save the order
-              if assign_platform_credentials(@order, params[:platform])
-                if @order.save
-                  add_products_to_order(@order, params[:product_ids])# Add products to the order
-                  @order.total_price = calculate_total_price(params[:order_data])
-
-                  # Return the order details, including the order ID
-                  render json: { success: true, order_id: @order.id }, status: :created
-                else
-                  render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
-                end
-              else
-                render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
-              end
-            else
-              # Payment was not successful
-              render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
-            end
-          rescue Stripe::InvalidRequestError => e
-            render json: { success: false, message: e.message }, status: :unprocessable_entity
-          end
-        else
-          render json: { success: false, message: 'Checkout session ID is required.' }, status: :unprocessable_entity
-        end
+      elsif current_user.role.in?(%w[customer skillmaster admin]) && session_id.present?
+        process_stripe_checkout(session_id)
       else
         render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
+
 
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
@@ -378,28 +337,27 @@ module Orders
       }
     end
 
-    def render_user_order_view
-      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+    def process_stripe_checkout(session_id)
+      session = Stripe::Checkout::Session.retrieve(session_id)
+      if session.payment_status == 'paid'
+        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+        @order.platform = params[:platform] if params[:platform].present?
+        @order.promo_data = params[:promo_data] if params[:promo_data].present?
+        @order.order_data = params[:order_data] if params[:order_data].present?
 
-      render json: {
-        order: @order.as_json(
-          include: {
-            products: {
-              only: %i[id name price tax image quantity]
-            }
-          },
-          only: %i[id state created_at total_price internal_id promo_data order_data]
-        ).merge(
-          platform: {
-            id: @order.platform,
-            name: Platform.find(@order.platform).name
-          }
-        ),
-        skill_master: {
-          id: skill_master_info&.id,
-          gamer_tag: skill_master_info&.gamer_tag
-        }
-      }
+        if assign_platform_credentials(@order, params[:platform]) && @order.save
+          add_products_to_order(@order, params[:product_ids])
+          @order.update(total_price: calculate_total_price(params[:order_data]))
+
+          render json: { success: true, order_id: @order.id }, status: :created
+        else
+          render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+        end
+      else
+        render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
+      end
+    rescue Stripe::InvalidRequestError => e
+      render json: { success: false, message: e.message }, status: :unprocessable_entity
     end
 
     def render_unauthorized

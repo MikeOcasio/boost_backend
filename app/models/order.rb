@@ -90,7 +90,6 @@ class Order < ApplicationRecord
     calculate_price
     calculate_tax
     calculate_total_price
-    save
   end
 
   def assign_platform_credentials
