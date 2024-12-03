@@ -71,12 +71,12 @@ module Orders
         @order.platform = params[:platform] if params[:platform].present?
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
         @order.order_data = params[:order_data] if params[:order_data].present?
-        @order.total_price = calculate_total_price(params[:order_data])
 
         # Assign platform credentials and save the order
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
             add_products_to_order(@order, params[:product_ids])
+            @order.total_price = calculate_total_price(params[:order_data])
             # Add products to the order
 
             # Return the order details, including the order ID
@@ -102,12 +102,12 @@ module Orders
               @order.platform = params[:platform] if params[:platform].present?
               @order.promo_data = params[:promo_data] if params[:promo_data].present?
               @order.order_data = params[:order_data] if params[:order_data].present?
-              @order.total_price = calculate_total_price(params[:order_data])
 
               # Assign platform credentials and save the order
               if assign_platform_credentials(@order, params[:platform])
                 if @order.save
-                  add_products_to_order(@order, params[:product_ids]) # Add products to the order
+                  add_products_to_order(@order, params[:product_ids])# Add products to the order
+                  @order.total_price = calculate_total_price(params[:order_data])
 
                   # Return the order details, including the order ID
                   render json: { success: true, order_id: @order.id }, status: :created

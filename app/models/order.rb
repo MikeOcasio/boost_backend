@@ -74,24 +74,24 @@ class Order < ApplicationRecord
     self.internal_id = SecureRandom.hex(5) # generates a random 20-character string
   end
 
-  # def calculate_price
-  #   self.price = order_products.includes(:product).sum { |order_product| order_product.product.price }
-  # end
+  def calculate_price
+    self.price = order_products.includes(:product).sum { |order_product| order_product.product.price }
+  end
 
-  # def calculate_tax
-  #   self.tax = order_products.includes(:product).sum { |order_product| order_product.product.tax }
-  # end
+  def calculate_tax
+    self.tax = order_products.includes(:product).sum { |order_product| order_product.product.tax }
+  end
 
-  # def calculate_total_price
-  #   self.total_price = price + tax
-  # end
+  def calculate_total_price
+    self.total_price = price + tax
+  end
 
-  # def update_totals
-  #   calculate_price
-  #   calculate_tax
-  #   calculate_total_price
-  #   save
-  # end
+  def update_totals
+    calculate_price
+    calculate_tax
+    calculate_total_price
+    save
+  end
 
   def assign_platform_credentials
     return unless platform_credential.nil? && user.present? && platform.present?
