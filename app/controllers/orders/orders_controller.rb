@@ -354,7 +354,7 @@ module Orders
         order: @order.as_json(
           include: {
             products: {
-              only: %i[id name price]
+              only: %i[id name price tax]
             }
           },
           only: %i[id state created_at total_price internal_id promo_data order_data]
