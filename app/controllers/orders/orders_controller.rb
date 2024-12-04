@@ -73,8 +73,13 @@ module Orders
           if @order.save
             # Add products to the order
             add_products_to_order(@order, params[:product_ids])
-            # Calculate and update the total price
-            @order.update(total_price: calculate_total_price(params[:order_data]))
+
+            # Calculate totals from order_data
+            totals = calculate_order_totals(params[:order_data])
+            @order.update(
+              total_price: totals[:total_price],
+              tax: totals[:tax]
+            )
 
             render json: { success: true, order_id: @order.id }, status: :created
           else
@@ -385,53 +390,18 @@ module Orders
       end
     end
 
-    def calculate_total_price(order_data)
-      return 0 unless order_data.blank?
-
-      total_price = 0
-
-      # Parse the order_data (assuming it's an array of JSON strings)
-      parsed_order_data = order_data.map { |data| JSON.parse(data) }
-
-      parsed_order_data.each do |product|
-        quantity = product['item_qty'] || 1
-        price = 0
-
-        if product['is_slider']
-          # Sum the prices from the slider range
-          price = product['slider_range'].sum { |slider| slider['price'].to_f }
-        elsif product['is_dropdown']
-          # Use the starting and ending points for dropdowns
-          starting_price = product.dig('starting_point', 'price').to_f || 0
-          ending_price = product.dig('ending_point', 'price').to_f || 0
-          price = (starting_price + ending_price)
-        else
-          # Base product price
-          price = product['price'].to_f
-        end
-
-        # Multiply price by quantity
-        total_price += price * quantity
-      end
-
-      total_price
-    end
-
     def add_products_to_order(order, product_ids)
       return if product_ids.blank?
 
       product_ids.each do |product_id|
         product = Product.find_by(id: product_id)
         if product
-          order.order_products.create(product: product) # No price or tax here
+          order.order_products.create(product: product)
         else
           Rails.logger.warn "Product with ID #{product_id} not found"
         end
       end
-
-      order.update_totals # Update order totals after adding products
     end
-
     # Set the order for actions that require it
     def set_order
       @order = Order.includes(:products, :user).find(params[:id])
@@ -455,6 +425,31 @@ module Orders
         :end_level,
         order_data: []
       )
+    end
+
+    def calculate_order_totals(order_data)
+      return { total_price: 0, tax: 0 } if order_data.blank?
+
+      total_price = 0
+      total_tax = 0
+      promo_discount = 0
+
+      # Parse the order_data array and sum up prices and taxes
+      order_data.each do |item|
+        item = JSON.parse(item) if item.is_a?(String)
+
+        # Get quantity from either item_qty or quantity, defaulting to 1
+        quantity = item['item_qty'].present? ? item['item_qty'] : (item['quantity'] || 1)
+
+        item_price = item['price'].to_f
+        item_tax = item['tax'].to_f
+
+        # Add tax to the price for total calculation
+        total_price += item_price + (item_tax * quantity)
+        total_tax += item_tax * quantity
+      end
+
+      { total_price: total_price, tax: total_tax }
     end
   end
 end
