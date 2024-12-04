@@ -209,7 +209,7 @@ module Orders
               only: %i[id name price tax image quantity]
             }
           },
-          only: %i[id state created_at total_price internal_id platform]
+          only: %i[id state created_at total_price internal_id platform order_data promo_data]
         ).map do |order|
           platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
           order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
