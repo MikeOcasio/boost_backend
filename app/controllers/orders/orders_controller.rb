@@ -3,7 +3,7 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order, only: %i[show update destroy pick_up_order]
 
-    # GET /api/orders
+    # GET /orders/info
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
     def index
       if current_user
@@ -24,7 +24,7 @@ module Orders
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data]
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data order_data]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
@@ -49,40 +49,38 @@ module Orders
     # Skill masters can only see their own assigned orders with platform credentials.
     # Admins and devs can see all orders.
     def show
-      if current_user&.role == 'skillmaster' && @order.assigned_skill_master_id == current_user.id
-        render_skillmaster_order_view
-      elsif current_user&.role.in?(%w[admin dev])
-        render_admin_dev_order_view
-      elsif current_user&.id == @order.user_id
-        render_user_order_view
+      if current_user&.id == @order.user_id
+        render_view
+      elsif current_user&.id == @order.assigned_skill_master_id &&
+            (current_user&.role == 'skillmaster' || current_user&.role.in?(%w[admin dev]))
+        render_view
       else
         render_unauthorized
       end
     end
 
     # POST orders/info
-    # Create a new order.
-    # Admins and devs can create orders for any user and attach platform credentials.
-    # Customers can create their own orders and attach their own platform credentials.
     def create
-      # Accept session_id as a parameter
       session_id = params[:session_id]
 
-      # Check if the current user is an admin or dev
       if current_user.role == 'dev'
         @order = Order.new(order_params)
-
         @order.platform = params[:platform] if params[:platform].present?
-
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
-        
-        # Assign platform credentials and save the order
+        @order.order_data = params[:order_data] if params[:order_data].present?
+
         if assign_platform_credentials(@order, params[:platform])
           if @order.save
-            add_products_to_order(@order, params[:product_ids])
             # Add products to the order
+            add_products_to_order(@order, params[:product_ids])
 
-            # Return the order details, including the order ID
+            # Calculate totals from order_data
+            totals = calculate_order_totals(params[:order_data])
+            @order.update(
+              total_price: totals[:total_price],
+              tax: totals[:tax]
+            )
+
             render json: { success: true, order_id: @order.id }, status: :created
           else
             render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
@@ -90,49 +88,13 @@ module Orders
         else
           render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
         end
-
-      # If the user is a customer, verify the Checkout session
-      elsif current_user.role == 'customer' || current_user.role == 'skillmaster' || current_user.role == 'admin'
-        if session_id.present?
-          begin
-            # Retrieve the Checkout Session from Stripe
-            session = Stripe::Checkout::Session.retrieve(session_id)
-
-            # Proceed to create the order if payment was successful
-            if session.payment_status == 'paid'
-              @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
-
-              @order.platform = params[:platform] if params[:platform].present?
-
-              @order.promo_data = params[:promo_data] if params[:promo_data].present?
-
-              # Assign platform credentials and save the order
-              if assign_platform_credentials(@order, params[:platform])
-                if @order.save
-                  add_products_to_order(@order, params[:product_ids]) # Add products to the order
-
-                  # Return the order details, including the order ID
-                  render json: { success: true, order_id: @order.id }, status: :created
-                else
-                  render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
-                end
-              else
-                render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
-              end
-            else
-              # Payment was not successful
-              render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
-            end
-          rescue Stripe::InvalidRequestError => e
-            render json: { success: false, message: e.message }, status: :unprocessable_entity
-          end
-        else
-          render json: { success: false, message: 'Checkout session ID is required.' }, status: :unprocessable_entity
-        end
+      elsif current_user.role.in?(%w[customer skillmaster admin]) && session_id.present?
+        process_stripe_checkout(session_id)
       else
         render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
+
 
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
@@ -344,17 +306,17 @@ module Orders
 
     private
 
-    def render_skillmaster_order_view
+    def render_view
       skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
 
       render json: {
         order: @order.as_json(
           include: {
             products: {
-              only: %i[id name price]
+              only: %i[id name price tax]
             }
           },
-          only: %i[id state created_at total_price internal_id promo_data]
+          only: %i[id state created_at total_price internal_id promo_data order_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -380,74 +342,31 @@ module Orders
       }
     end
 
-    def render_admin_dev_order_view
-      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+    def process_stripe_checkout(session_id)
+      session = Stripe::Checkout::Session.retrieve(session_id)
+      if session.payment_status == 'paid'
+        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+        @order.platform = params[:platform] if params[:platform].present?
+        @order.promo_data = params[:promo_data] if params[:promo_data].present?
+        @order.order_data = params[:order_data] if params[:order_data].present?
 
-      render json: {
-        order: @order.as_json(
-          include: {
-            products: {
-              only: %i[id name price tax image quantity]
-            }
-          },
-          only: %i[id state created_at total_price internal_id promo_data]
-        ).merge(
-          platform: {
-            id: @order.platform,
-            name: Platform.find(@order.platform).name
-          }
-        ),
-        skill_master: {
-          id: skill_master_info&.id,
-          gamer_tag: skill_master_info&.gamer_tag
-        }
-      }
-    end
+        if assign_platform_credentials(@order, params[:platform]) && @order.save
+          add_products_to_order(@order, params[:product_ids])
+          @order.update(total_price: calculate_total_price(params[:order_data]))
 
-    def render_user_order_view
-      skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
-
-      render json: {
-        order: @order.as_json(
-          include: {
-            products: {
-              only: %i[id name price tax image quantity]
-            }
-          },
-          only: %i[id state created_at total_price internal_id promo_data]
-        ).merge(
-          platform: {
-            id: @order.platform,
-            name: Platform.find(@order.platform).name
-          }
-        ),
-        skill_master: {
-          id: skill_master_info&.id,
-          gamer_tag: skill_master_info&.gamer_tag
-        }
-      }
+          render json: { success: true, order_id: @order.id }, status: :created
+        else
+          render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+        end
+      else
+        render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
+      end
+    rescue Stripe::InvalidRequestError => e
+      render json: { success: false, message: e.message }, status: :unprocessable_entity
     end
 
     def render_unauthorized
       render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
-    end
-
-    # Method to handle dynamic pricing based on levels
-    def handle_dynamic_pricing(order, product_id, selected_level)
-      product = Product.find(product_id)
-
-      if product.prod_attr_cats.exists?(name: 'Levels')
-        # Dynamic pricing logic if 'Levels' attribute category is selected
-        selected_level = selected_level.to_i
-        price = product.calculate_price(selected_level)
-
-        # Update the order with dynamic price and selected level
-        order.selected_level = selected_level
-        order.dynamic_price = price
-      else
-        # Use the product's static price for non-level based products
-        order.price = product.price
-      end
     end
 
     def assign_platform_credentials(order, platform_id)
@@ -477,15 +396,12 @@ module Orders
       product_ids.each do |product_id|
         product = Product.find_by(id: product_id)
         if product
-          order.order_products.create(product: product) # No price or tax here
+          order.order_products.create(product: product)
         else
           Rails.logger.warn "Product with ID #{product_id} not found"
         end
       end
-
-      order.update_totals # Update order totals after adding products
     end
-
     # Set the order for actions that require it
     def set_order
       @order = Order.includes(:products, :user).find(params[:id])
@@ -507,7 +423,33 @@ module Orders
         :dynamic_price,
         :start_level,
         :end_level,
+        order_data: []
       )
+    end
+
+    def calculate_order_totals(order_data)
+      return { total_price: 0, tax: 0 } if order_data.blank?
+
+      total_price = 0
+      total_tax = 0
+      promo_discount = 0
+
+      # Parse the order_data array and sum up prices and taxes
+      order_data.each do |item|
+        item = JSON.parse(item) if item.is_a?(String)
+
+        # Get quantity from either item_qty or quantity, defaulting to 1
+        quantity = item['item_qty'].present? ? item['item_qty'] : (item['quantity'] || 1)
+
+        item_price = item['price'].to_f
+        item_tax = item['tax'].to_f
+
+        # Add tax to the price for total calculation
+        total_price += item_price + (item_tax * quantity)
+        total_tax += item_tax * quantity
+      end
+
+      { total_price: total_price, tax: total_tax }
     end
   end
 end
