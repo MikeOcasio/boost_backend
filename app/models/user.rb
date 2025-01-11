@@ -32,7 +32,7 @@ class User < ApplicationRecord
   has_many :orders, dependent: :nullify
   has_many :notifications, dependent: :nullify
   has_many :preferred_skill_masters, dependent: :nullify
-  has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user, dependent: :nullify  # Add dependent: :nullify here
+  has_many :preferred_skill_masters_users, through: :preferred_skill_masters, source: :user, dependent: :nullify # Add dependent: :nullify here
   has_many :platform_credentials, dependent: :destroy
   has_many :users_categories, dependent: :nullify
   has_many :categories, through: :users_categories, dependent: :nullify
@@ -68,7 +68,8 @@ class User < ApplicationRecord
   # Two-factor authentication configuration
   # This uses the ROTP gem under the hood (part of devise-two-factor)
   def need_two_factor_authentication?(_request)
-    otp_required_for_login
+    # Only require 2FA if the user has opted in
+    otp_required_for_login && otp_setup_complete
   end
 
   # Ensure user has a OTP secret
