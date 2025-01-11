@@ -352,7 +352,7 @@ module Orders
 
         if assign_platform_credentials(@order, params[:platform]) && @order.save
           add_products_to_order(@order, params[:product_ids])
-          @order.update(total_price: calculate_total_price(params[:order_data]))
+          @order.update(total_price: calculate_order_totals(params[:order_data]))
 
           render json: { success: true, order_id: @order.id }, status: :created
         else
