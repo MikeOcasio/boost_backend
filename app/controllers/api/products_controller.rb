@@ -2,13 +2,30 @@ module Api
   class ProductsController < ApplicationController
     before_action :set_product, only: %i[show update destroy platforms add_platform remove_platform]
 
+    # Optimize?? ----------------------------
+
     # GET /products
     def index
-      @products = Product.includes(:category, :platforms, :prod_attr_cats, :children) # Preload necessary associations
-                         .where(categories: { is_active: true }) # Filter products where category is active
+      # Cache the query results (adjust cache duration as needed)
+      @products = Rails.cache.fetch('active_products', expires_in: 1.hour) do
+        # Load all products in a single query with necessary associations
+        products = Product.includes(
+          :category,
+          :platforms,
+          :prod_attr_cats,
+          { children: %i[category platforms prod_attr_cats] }
+        ).joins(:category)
+                          .where(categories: { is_active: true })
+                          .to_a
 
-      # Render the products in the format with necessary details
-      render json: @products.map { |product| recursive_json(product) }, status: :ok
+        # Build a hash map for O(1) lookups
+        product_map = products.index_by(&:id)
+
+        # Pre-compute the JSON structure
+        products.map { |product| build_product_json(product, product_map) }
+      end
+
+      render json: @products, status: :ok
     end
 
     # GET /products/:id
@@ -305,6 +322,19 @@ module Api
         raise ArgumentError,
               "Expected an instance of ActionDispatch::Http::UploadedFile, a base64 string, or an S3 URL, got #{file.class.name}"
       end
+    end
+
+    def build_product_json(product, product_map)
+      {
+        id: product.id,
+        name: product.name,
+        category: product.category&.slice(:id, :name),
+        platforms: product.platforms.map { |p| p.slice(:id, :name) },
+        attributes: product.prod_attr_cats.map { |a| a.slice(:id, :name) },
+        children: product.children.map do |child|
+          build_product_json(child, product_map) if child
+        end.compact
+      }
     end
   end
 end
