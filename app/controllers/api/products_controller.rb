@@ -1,6 +1,7 @@
 module Api
   class ProductsController < ApplicationController
     before_action :set_product, only: %i[show update destroy platforms add_platform remove_platform]
+    after_action :clear_cache, only: %i[create update destroy]
 
     # Optimize?? ----------------------------
 
@@ -285,6 +286,10 @@ module Api
         platform_ids: [],     # Assuming platform_ids is an array
         prod_attr_cat_ids: [] # Assuming prod_attr_cat_ids is an array
       )
+    end
+
+    def clear_cache
+      Rails.cache.delete('active_products')
     end
 
     def upload_to_s3(file)
