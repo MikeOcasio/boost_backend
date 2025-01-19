@@ -13,17 +13,13 @@ class Users::TwoFactorAuthenticationController < ApplicationController
 
       render json: {
         qr_code: qr_code_svg,
-        otp_secret: current_user.otp_secret,
-        allow_skip: true # Indicate that the user can skip 2FA setup
+        otp_secret: current_user.otp_secret
       }, status: :ok
     end
   end
 
   def verify
-    if params[:skip_2fa]
-      current_user.update(otp_required_for_login: false, otp_setup_complete: false)
-      render json: { message: '2FA setup skipped' }, status: :ok
-    elsif current_user.validate_and_consume_otp!(params[:otp_attempt])
+    if current_user.validate_and_consume_otp!(params[:otp_attempt])
       # Mark the setup as complete only after a successful OTP verification
       current_user.update(otp_required_for_login: true, otp_setup_complete: true)
       render json: { message: 'OTP verified and 2FA enabled' }, status: :ok
