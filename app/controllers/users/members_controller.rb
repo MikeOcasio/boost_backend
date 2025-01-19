@@ -1,7 +1,7 @@
 module Users
   class MembersController < ApplicationController
     before_action :authenticate_user!, except: %i[update_password user_exists]
-    skip_before_action :authenticate_user!, only: %i[update_password user_exists]
+    skip_before_action :authenticate_user!, only: %i[update_password user_exists skillmasters]
     before_action :set_user, only: %i[update destroy add_platform remove_platform lock_user unlock_user]
 
     # GET /users/member-data/signed_in_user

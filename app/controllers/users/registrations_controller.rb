@@ -25,6 +25,8 @@ class Users::RegistrationsController < Devise::RegistrationsController
       # Proceed with building the user resource
       build_resource(sign_up_params)
 
+      resource.two_factor_method = params[:user][:two_factor_method] # Capture the user's choice
+
       # Save the resource
       if resource.save
         yield resource if block_given?
@@ -47,6 +49,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
   end
 
   def sign_up_params
-    params.require(:user).permit(:email, :password, :password_confirmation, :role, :first_name, :last_name)
+    params.require(:user).permit(:email, :password, :password_confirmation, :role, :first_name, :last_name, :two_factor_method)
   end
 end

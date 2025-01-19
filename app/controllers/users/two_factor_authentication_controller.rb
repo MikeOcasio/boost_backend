@@ -27,4 +27,24 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       render json: { error: 'Invalid OTP' }, status: :unprocessable_entity
     end
   end
+
+  def update_method
+    if %w[app email].include?(params[:method])
+      current_user.update(two_factor_method: params[:method])
+
+      if params[:method] == 'email'
+        current_user.send_two_factor_authentication_code
+        render json: { message: 'OTP sent to your email.' }, status: :ok
+      else
+        render json: { message: '2FA method updated to app. Please scan the QR code.' }, status: :ok
+      end
+    else
+      render json: { error: 'Invalid 2FA method' }, status: :unprocessable_entity
+    end
+  end
+
+  def send_otp_email
+    current_user.send_two_factor_authentication_code
+    render json: { message: 'Enter the OTP sent.' }, status: :ok
+  end
 end
