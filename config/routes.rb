@@ -6,8 +6,12 @@ Rails.application.routes.draw do
     sessions: 'users/sessions',
     registrations: 'users/registrations',
     unlocks: 'users/unlocks',
-    passwords: 'users/passwords'
+    passwords: 'users/passwords',
+    two_factor_authentication: 'users/two_factor_authentication'
   }
+
+  # Custom route for updating 2FA method
+  post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
 
   namespace :users do
     resources :members, path: 'member-data', only: %i[index create show update destroy] do
@@ -35,8 +39,8 @@ Rails.application.routes.draw do
     # Change the two_factor_authentication route to 2fa
     resource :two_factor_authentication, only: [:show], controller: 'two_factor_authentication', path: '2fa' do
       post 'verify', to: 'two_factor_authentication#verify'
+      post 'send_otp_email', to: 'two_factor_authentication#send_otp_email' # New route for sending OTP email
     end
-
     # Adding the skillmaster applications routes
     resources :skillmaster_applications
 

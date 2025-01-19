@@ -134,4 +134,13 @@ class User < ApplicationRecord
   def deleted?
     deleted_at.present?
   end
+
+  # Add a column to store the preferred 2FA method
+  def two_factor_method
+    read_attribute(:two_factor_method) || 'email' # Default to email if not set
+  end
+
+  def send_two_factor_authentication_code
+    UserMailer.otp(self, current_otp).deliver_now
+  end
 end

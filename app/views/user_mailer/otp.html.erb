@@ -79,13 +79,13 @@
   <div class="container">
     <!-- Email Header -->
     <div class="header">
-      <img src="https://www.ravenboost.com/images/logo.png" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
+      <img src="https://www.ravenboost.com/logo.svg" alt="RavenBoost Logo"> <!-- Replace with correct logo URL -->
       <h1>One-Time Password (OTP)</h1>
     </div>
 
     <!-- Email Content -->
     <div class="content">
-      <h2>Hello, <%= @user.name %>,</h2>
+      <h2>Hello, <%= @user.first_name %>,</h2>
       <p>You are receiving this email because you have requested a one-time password (OTP) for authentication.</p>
 
       <p>Your OTP is:</p>
@@ -108,4 +108,4 @@
     </div>
   </div>
 </body>
-</html>
+</html> 
