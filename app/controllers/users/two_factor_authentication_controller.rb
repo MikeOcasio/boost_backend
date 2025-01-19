@@ -44,11 +44,7 @@ class Users::TwoFactorAuthenticationController < ApplicationController
   end
 
   def send_otp_email
-    if current_user.two_factor_method == 'email'
-      current_user.send_two_factor_authentication_code
-      render json: { message: 'OTP sent to your email.' }, status: :ok
-    else
-      render json: { error: 'Email is not set as your 2FA method.' }, status: :unprocessable_entity
-    end
+    current_user.send_two_factor_authentication_code
+    render json: { message: 'Enter the OTP sent.' }, status: :ok
   end
 end

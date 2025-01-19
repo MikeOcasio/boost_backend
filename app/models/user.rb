@@ -141,10 +141,6 @@ class User < ApplicationRecord
   end
 
   def send_two_factor_authentication_code
-    if two_factor_method == 'email'
-      UserMailer.otp(self, current_otp).deliver_now
-    else
-      super # This will use the default app-based method
-    end
+    UserMailer.otp(self, current_otp).deliver_now
   end
 end
