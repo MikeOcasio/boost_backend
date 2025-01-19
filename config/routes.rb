@@ -6,8 +6,12 @@ Rails.application.routes.draw do
     sessions: 'users/sessions',
     registrations: 'users/registrations',
     unlocks: 'users/unlocks',
-    passwords: 'users/passwords'
+    passwords: 'users/passwords',
+    two_factor_authentication: 'users/two_factor_authentication'
   }
+
+  # Custom route for updating 2FA method
+  post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
 
   namespace :users do
     resources :members, path: 'member-data', only: %i[index create show update destroy] do

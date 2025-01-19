@@ -27,4 +27,13 @@ class Users::TwoFactorAuthenticationController < ApplicationController
       render json: { error: 'Invalid OTP' }, status: :unprocessable_entity
     end
   end
+
+  def update_method
+    if %w[app email].include?(params[:method])
+      current_user.update(two_factor_method: params[:method])
+      render json: { message: '2FA method updated successfully' }, status: :ok
+    else
+      render json: { error: 'Invalid 2FA method' }, status: :unprocessable_entity
+    end
+  end
 end

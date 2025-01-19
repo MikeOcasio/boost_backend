@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_29_153818) do
+ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -327,6 +327,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_29_153818) do
     t.string "gameplay_info", default: [], array: true
     t.string "rememberable_value"
     t.boolean "otp_setup_complete"
+    t.string "two_factor_method", default: "email"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
   end
