@@ -10,6 +10,7 @@
 #  created_at         :datetime         not null
 #  updated_at         :datetime         not null
 
+
 class Promotion < ApplicationRecord
   # Ensure the promotion is active before allowing use
   def active?
