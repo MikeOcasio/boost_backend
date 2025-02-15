@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
+ActiveRecord::Schema[7.0].define(version: 2025_02_15_032338) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -84,6 +84,17 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
   end
 
+  create_table "chats", force: :cascade do |t|
+    t.bigint "customer_id", null: false
+    t.bigint "booster_id", null: false
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["booster_id"], name: "index_chats_on_booster_id"
+    t.index ["customer_id", "booster_id"], name: "index_chats_on_customer_id_and_booster_id", unique: true
+    t.index ["customer_id"], name: "index_chats_on_customer_id"
+  end
+
   create_table "graveyards", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -95,6 +106,17 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylist_on_jti"
+  end
+
+  create_table "messages", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "sender_id", null: false
+    t.text "content"
+    t.boolean "read", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id"], name: "index_messages_on_chat_id"
+    t.index ["sender_id"], name: "index_messages_on_sender_id"
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -273,10 +295,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   end
 
   create_table "sub_platforms", force: :cascade do |t|
-    t.string "name", null: false
     t.bigint "platform_id", null: false
+    t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
     t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
@@ -347,6 +370,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
+  add_foreign_key "chats", "users", column: "booster_id"
+  add_foreign_key "chats", "users", column: "customer_id"
+  add_foreign_key "messages", "chats"
+  add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
