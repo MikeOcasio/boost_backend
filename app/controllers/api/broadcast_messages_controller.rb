@@ -26,8 +26,8 @@ class Api::BroadcastMessagesController < ApplicationController
   end
 
   def ensure_admin_or_developer
-    unless current_user.role.in?(['admin', 'developer'])
+    unless current_user.role.in?(['admin', 'dev'])
       render json: { error: 'Unauthorized' }, status: :unauthorized
     end
   end
-end 
+end
