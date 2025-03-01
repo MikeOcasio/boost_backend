@@ -16,6 +16,7 @@ module Api
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
                           .where(categories: { is_active: true })
+                          .where(is_active: true)
                           .page(page)
                           .per(per_page)
 
