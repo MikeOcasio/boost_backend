@@ -3,8 +3,6 @@ module Api
     before_action :set_product, only: %i[show update destroy platforms add_platform remove_platform]
     after_action :clear_cache, only: %i[create update destroy]
 
-    # Optimize?? ----------------------------
-
     # GET /products
     def index
       page = params[:page] || 1
