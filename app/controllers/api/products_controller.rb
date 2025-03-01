@@ -3,27 +3,53 @@ module Api
     before_action :set_product, only: %i[show update destroy platforms add_platform remove_platform]
     after_action :clear_cache, only: %i[create update destroy]
 
-    # Optimize?? ----------------------------
-
     # GET /products
     def index
-      # Cache the query results (adjust cache duration as needed)
-      @products = Rails.cache.fetch('active_products', expires_in: 1.hour) do
-        # Load all products in a single query with necessary associations
+      page = params[:page] || 1
+      per_page = params[:per_page] || 12
+      get_all = ActiveModel::Type::Boolean.new.cast(params[:get_all])
+      status = params[:status] # Can be 'active', 'inactive', or nil for all
+
+      cache_key = if get_all
+                    "all_products_page_#{page}_per_#{per_page}"
+                  elsif status == 'inactive'
+                    "inactive_products_page_#{page}_per_#{per_page}"
+                  else
+                    "active_products_page_#{page}_per_#{per_page}"
+                  end
+
+      @products = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
         products = Product.includes(
           :category,
           :platforms,
           :prod_attr_cats,
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
-                          .where(categories: { is_active: true })
-                          .to_a
 
-        # Build a hash map for O(1) lookups
+        # Apply filters based on get_all and status parameters
+        unless get_all
+          case status
+          when 'inactive'
+            products = products.where(is_active: false)
+          when 'active', nil
+            products = products.where(categories: { is_active: true })
+                               .where(is_active: true)
+          end
+        end
+
+        products = products.page(page).per(per_page)
         product_map = products.index_by(&:id)
 
-        # Pre-compute the JSON structure
-        products.map { |product| build_product_json(product, product_map) }
+        {
+          products: products.map { |product| build_product_json(product, product_map) },
+          meta: {
+            current_page: products.current_page,
+            total_pages: products.total_pages,
+            total_count: products.total_count,
+            per_page: products.limit_value,
+            filter_status: status || 'active'
+          }
+        }
       end
 
       render json: @products, status: :ok
@@ -289,7 +315,9 @@ module Api
     end
 
     def clear_cache
-      Rails.cache.delete('active_products')
+      Rails.cache.delete_matched('active_products_page_*')
+      Rails.cache.delete_matched('inactive_products_page_*')
+      Rails.cache.delete_matched('all_products_page_*')
     end
 
     def upload_to_s3(file)
