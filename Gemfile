@@ -33,6 +33,7 @@ gem 'devise-jwt'
 gem 'devise_token_auth'
 gem 'devise-two-factor'
 gem 'rbnacl'
+gem 'kaminari'
 
 gem 'rotp'
 gem 'rqrcode'
