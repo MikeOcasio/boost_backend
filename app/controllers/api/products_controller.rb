@@ -7,19 +7,37 @@ module Api
     def index
       page = params[:page] || 1
       per_page = params[:per_page] || 12
+      get_all = ActiveModel::Type::Boolean.new.cast(params[:get_all])
+      status = params[:status] # Can be 'active', 'inactive', or nil for all
 
-      @products = Rails.cache.fetch("active_products_page_#{page}_per_#{per_page}", expires_in: 1.hour) do
+      cache_key = if get_all
+                    "all_products_page_#{page}_per_#{per_page}"
+                  elsif status == 'inactive'
+                    "inactive_products_page_#{page}_per_#{per_page}"
+                  else
+                    "active_products_page_#{page}_per_#{per_page}"
+                  end
+
+      @products = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
         products = Product.includes(
           :category,
           :platforms,
           :prod_attr_cats,
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
-                          .where(categories: { is_active: true })
-                          .where(is_active: true)
-                          .page(page)
-                          .per(per_page)
 
+        # Apply filters based on get_all and status parameters
+        unless get_all
+          case status
+          when 'inactive'
+            products = products.where(is_active: false)
+          when 'active', nil
+            products = products.where(categories: { is_active: true })
+                               .where(is_active: true)
+          end
+        end
+
+        products = products.page(page).per(per_page)
         product_map = products.index_by(&:id)
 
         {
@@ -28,7 +46,8 @@ module Api
             current_page: products.current_page,
             total_pages: products.total_pages,
             total_count: products.total_count,
-            per_page: products.limit_value
+            per_page: products.limit_value,
+            filter_status: status || 'active'
           }
         }
       end
@@ -297,6 +316,8 @@ module Api
 
     def clear_cache
       Rails.cache.delete_matched('active_products_page_*')
+      Rails.cache.delete_matched('inactive_products_page_*')
+      Rails.cache.delete_matched('all_products_page_*')
     end
 
     def upload_to_s3(file)
