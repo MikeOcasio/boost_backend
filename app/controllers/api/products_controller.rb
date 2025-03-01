@@ -9,8 +9,11 @@ module Api
       per_page = params[:per_page] || 12
       get_all = ActiveModel::Type::Boolean.new.cast(params[:get_all])
       status = params[:status] # Can be 'active', 'inactive', or nil for all
+      search_query = params[:search]&.downcase
 
-      cache_key = if get_all
+      cache_key = if search_query
+                    "search_#{search_query}_status_#{status}_page_#{page}_per_#{per_page}"
+                  elsif get_all
                     "all_products_page_#{page}_per_#{per_page}"
                   elsif status == 'inactive'
                     "inactive_products_page_#{page}_per_#{per_page}"
@@ -25,6 +28,12 @@ module Api
           :prod_attr_cats,
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
+
+        # Apply search if present
+        if search_query.present?
+          products = products.where('LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ?',
+                                    "%#{search_query}%", "%#{search_query}%")
+        end
 
         # Apply filters based on get_all and status parameters
         unless get_all
@@ -47,7 +56,8 @@ module Api
             total_pages: products.total_pages,
             total_count: products.total_count,
             per_page: products.limit_value,
-            filter_status: status || 'active'
+            filter_status: status || 'active',
+            search_query: search_query
           }
         }
       end
@@ -318,6 +328,7 @@ module Api
       Rails.cache.delete_matched('active_products_page_*')
       Rails.cache.delete_matched('inactive_products_page_*')
       Rails.cache.delete_matched('all_products_page_*')
+      Rails.cache.delete_matched('search_*')
     end
 
     def upload_to_s3(file)
