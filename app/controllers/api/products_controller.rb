@@ -20,7 +20,6 @@ module Api
                           .where(categories: { is_active: true })
                           .page(page)
                           .per(per_page)
-                          .to_a
 
         product_map = products.index_by(&:id)
 
