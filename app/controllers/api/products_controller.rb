@@ -245,6 +245,7 @@ module Api
         is_slider: product.is_slider,
         slider_range: product.slider_range,
         parent_id: product.parent_id,
+        parent_name: product.parent&.name,
 
         # Include associated platforms, categories, and prod_attr_cats
         platforms: product.platforms.as_json(only: %i[id name]),
