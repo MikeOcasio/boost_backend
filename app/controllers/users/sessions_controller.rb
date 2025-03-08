@@ -37,11 +37,20 @@ class Users::SessionsController < Devise::SessionsController
   private
 
   def respond_with(resource, _opts = {})
-    token = request.env['warden-jwt_auth.token']
+    session_token = request.env['warden-jwt_auth.token']
+
+    # Generate maintenance token only if site is in maintenance and user is admin/dev
+    maintenance_token = if AppStatus.current.maintenance? && %w[admin dev].include?(resource.role)
+                          payload = JWT.decode(session_token, Rails.application.credentials.devise_jwt_secret_key, true).first
+                          payload['type'] = 'maintenance' # Add type claim to distinguish token
+                          JWT.encode(payload, Rails.application.credentials.devise_jwt_secret_key)
+                        end
+
     render json: {
       message: 'You are logged in.',
       user: resource,
-      token: token
+      token: session_token,
+      maintenance_token: maintenance_token
     }, status: :ok
   end
 
