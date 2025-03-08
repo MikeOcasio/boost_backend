@@ -6,7 +6,6 @@ class Users::SessionsController < Devise::SessionsController
     user = User.find_by(email: params[:user][:email])
 
     if user.nil?
-
       render json: { error: 'User not found. Please register.' }, status: :not_found
       return
     end
@@ -21,8 +20,9 @@ class Users::SessionsController < Devise::SessionsController
       return
     end
 
-    # Restrict login from the Under Construction page
-    if params[:under_construction] && %w[admin dev].exclude?(user.role)
+    # Check maintenance access before proceeding with authentication
+    app_status = AppStatus.current
+    if (app_status.maintenance? || params[:under_construction]) && !%w[admin dev].include?(user.role)
       render json: { error: 'Only admins and devs can log in during maintenance.' }, status: :forbidden
       return
     end
@@ -47,11 +47,11 @@ class Users::SessionsController < Devise::SessionsController
                         end
 
     render json: {
-      message: 'You are logged in.',
+      message: resource.role.in?(%w[admin dev]) ? 'You are logged in.' : 'Only admins and devs can log in during maintenance.',
       user: resource,
       token: session_token,
       maintenance_token: maintenance_token
-    }, status: :ok
+    }, status: maintenance_token.nil? && AppStatus.current.maintenance? ? :forbidden : :ok
   end
 
   def respond_to_on_destroy
