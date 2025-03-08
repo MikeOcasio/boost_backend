@@ -21,6 +21,12 @@ class Users::SessionsController < Devise::SessionsController
       return
     end
 
+    # Restrict login from the Under Construction page
+    if params[:under_construction] && %w[admin dev].exclude?(user.role)
+      render json: { error: 'Only admins and devs can log in during maintenance.' }, status: :forbidden
+      return
+    end
+
     # Remember me functionality if passed
     params[:user][:remember_me] = params[:user][:remember_me] if params[:user].key?(:remember_me)
 

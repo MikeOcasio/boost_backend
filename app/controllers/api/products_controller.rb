@@ -8,11 +8,14 @@ module Api
       page = params[:page] || 1
       per_page = params[:per_page] || 12
       get_all = ActiveModel::Type::Boolean.new.cast(params[:get_all])
-      status = params[:status] # Can be 'active', 'inactive', or nil for all
+      status = params[:status]
       search_query = params[:search]&.downcase
+      category_id = params[:category_id]
+      platform_id = params[:platform_id]
+      attribute_id = params[:attribute_id]
 
-      cache_key = if search_query
-                    "search_#{search_query}_status_#{status}_page_#{page}_per_#{per_page}"
+      cache_key = if search_query.present? || category_id.present? || platform_id.present? || attribute_id.present?
+                    "products_#{search_query}_status_#{status}_cat_#{category_id}_plat_#{platform_id}_attr_#{attribute_id}_page_#{page}_per_#{per_page}"
                   elsif get_all
                     "all_products_page_#{page}_per_#{per_page}"
                   elsif status == 'inactive'
@@ -35,7 +38,16 @@ module Api
                                     "%#{search_query}%", "%#{search_query}%")
         end
 
-        # Apply filters based on get_all and status parameters
+        # Filter by category
+        products = products.where(category_id: category_id) if category_id.present?
+
+        # Filter by platform
+        products = products.joins(:platforms).where(platforms: { id: platform_id }) if platform_id.present?
+
+        # Filter by product attribute
+        products = products.joins(:prod_attr_cats).where(prod_attr_cats: { id: attribute_id }) if attribute_id.present?
+
+        # Apply status filters
         unless get_all
           case status
           when 'inactive'
@@ -46,7 +58,7 @@ module Api
           end
         end
 
-        products = products.page(page).per(per_page)
+        products = products.distinct.page(page).per(per_page)
         product_map = products.index_by(&:id)
 
         {
@@ -57,7 +69,10 @@ module Api
             total_count: products.total_count,
             per_page: products.limit_value,
             filter_status: status || 'active',
-            search_query: search_query
+            search_query: search_query,
+            category_id: category_id,
+            platform_id: platform_id,
+            attribute_id: attribute_id
           }
         }
       end
@@ -245,6 +260,7 @@ module Api
         is_slider: product.is_slider,
         slider_range: product.slider_range,
         parent_id: product.parent_id,
+        parent_name: product.parent&.name,
 
         # Include associated platforms, categories, and prod_attr_cats
         platforms: product.platforms.as_json(only: %i[id name]),
@@ -328,7 +344,7 @@ module Api
       Rails.cache.delete_matched('active_products_page_*')
       Rails.cache.delete_matched('inactive_products_page_*')
       Rails.cache.delete_matched('all_products_page_*')
-      Rails.cache.delete_matched('search_*')
+      Rails.cache.delete_matched('products_*')
     end
 
     def upload_to_s3(file)

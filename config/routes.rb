@@ -116,5 +116,13 @@ Rails.application.routes.draw do
     resources :payments, only: [] do
       post 'create_checkout_session', on: :collection
     end
+
+    resource :app_status, only: %i[show update], controller: 'app_status'
+
+    resources :chats, only: %i[index show create] do
+      resources :messages, only: %i[create]
+    end
+
+    resources :broadcast_messages, only: %i[index create]
   end
 end
