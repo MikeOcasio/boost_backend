@@ -118,5 +118,11 @@ Rails.application.routes.draw do
     end
 
     resource :app_status, only: %i[show update], controller: 'app_status'
+
+    resources :chats, only: %i[index show create] do
+      resources :messages, only: %i[create]
+    end
+
+    resources :broadcast_messages, only: %i[index create]
   end
 end
