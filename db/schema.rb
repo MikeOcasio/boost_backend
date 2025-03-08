@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,13 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "app_statuses", force: :cascade do |t|
+    t.string "status", default: "active", null: false
+    t.string "message", default: "Application is running normally", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "banned_emails", force: :cascade do |t|
@@ -84,6 +91,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
   end
 
+  create_table "chats", force: :cascade do |t|
+    t.bigint "customer_id", null: false
+    t.bigint "booster_id", null: false
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "broadcast"
+    t.string "title"
+    t.index ["booster_id"], name: "index_chats_on_booster_id"
+    t.index ["customer_id", "booster_id"], name: "index_chats_on_customer_id_and_booster_id", unique: true
+    t.index ["customer_id"], name: "index_chats_on_customer_id"
+  end
+
   create_table "graveyards", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -95,6 +115,17 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylist_on_jti"
+  end
+
+  create_table "messages", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "sender_id", null: false
+    t.text "content"
+    t.boolean "read", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id"], name: "index_messages_on_chat_id"
+    t.index ["sender_id"], name: "index_messages_on_sender_id"
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -192,15 +223,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.datetime "updated_at", null: false
   end
 
-  create_table "product_categories", force: :cascade do |t|
-    t.bigint "product_id", null: false
-    t.bigint "category_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["category_id"], name: "index_product_categories_on_category_id"
-    t.index ["product_id"], name: "index_product_categories_on_product_id"
-  end
-
   create_table "product_platforms", force: :cascade do |t|
     t.bigint "product_id", null: false
     t.bigint "platform_id", null: false
@@ -215,6 +237,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.text "description"
     t.decimal "price"
     t.string "image"
+    t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_priority", default: false
@@ -226,12 +249,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
-    t.bigint "category_id"
     t.boolean "is_dropdown", default: false
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
     t.bigint "parent_id"
+    t.index ["category_id"], name: "index_products_on_category_id"
     t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
@@ -273,10 +296,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   end
 
   create_table "sub_platforms", force: :cascade do |t|
-    t.string "name", null: false
     t.bigint "platform_id", null: false
+    t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
     t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
@@ -347,6 +371,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
+  add_foreign_key "chats", "users", column: "booster_id"
+  add_foreign_key "chats", "users", column: "customer_id"
+  add_foreign_key "messages", "chats"
+  add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
@@ -359,10 +387,9 @@ ActiveRecord::Schema[7.0].define(version: 2025_01_19_165944) do
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
-  add_foreign_key "product_categories", "categories"
-  add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
+  add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
