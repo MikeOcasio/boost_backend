@@ -22,7 +22,7 @@ class Users::SessionsController < Devise::SessionsController
     end
 
     # Restrict login from the Under Construction page
-    if params[:under_construction] && !%w[admin dev].include?(user.role)
+    if params[:under_construction] && %w[admin dev].exclude?(user.role)
       render json: { error: 'Only admins and devs can log in during maintenance.' }, status: :forbidden
       return
     end
