@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,13 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "app_statuses", force: :cascade do |t|
+    t.string "status", default: "active", null: false
+    t.string "message", default: "Application is running normally", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "banned_emails", force: :cascade do |t|
@@ -216,15 +223,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
     t.datetime "updated_at", null: false
   end
 
-  create_table "product_categories", force: :cascade do |t|
-    t.bigint "product_id", null: false
-    t.bigint "category_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["category_id"], name: "index_product_categories_on_category_id"
-    t.index ["product_id"], name: "index_product_categories_on_product_id"
-  end
-
   create_table "product_platforms", force: :cascade do |t|
     t.bigint "product_id", null: false
     t.bigint "platform_id", null: false
@@ -239,6 +237,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
     t.text "description"
     t.decimal "price"
     t.string "image"
+    t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_priority", default: false
@@ -250,12 +249,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
-    t.bigint "category_id"
     t.boolean "is_dropdown", default: false
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
     t.bigint "parent_id"
+    t.index ["category_id"], name: "index_products_on_category_id"
     t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
@@ -388,10 +387,9 @@ ActiveRecord::Schema[7.0].define(version: 2025_02_15_212501) do
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
-  add_foreign_key "product_categories", "categories"
-  add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
+  add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
