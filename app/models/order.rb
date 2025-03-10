@@ -25,6 +25,7 @@ class Order < ApplicationRecord
   has_many :order_products, dependent: :destroy
   has_many :products, through: :order_products
   has_one :promotion
+  has_many :reviews, dependent: :destroy
 
   before_create :generate_internal_id
   before_save :assign_platform_credentials

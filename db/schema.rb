@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_10_014446) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_10_022438) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -271,6 +271,23 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_014446) do
     t.index ["code"], name: "index_promotions_on_code", unique: true
   end
 
+  create_table "reviews", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "reviewable_type", null: false
+    t.bigint "reviewable_id", null: false
+    t.bigint "order_id"
+    t.integer "rating", null: false
+    t.text "content", null: false
+    t.string "review_type", null: false
+    t.boolean "verified_purchase", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["order_id"], name: "index_reviews_on_order_id"
+    t.index ["reviewable_type", "reviewable_id"], name: "index_reviews_on_reviewable"
+    t.index ["user_id", "reviewable_type", "reviewable_id"], name: "index_unique_order_reviews", unique: true, where: "((review_type)::text = 'order'::text)"
+    t.index ["user_id"], name: "index_reviews_on_user_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.string "session_id", null: false
     t.text "data"
@@ -408,6 +425,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_014446) do
   add_foreign_key "product_platforms", "products"
   add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
+  add_foreign_key "reviews", "orders"
+  add_foreign_key "reviews", "users"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "skillmaster_rewards", "users"
