@@ -124,5 +124,11 @@ Rails.application.routes.draw do
     end
 
     resources :broadcast_messages, only: %i[index create]
+
+    resources :skillmaster_rewards, only: [:index] do
+      member do
+        post :claim
+      end
+    end
   end
 end
