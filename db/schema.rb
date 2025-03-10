@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_10_014446) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -164,8 +164,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.decimal "dynamic_price", precision: 8, scale: 2
     t.string "promo_data"
     t.string "order_data", default: [], array: true
+    t.bigint "referral_skillmaster_id"
+    t.integer "points", default: 0
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
+    t.index ["referral_skillmaster_id"], name: "index_orders_on_referral_skillmaster_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
@@ -295,6 +298,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
 
+  create_table "skillmaster_rewards", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "points", default: 0, null: false
+    t.string "reward_type", null: false
+    t.string "status", default: "pending", null: false
+    t.decimal "amount", precision: 10, scale: 2
+    t.datetime "claimed_at"
+    t.datetime "paid_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_skillmaster_rewards_on_user_id"
+  end
+
   create_table "sub_platforms", force: :cascade do |t|
     t.bigint "platform_id", null: false
     t.string "name", null: false
@@ -382,6 +398,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
+  add_foreign_key "orders", "users", column: "referral_skillmaster_id"
   add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
@@ -393,6 +410,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
+  add_foreign_key "skillmaster_rewards", "users"
   add_foreign_key "sub_platforms", "platforms"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"

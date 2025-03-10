@@ -36,6 +36,8 @@ class User < ApplicationRecord
   has_many :platform_credentials, dependent: :destroy
   has_many :users_categories, dependent: :nullify
   has_many :categories, through: :users_categories, dependent: :nullify
+  has_many :skillmaster_rewards
+  has_many :referrals, class_name: 'Order', foreign_key: 'referral_skillmaster_id'
 
   before_validation :set_default_role, on: :create
   # ---------------
@@ -142,5 +144,28 @@ class User < ApplicationRecord
 
   def send_two_factor_authentication_code
     UserMailer.otp(self, current_otp).deliver_now
+  end
+
+  def referral_link
+    # Generate unique referral link
+    "#{Rails.application.routes.url_helpers.root_url}?ref=#{self.id}"
+  end
+
+  def completion_points
+    # Calculate points based on completed orders
+    completed_orders.sum(:points)
+  end
+
+  def referral_points
+    # Calculate points from valid referrals (orders >= $10)
+    referrals.where('total >= ?', 10.00).count * 10
+  end
+
+  def next_completion_reward
+    SkillmasterReward.calculate_next_threshold(completion_points, 'completion')
+  end
+
+  def next_referral_reward
+    SkillmasterReward.calculate_next_threshold(referral_points, 'referral')
   end
 end
