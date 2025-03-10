@@ -38,6 +38,7 @@ class User < ApplicationRecord
   has_many :categories, through: :users_categories, dependent: :nullify
   has_many :skillmaster_rewards
   has_many :referrals, class_name: 'Order', foreign_key: 'referral_skillmaster_id'
+  has_many :reviews, dependent: :destroy
 
   before_validation :set_default_role, on: :create
   # ---------------
