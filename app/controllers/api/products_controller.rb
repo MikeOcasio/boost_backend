@@ -31,7 +31,8 @@ module Api
           :prod_attr_cats,
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
-                          .where(parent_id: nil) # Only get parent products
+                          .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
+                          .distinct # Only get parent products or products with children
 
         # Apply search if present
         if search_query.present?
