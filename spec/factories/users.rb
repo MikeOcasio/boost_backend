@@ -3,11 +3,13 @@ require 'rotp'
 FactoryBot.define do
   factory :user do
     email { Faker::Internet.email }
+    password { 'Password123!' }
     first_name { Faker::Name.first_name }
     last_name { Faker::Name.last_name }
-    password { 'Password123!' }
-    password_confirmation { 'Password123!' }
     role { 'customer' }
+    otp_secret { nil }
+    otp_required_for_login { false }
+    platform_credentials { [] }
     gamer_tag { Faker::Internet.username }
     bio { Faker::Lorem.paragraph }
     image_url { Faker::Internet.url(host: 'example.com', path: '/avatar.jpg') }
@@ -16,25 +18,38 @@ FactoryBot.define do
     preferred_skill_master_ids { [] }
     platforms { [] }
 
-    # Default values
-    otp_required_for_login { false }
-    otp_setup_complete { false }
-    two_factor_method { 'none' }
-    locked_by_admin { false }
-    deleted_at { nil }
+    trait :admin do
+      role { 'admin' }
+    end
 
-    # Devise/Authentication related
-    confirmed_at { Time.current }
-    confirmation_sent_at { 1.day.ago }
-    sign_in_count { 0 }
-    current_sign_in_at { nil }
-    last_sign_in_at { nil }
-    current_sign_in_ip { nil }
-    last_sign_in_ip { nil }
+    trait :skillmaster do
+      role { 'skillmaster' }
+    end
+
+    trait :customer do
+      role { 'customer' }
+    end
+
+    trait :locked do
+      locked_at { Time.current }
+      locked_by_admin { true }
+    end
+
+    trait :with_platform_credentials do
+      after(:create) do |user|
+        create_list(:platform_credential, 2, user: user)
+      end
+    end
 
     trait :with_platforms do
       after(:create) do |user|
         create_list(:platform, 2, users: [user])
+      end
+    end
+
+    trait :with_categories do
+      after(:create) do |user|
+        create_list(:category, 2, users: [user])
       end
     end
 
@@ -43,19 +58,6 @@ FactoryBot.define do
       otp_setup_complete { true }
       otp_secret { ROTP::Base32.random }
       two_factor_method { 'app' }
-    end
-
-    trait :locked do
-      locked_at { Time.current }
-      failed_attempts { 3 }
-    end
-
-    trait :admin_locked do
-      locked_by_admin { true }
-    end
-
-    trait :deleted do
-      deleted_at { Time.current }
     end
 
     trait :with_gameplay_info do
@@ -76,6 +78,9 @@ FactoryBot.define do
       end
     end
 
+    factory :admin_user, traits: [:admin]
+    factory :skillmaster_user, traits: [:skillmaster]
+    factory :locked_user, traits: [:locked]
     factory :customer do
       role { 'customer' }
     end
@@ -89,10 +94,6 @@ FactoryBot.define do
           'experience_years' => rand(1..10)
         }
       end
-    end
-
-    factory :admin do
-      role { 'admin' }
     end
 
     factory :dev do
