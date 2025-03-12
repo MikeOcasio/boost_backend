@@ -79,6 +79,7 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get 'by_platforms/:platform_id', to: 'products#by_platform'
+        get 'by_category/:category_id', to: 'products#by_category'
       end
       member do
         get :platforms
