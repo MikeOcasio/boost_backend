@@ -109,11 +109,9 @@ module Api
 
     def by_category
       @category = Category.find(params[:category_id])
-      @products = @category.products.includes(:product_attribute_category)
+      @products = @category.products
 
-      render json: @products,
-             include: [:product_attribute_category],
-             status: :ok
+      render json: @products, status: :ok
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Category not found' }, status: :not_found
     end
