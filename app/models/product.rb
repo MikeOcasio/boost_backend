@@ -34,6 +34,8 @@ class Product < ApplicationRecord
   belongs_to :parent, class_name: 'Product', optional: true, inverse_of: :children
   has_many :children, class_name: 'Product', foreign_key: 'parent_id', dependent: :nullify, inverse_of: :parent
 
+  has_many :reviews, as: :reviewable
+
   validates :name, presence: true
 
   validate :has_at_least_one_platform

@@ -36,6 +36,11 @@ class User < ApplicationRecord
   has_many :platform_credentials, dependent: :destroy
   has_many :users_categories, dependent: :nullify
   has_many :categories, through: :users_categories, dependent: :nullify
+  has_many :skillmaster_rewards
+  has_many :referrals, class_name: 'Order', foreign_key: 'referral_skillmaster_id'
+  has_many :reviews, dependent: :destroy
+  has_many :received_reviews, as: :reviewable, class_name: 'Review'
+  has_many :written_reviews, class_name: 'Review'
 
   before_validation :set_default_role, on: :create
   # ---------------
@@ -101,7 +106,7 @@ class User < ApplicationRecord
     # Return false if the user is marked as deleted
     return false if deleted?
 
-    super(password)
+    super
   end
 
   def set_default_role
@@ -112,7 +117,7 @@ class User < ApplicationRecord
     if locked_by_admin
       update!(locked_at: Time.current)
     else
-      super(opts)
+      super
     end
   end
 
@@ -142,5 +147,75 @@ class User < ApplicationRecord
 
   def send_two_factor_authentication_code
     UserMailer.otp(self, current_otp).deliver_now
+  end
+
+  def referral_link
+    # Generate unique referral link
+    "#{Rails.application.routes.url_helpers.root_url}?ref=#{id}"
+  end
+
+  def completion_points
+    # Calculate points based on completed orders
+    completed_orders.sum(:points)
+  end
+
+  def referral_points
+    # Calculate points from valid referrals (orders >= $10)
+    referrals.where('total >= ?', 10.00).count * 10
+  end
+
+  def next_completion_reward
+    SkillmasterReward.calculate_next_threshold(completion_points, 'completion')
+  end
+
+  def next_referral_reward
+    SkillmasterReward.calculate_next_threshold(referral_points, 'referral')
+  end
+
+  def can_review?(target)
+    case target
+    when User
+      if role == 'skillmaster'
+        target.role == 'customer' && Order.exists?(
+          state: 'complete',
+          user_id: target.id,
+          assigned_skill_master_id: id
+        )
+      elsif role == 'customer'
+        target.role == 'skillmaster' && Order.exists?(
+          state: 'complete',
+          user_id: id,
+          assigned_skill_master_id: target.id
+        )
+      end
+    when Order
+      target.complete? && (id == target.user_id || id == target.assigned_skill_master_id)
+    when Product
+      Order.joins(:products)
+           .exists?(user_id: id, products: { id: target.id }, state: 'complete')
+    else
+      false
+    end
+  end
+
+  # Role helper methods
+  def customer?
+    role == 'customer'
+  end
+
+  def skillmaster?
+    role == 'skillmaster'
+  end
+
+  def admin?
+    role == 'admin'
+  end
+
+  def dev?
+    role == 'dev'
+  end
+
+  def staff?
+    skillmaster? || admin? || dev?
   end
 end
