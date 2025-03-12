@@ -112,7 +112,12 @@ module Api
       page = params[:page] || 1
       per_page = params[:per_page] || 12
 
-      @products = @category.products.includes(:platforms, :category, :prod_attr_cats, :children).page(page).per(per_page)
+      @products = @category.products
+                           .includes(:platforms, :category, :prod_attr_cats,
+                                     { children: %i[platforms category prod_attr_cats] })
+                           .joins(:children) # Only get products that have children
+                           .distinct # Prevent duplicate products
+                           .page(page).per(per_page)
 
       render json: {
         products: @products.map { |product| recursive_json(product) },
