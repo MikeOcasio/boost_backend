@@ -121,6 +121,9 @@ Rails.application.routes.draw do
 
     resources :chats, only: %i[index show create] do
       resources :messages, only: %i[create]
+      member do
+        post :archive
+      end
     end
 
     resources :broadcast_messages, only: %i[index create]

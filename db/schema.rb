@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_10_022438) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -83,6 +83,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_022438) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_active", default: true, null: false
+    t.string "image"
+    t.string "bg_image"
   end
 
   create_table "categories_skillmaster_apps", id: false, force: :cascade do |t|
@@ -91,17 +93,33 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_022438) do
     t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
   end
 
+  create_table "chat_participants", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id", "user_id"], name: "index_chat_participants_on_chat_id_and_user_id", unique: true
+    t.index ["chat_id"], name: "index_chat_participants_on_chat_id"
+    t.index ["user_id"], name: "index_chat_participants_on_user_id"
+  end
+
   create_table "chats", force: :cascade do |t|
-    t.bigint "customer_id", null: false
-    t.bigint "booster_id", null: false
+    t.bigint "initiator_id", null: false
+    t.bigint "recipient_id", null: false
     t.boolean "active", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "broadcast"
     t.string "title"
-    t.index ["booster_id"], name: "index_chats_on_booster_id"
-    t.index ["customer_id", "booster_id"], name: "index_chats_on_customer_id_and_booster_id", unique: true
-    t.index ["customer_id"], name: "index_chats_on_customer_id"
+    t.string "chat_type", null: false
+    t.string "ticket_number"
+    t.string "status", default: "active"
+    t.bigint "order_id"
+    t.index ["initiator_id", "recipient_id"], name: "index_chats_on_initiator_id_and_recipient_id", unique: true
+    t.index ["initiator_id"], name: "index_chats_on_initiator_id"
+    t.index ["order_id"], name: "index_chats_on_order_id"
+    t.index ["recipient_id"], name: "index_chats_on_recipient_id"
+    t.index ["ticket_number"], name: "index_chats_on_ticket_number", unique: true
   end
 
   create_table "graveyards", force: :cascade do |t|
@@ -404,8 +422,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_022438) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
-  add_foreign_key "chats", "users", column: "booster_id"
-  add_foreign_key "chats", "users", column: "customer_id"
+  add_foreign_key "chat_participants", "chats"
+  add_foreign_key "chat_participants", "users"
+  add_foreign_key "chats", "orders"
+  add_foreign_key "chats", "users", column: "initiator_id"
+  add_foreign_key "chats", "users", column: "recipient_id"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"

@@ -18,6 +18,16 @@
 class Order < ApplicationRecord
   include AASM
 
+  VALID_STATES = %w[
+    open
+    assigned
+    in_progress
+    delayed
+    disputed
+    re_assigned
+    complete
+  ].freeze
+
   scope :graveyard_orders, -> { where(assigned_skill_master_id: nil) }
 
   belongs_to :user
@@ -27,10 +37,10 @@ class Order < ApplicationRecord
   has_one :promotion
   has_many :reviews, dependent: :destroy
 
-  before_create :generate_internal_id
   before_save :assign_platform_credentials
+  before_create :generate_internal_id
 
-  validates :state, presence: true
+  validates :state, inclusion: { in: VALID_STATES }
   validates :internal_id, uniqueness: true
   validates :user, presence: true
 
