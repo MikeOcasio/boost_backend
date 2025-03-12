@@ -113,13 +113,14 @@ module Api
       per_page = params[:per_page] || 12
 
       @products = @category.products
-                           .includes(:platforms, :category, :prod_attr_cats, :children)
+                           .includes(:platforms, :category, :prod_attr_cats,
+                                     { children: %i[platforms category prod_attr_cats] })
                            .where(parent_id: nil) # Only get parent products
                            .page(page).per(per_page)
 
       render json: {
         products: @products.map do |product|
-          recursive_json(product).except(:parent_id, :parent_name) # Remove parent references
+          recursive_json(product)
         end,
         meta: {
           current_page: @products.current_page,
