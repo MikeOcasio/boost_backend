@@ -18,6 +18,12 @@ class Api::ChatsController < ApplicationController
     @chat = Chat.new(chat_params)
     @chat.initiator = current_user
 
+    # For group chats, set the first non-initiator participant as recipient
+    if @chat.chat_type == 'group' && params[:chat][:participant_ids].present?
+      other_participants = params[:chat][:participant_ids].map(&:to_i) - [current_user.id]
+      @chat.recipient_id = other_participants.first if other_participants.any?
+    end
+
     if @chat.save
       create_initial_participants
       render json: @chat, status: :created
@@ -51,9 +57,9 @@ class Api::ChatsController < ApplicationController
   def chat_params
     params.require(:chat).permit(
       :chat_type,
+      :title,
       :recipient_id,
       :order_id,
-      :title,
       participant_ids: []
     )
   end
@@ -61,12 +67,15 @@ class Api::ChatsController < ApplicationController
   def create_initial_participants
     case @chat.chat_type
     when 'group'
-      params[:participant_ids].each do |user_id|
+      # Add all specified participants
+      (params[:chat][:participant_ids] || []).each do |user_id|
         @chat.chat_participants.create(user_id: user_id)
       end
+      # Add initiator if not already included
+      @chat.chat_participants.create(user_id: current_user.id) unless @chat.participant_ids.include?(current_user.id)
     when 'direct', 'support'
       @chat.chat_participants.create(user_id: @chat.initiator_id)
-      @chat.chat_participants.create(user_id: @chat.recipient_id) if @chat.recipient_id
+      @chat.chat_participants.create(user_id: @chat.recipient_id)
     end
   end
 
