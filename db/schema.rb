@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -83,6 +83,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_active", default: true, null: false
+    t.string "image"
+    t.string "bg_image"
   end
 
   create_table "categories_skillmaster_apps", id: false, force: :cascade do |t|
@@ -91,17 +93,33 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
   end
 
+  create_table "chat_participants", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id", "user_id"], name: "index_chat_participants_on_chat_id_and_user_id", unique: true
+    t.index ["chat_id"], name: "index_chat_participants_on_chat_id"
+    t.index ["user_id"], name: "index_chat_participants_on_user_id"
+  end
+
   create_table "chats", force: :cascade do |t|
-    t.bigint "customer_id", null: false
-    t.bigint "booster_id", null: false
+    t.bigint "initiator_id", null: false
+    t.bigint "recipient_id", null: false
     t.boolean "active", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "broadcast"
     t.string "title"
-    t.index ["booster_id"], name: "index_chats_on_booster_id"
-    t.index ["customer_id", "booster_id"], name: "index_chats_on_customer_id_and_booster_id", unique: true
-    t.index ["customer_id"], name: "index_chats_on_customer_id"
+    t.string "chat_type", null: false
+    t.string "ticket_number"
+    t.string "status", default: "active"
+    t.bigint "order_id"
+    t.index ["initiator_id", "recipient_id"], name: "index_chats_on_initiator_id_and_recipient_id", unique: true
+    t.index ["initiator_id"], name: "index_chats_on_initiator_id"
+    t.index ["order_id"], name: "index_chats_on_order_id"
+    t.index ["recipient_id"], name: "index_chats_on_recipient_id"
+    t.index ["ticket_number"], name: "index_chats_on_ticket_number", unique: true
   end
 
   create_table "graveyards", force: :cascade do |t|
@@ -164,8 +182,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.decimal "dynamic_price", precision: 8, scale: 2
     t.string "promo_data"
     t.string "order_data", default: [], array: true
+    t.bigint "referral_skillmaster_id"
+    t.integer "points", default: 0
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
+    t.index ["referral_skillmaster_id"], name: "index_orders_on_referral_skillmaster_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
@@ -268,6 +289,23 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.index ["code"], name: "index_promotions_on_code", unique: true
   end
 
+  create_table "reviews", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "reviewable_type", null: false
+    t.bigint "reviewable_id", null: false
+    t.bigint "order_id"
+    t.integer "rating", null: false
+    t.text "content", null: false
+    t.string "review_type", null: false
+    t.boolean "verified_purchase", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["order_id"], name: "index_reviews_on_order_id"
+    t.index ["reviewable_type", "reviewable_id"], name: "index_reviews_on_reviewable"
+    t.index ["user_id", "reviewable_type", "reviewable_id"], name: "index_unique_order_reviews", unique: true, where: "((review_type)::text = 'order'::text)"
+    t.index ["user_id"], name: "index_reviews_on_user_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.string "session_id", null: false
     t.text "data"
@@ -293,6 +331,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
     t.string "games", default: [], array: true
     t.index ["reviewer_id"], name: "index_skillmaster_applications_on_reviewer_id"
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
+  end
+
+  create_table "skillmaster_rewards", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "points", default: 0, null: false
+    t.string "reward_type", null: false
+    t.string "status", default: "pending", null: false
+    t.decimal "amount", precision: 10, scale: 2
+    t.datetime "claimed_at"
+    t.datetime "paid_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_skillmaster_rewards_on_user_id"
   end
 
   create_table "sub_platforms", force: :cascade do |t|
@@ -371,8 +422,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
-  add_foreign_key "chats", "users", column: "booster_id"
-  add_foreign_key "chats", "users", column: "customer_id"
+  add_foreign_key "chat_participants", "chats"
+  add_foreign_key "chat_participants", "users"
+  add_foreign_key "chats", "orders"
+  add_foreign_key "chats", "users", column: "initiator_id"
+  add_foreign_key "chats", "users", column: "recipient_id"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"
@@ -382,6 +436,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
+  add_foreign_key "orders", "users", column: "referral_skillmaster_id"
   add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
@@ -391,8 +446,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_08_061200) do
   add_foreign_key "product_platforms", "products"
   add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
+  add_foreign_key "reviews", "orders"
+  add_foreign_key "reviews", "users"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
+  add_foreign_key "skillmaster_rewards", "users"
   add_foreign_key "sub_platforms", "platforms"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
