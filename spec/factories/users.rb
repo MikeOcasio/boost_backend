@@ -3,11 +3,15 @@ require 'rotp'
 FactoryBot.define do
   factory :user do
     email { Faker::Internet.email }
+    password { 'Password123!' } # Ensure password meets complexity requirements
     first_name { Faker::Name.first_name }
     last_name { Faker::Name.last_name }
     password { 'Password123!' }
     password_confirmation { 'Password123!' }
     role { 'customer' }
+    otp_secret { nil } # You can modify this as needed, especially if you're testing 2FA
+    otp_required_for_login { false } # Adjust based on your tests
+    platform_credentials { [] } # Assuming platform credentials are optional for the factory
     gamer_tag { Faker::Internet.username }
     bio { Faker::Lorem.paragraph }
     image_url { Faker::Internet.url(host: 'example.com', path: '/avatar.jpg') }
@@ -16,6 +20,8 @@ FactoryBot.define do
     preferred_skill_master_ids { [] }
     platforms { [] }
 
+    # Remove the automatic creation of platforms and categories
+    # Only create them when specifically needed using traits
     # Default values
     otp_required_for_login { false }
     otp_setup_complete { false }
@@ -67,6 +73,21 @@ FactoryBot.define do
       end
     end
 
+    trait :with_platforms do
+      after(:create) do |user|
+        create_list(:platform, 2, users: [user])
+      end
+    end
+
+    trait :with_categories do
+      after(:create) do |user|
+        create_list(:category, 2, users: [user])
+      end
+    end
+
+    factory :admin_user, traits: [:admin]
+    factory :skillmaster_user, traits: [:skillmaster]
+    factory :locked_user, traits: [:locked]
     trait :with_achievements do
       achievements do
         [

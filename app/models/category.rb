@@ -19,6 +19,9 @@ class Category < ApplicationRecord
 
   validates :name, presence: true, uniqueness: true
 
+  # Virtual attributes for image removal
+  attr_accessor :remove_image, :remove_bg_image
+
   after_create :add_to_cat_list
 
   def add_to_cat_list
