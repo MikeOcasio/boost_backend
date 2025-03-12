@@ -112,10 +112,10 @@ module Api
       page = params[:page] || 1
       per_page = params[:per_page] || 12
 
-      @products = @category.products.page(page).per(per_page)
+      @products = @category.products.includes(:platforms, :category, :prod_attr_cats, :children).page(page).per(per_page)
 
       render json: {
-        products: @products,
+        products: @products.map { |product| recursive_json(product) },
         meta: {
           current_page: @products.current_page,
           total_pages: @products.total_pages,
