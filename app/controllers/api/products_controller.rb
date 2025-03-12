@@ -115,8 +115,8 @@ module Api
       @products = @category.products
                            .includes(:platforms, :category, :prod_attr_cats,
                                      { children: %i[platforms category prod_attr_cats] })
-                           .joins(:children) # Only get products that have children
-                           .distinct # Prevent duplicate products
+                           .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
+                           .distinct
                            .page(page).per(per_page)
 
       render json: {
