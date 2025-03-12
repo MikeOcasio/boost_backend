@@ -32,7 +32,6 @@ module Api
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
                           .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
-                          .distinct # Only get parent products or products with children
 
         # Apply search if present
         if search_query.present?
@@ -44,10 +43,17 @@ module Api
         products = products.where(category_id: category_id) if category_id.present?
 
         # Filter by platform
-        products = products.joins(:platforms).where(platforms: { id: platform_id }) if platform_id.present?
+        if platform_id.present?
+          products = products.left_joins(:platforms).where(platforms: { id: platform_id })
+        end
 
         # Filter by product attribute
-        products = products.joins(:prod_attr_cats).where(prod_attr_cats: { id: attribute_id }) if attribute_id.present?
+        if attribute_id.present?
+          products = products.left_joins(:prod_attr_cats).where(prod_attr_cats: { id: attribute_id })
+        end
+
+        # Apply distinct AFTER all joins and filters
+        products = products.distinct
 
         # Apply status filters
         unless get_all
@@ -60,7 +66,7 @@ module Api
           end
         end
 
-        products = products.distinct.page(page).per(per_page)
+        products = products.page(page).per(per_page)
         product_map = products.index_by(&:id)
 
         {
