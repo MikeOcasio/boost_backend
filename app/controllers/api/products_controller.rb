@@ -109,9 +109,20 @@ module Api
 
     def by_category
       @category = Category.find(params[:category_id])
-      @products = @category.products
+      page = params[:page] || 1
+      per_page = params[:per_page] || 12
 
-      render json: @products, status: :ok
+      @products = @category.products.page(page).per(per_page)
+
+      render json: {
+        products: @products,
+        meta: {
+          current_page: @products.current_page,
+          total_pages: @products.total_pages,
+          total_count: @products.total_count,
+          per_page: @products.limit_value
+        }
+      }, status: :ok
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Category not found' }, status: :not_found
     end
