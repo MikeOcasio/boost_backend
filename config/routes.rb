@@ -121,6 +121,9 @@ Rails.application.routes.draw do
 
     resources :chats, only: %i[index show create] do
       resources :messages, only: %i[create]
+      member do
+        post :archive
+      end
     end
 
     resources :broadcast_messages, only: %i[index create]
@@ -128,6 +131,15 @@ Rails.application.routes.draw do
     resources :skillmaster_rewards, only: [:index] do
       member do
         post :claim
+      end
+    end
+
+    resources :reviews, only: %i[index create show destroy] do
+      collection do
+        get 'product/:product_id', to: 'reviews#index', defaults: { type: 'product' }
+        get 'skillmaster/:skillmaster_id', to: 'reviews#index', defaults: { type: 'skillmaster' }
+        get 'website', to: 'reviews#index', defaults: { type: 'website' }
+        get 'orders', to: 'reviews#index', defaults: { type: 'order' }
       end
     end
   end

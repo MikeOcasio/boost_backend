@@ -1,10 +1,20 @@
 # spec/factories/categories.rb
 FactoryBot.define do
   factory :category do
-    name { Faker::Commerce.department } # Using Faker for generating random category names
-    description { Faker::Lorem.sentence }
+    sequence(:name) { |n| "Category #{n}" }
+    description { 'Test category description' }
+    is_active { true }
+    image { nil }
+    bg_image { nil }
 
-    # Optional trait for creating a category with products
+    trait :with_image do
+      image { 'https://example-bucket.s3.amazonaws.com/categories/test.jpg' }
+    end
+
+    trait :with_bg_image do
+      bg_image { 'https://example-bucket.s3.amazonaws.com/categories/test-bg.jpg' }
+    end
+
     trait :with_products do
       after(:create) do |category|
         create_list(:product, 3, category: category)
