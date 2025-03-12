@@ -197,4 +197,25 @@ class User < ApplicationRecord
       false
     end
   end
+
+  # Role helper methods
+  def customer?
+    role == 'customer'
+  end
+
+  def skillmaster?
+    role == 'skillmaster'
+  end
+
+  def admin?
+    role == 'admin'
+  end
+
+  def dev?
+    role == 'dev'
+  end
+
+  def staff?
+    skillmaster? || admin? || dev?
+  end
 end

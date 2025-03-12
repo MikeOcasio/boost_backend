@@ -16,6 +16,12 @@ class Chat < ApplicationRecord
   scope :archived, -> { where(status: 'archived') }
   scope :support_tickets, -> { where(chat_type: 'support') }
 
+  validate :validate_direct_chat, if: -> { chat_type == 'direct' }
+  validate :validate_group_chat, if: -> { chat_type == 'group' }
+  validate :validate_support_chat, if: -> { chat_type == 'support' }
+
+  VALID_ORDER_STATES = %w[assigned in_progress delayed disputed].freeze
+
   def archive!
     update(status: 'archived')
   end
@@ -42,17 +48,35 @@ class Chat < ApplicationRecord
   end
 
   def validate_direct_chat
-    return true if order_based_chat? || internal_staff_chat?
+    return true unless chat_type == 'direct'
+    return true unless initiator&.customer? && recipient&.skillmaster?
 
-    errors.add(:base, 'Invalid chat participants')
-    false
+    unless order.present? &&
+           VALID_ORDER_STATES.include?(order.state) &&
+           order.assigned_skill_master_id == recipient.id &&
+           order.user_id == initiator.id
+      errors.add(:base, 'Cannot create chat without an active order')
+    end
   end
 
   def validate_group_chat
-    return if participants.all? { |p| %w[skillmaster admin dev].include?(p.role) }
+    return true unless chat_type == 'group'
 
-    errors.add(:base, 'Invalid group chat participants')
-    false
+    # Debug logging
+    Rails.logger.debug { "Validating group chat: #{id}" }
+    Rails.logger.debug { "Participants count: #{chat_participants.length}" }
+    Rails.logger.debug { "Participants: #{chat_participants.map(&:user).map(&:role)}" }
+
+    # First check participant roles
+    if chat_participants.map(&:user).any? { |u| !%w[skillmaster admin dev].include?(u.role) }
+      errors.add(:base, 'Group chat can only include staff members')
+      return
+    end
+
+    # Then check participant count
+    return unless chat_participants.length < 2
+
+    errors.add(:base, 'Group chat requires at least two participants')
   end
 
   def validate_support_chat

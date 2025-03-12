@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_10_144606) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_11_161102) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -89,6 +89,16 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_144606) do
     t.bigint "category_id", null: false
     t.bigint "skillmaster_application_id", null: false
     t.index ["category_id", "skillmaster_application_id"], name: "index_cat_sma_on_cat_id_and_sma_id", unique: true
+  end
+
+  create_table "chat_participants", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id", "user_id"], name: "index_chat_participants_on_chat_id_and_user_id", unique: true
+    t.index ["chat_id"], name: "index_chat_participants_on_chat_id"
+    t.index ["user_id"], name: "index_chat_participants_on_user_id"
   end
 
   create_table "chats", force: :cascade do |t|
@@ -410,6 +420,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_10_144606) do
   add_foreign_key "bug_reports", "users"
   add_foreign_key "carts", "products"
   add_foreign_key "carts", "users"
+  add_foreign_key "chat_participants", "chats"
+  add_foreign_key "chat_participants", "users"
   add_foreign_key "chats", "orders"
   add_foreign_key "chats", "users", column: "initiator_id"
   add_foreign_key "chats", "users", column: "recipient_id"
