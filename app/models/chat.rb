@@ -60,27 +60,13 @@ class Chat < ApplicationRecord
   end
 
   def validate_group_chat
-    return true unless chat_type == 'group'
-
-    # Debug logging
-    Rails.logger.debug { "Validating group chat: #{id}" }
-    Rails.logger.debug { "Participants count: #{chat_participants.length}" }
-    Rails.logger.debug { "Participants: #{chat_participants.map(&:user).map(&:role)}" }
-
-    # First check participant roles
-    if chat_participants.map(&:user).any? { |u| !%w[skillmaster admin dev].include?(u.role) }
-      errors.add(:base, 'Group chat can only include staff members')
-      return
-    end
-
-    # Then check participant count
-    return unless chat_participants.length < 2
+    return true if initiator.role.in?(%w[admin dev c_support manager]) && chat_type == 'group'
 
     errors.add(:base, 'Group chat requires at least two participants')
   end
 
   def validate_support_chat
-    return if initiator.role == 'customer' && recipient.role.in?(%w[admin dev])
+    return if initiator.role == 'customer' && recipient.role.in?(%w[admin dev c_support manager])
 
     errors.add(:base, 'Invalid support chat participants')
     false
@@ -97,7 +83,7 @@ class Chat < ApplicationRecord
   end
 
   def internal_staff_chat?
-    initiator.role.in?(%w[skillmaster admin dev]) &&
-      recipient.role.in?(%w[skillmaster admin dev])
+    initiator.role.in?(%w[skillmaster admin dev c_support manager]) &&
+      recipient.role.in?(%w[skillmaster admin dev c_support manager])
   end
 end

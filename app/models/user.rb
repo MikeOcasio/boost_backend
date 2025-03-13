@@ -44,7 +44,7 @@ class User < ApplicationRecord
 
   before_validation :set_default_role, on: :create
   # ---------------
-  ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev].freeze
+  ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev c_support manager].freeze
 
   # Validations
   # ---------------
@@ -212,7 +212,15 @@ class User < ApplicationRecord
     role == 'dev'
   end
 
+  def c_support?
+    role == 'c_support'
+  end
+
+  def manager?
+    role == 'manager'
+  end
+
   def staff?
-    skillmaster? || admin? || dev?
+    skillmaster? || admin? || dev? || c_support? || manager?
   end
 end

@@ -216,7 +216,7 @@ module Users
     def unlock_user
       current_user = get_user_from_token
 
-      if current_user.role == 'admin' || current_user.role == 'dev'
+      if current_user.role.in?(%w[admin dev c_support manager])
         if @user.access_locked?
           @user.update(locked_by_admin: false)
           @user.unlock_access!

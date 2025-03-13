@@ -143,5 +143,16 @@ Rails.application.routes.draw do
         get 'orders', to: 'reviews#index', defaults: { type: 'order' }
       end
     end
+
+    resources :support, only: [] do
+      collection do
+        get :available_skillmasters
+        post :create_urgent_chat
+      end
+    end
+
+    namespace :staff do
+      resources :user_profiles, only: [:show]
+    end
   end
 end
