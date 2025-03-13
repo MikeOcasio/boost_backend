@@ -36,15 +36,15 @@ class User < ApplicationRecord
   has_many :platform_credentials, dependent: :destroy
   has_many :users_categories, dependent: :nullify
   has_many :categories, through: :users_categories, dependent: :nullify
-  has_many :skillmaster_rewards
-  has_many :referrals, class_name: 'Order', foreign_key: 'referral_skillmaster_id'
+  has_many :user_rewards, dependent: :destroy
+  has_many :referrals, class_name: 'Order', foreign_key: 'referral_user_id'
   has_many :reviews, dependent: :destroy
   has_many :received_reviews, as: :reviewable, class_name: 'Review'
   has_many :written_reviews, class_name: 'Review'
 
   before_validation :set_default_role, on: :create
   # ---------------
-  ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev].freeze
+  ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev c_support manager].freeze
 
   # Validations
   # ---------------
@@ -150,26 +150,23 @@ class User < ApplicationRecord
   end
 
   def referral_link
-    # Generate unique referral link
     "#{Rails.application.routes.url_helpers.root_url}?ref=#{id}"
   end
 
   def completion_points
-    # Calculate points based on completed orders
     completed_orders.sum(:points)
   end
 
   def referral_points
-    # Calculate points from valid referrals (orders >= $10)
     referrals.where('total >= ?', 10.00).count * 10
   end
 
   def next_completion_reward
-    SkillmasterReward.calculate_next_threshold(completion_points, 'completion')
+    UserReward.calculate_next_threshold(completion_points, 'completion')
   end
 
   def next_referral_reward
-    SkillmasterReward.calculate_next_threshold(referral_points, 'referral')
+    UserReward.calculate_next_threshold(referral_points, 'referral')
   end
 
   def can_review?(target)
@@ -215,7 +212,15 @@ class User < ApplicationRecord
     role == 'dev'
   end
 
+  def c_support?
+    role == 'c_support'
+  end
+
+  def manager?
+    role == 'manager'
+  end
+
   def staff?
-    skillmaster? || admin? || dev?
+    skillmaster? || admin? || dev? || c_support? || manager?
   end
 end
