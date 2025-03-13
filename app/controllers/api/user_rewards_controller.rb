@@ -1,27 +1,27 @@
 module Api
-  class SkillmasterRewardsController < ApplicationController
+  class UserRewardsController < ApplicationController
     before_action :authenticate_user!
-    before_action :ensure_skillmaster
+    before_action :set_reward, only: [:claim]
 
     def index
       render json: {
         completion: {
           points: current_user.completion_points,
           next_threshold: current_user.next_completion_reward,
-          rewards: SkillmasterReward::COMPLETION_THRESHOLDS
+          rewards: UserReward::COMPLETION_THRESHOLDS
         },
         referral: {
           points: current_user.referral_points,
           next_threshold: current_user.next_referral_reward,
-          rewards: SkillmasterReward::REFERRAL_THRESHOLDS,
+          rewards: UserReward::REFERRAL_THRESHOLDS,
           referral_link: current_user.referral_link
         },
-        earned_rewards: current_user.skillmaster_rewards
+        earned_rewards: current_user.user_rewards
       }
     end
 
     def claim
-      reward = current_user.skillmaster_rewards.find(params[:id])
+      reward = current_user.user_rewards.find(params[:id])
       if reward.update(status: 'claimed', claimed_at: Time.current)
         render json: reward
       else
@@ -31,10 +31,8 @@ module Api
 
     private
 
-    def ensure_skillmaster
-      return if current_user.role == 'skillmaster'
-
-      render json: { error: 'Access denied' }, status: :forbidden
+    def set_reward
+      @reward = current_user.user_rewards.find(params[:id])
     end
   end
 end
