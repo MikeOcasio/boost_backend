@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_13_202401) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -405,6 +405,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_202401) do
     t.string "two_factor_method", default: "email"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
+    t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
   end
 
   create_table "users_categories", force: :cascade do |t|
