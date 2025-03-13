@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -182,11 +182,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
     t.decimal "dynamic_price", precision: 8, scale: 2
     t.string "promo_data"
     t.string "order_data", default: [], array: true
-    t.bigint "referral_skillmaster_id"
+    t.bigint "referral_user_id"
     t.integer "points", default: 0
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
-    t.index ["referral_skillmaster_id"], name: "index_orders_on_referral_skillmaster_id"
+    t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
@@ -333,19 +333,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
     t.index ["user_id"], name: "index_skillmaster_applications_on_user_id"
   end
 
-  create_table "skillmaster_rewards", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.integer "points", default: 0, null: false
-    t.string "reward_type", null: false
-    t.string "status", default: "pending", null: false
-    t.decimal "amount", precision: 10, scale: 2
-    t.datetime "claimed_at"
-    t.datetime "paid_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["user_id"], name: "index_skillmaster_rewards_on_user_id"
-  end
-
   create_table "sub_platforms", force: :cascade do |t|
     t.bigint "platform_id", null: false
     t.string "name", null: false
@@ -362,6 +349,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
     t.datetime "updated_at", null: false
     t.index ["platform_id"], name: "index_user_platforms_on_platform_id"
     t.index ["user_id"], name: "index_user_platforms_on_user_id"
+  end
+
+  create_table "user_rewards", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "points", default: 0, null: false
+    t.string "reward_type", null: false
+    t.string "status", default: "pending", null: false
+    t.decimal "amount", precision: 10, scale: 2
+    t.datetime "claimed_at"
+    t.datetime "paid_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_user_rewards_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -405,6 +405,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
     t.string "two_factor_method", default: "email"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
+    t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
   end
 
   create_table "users_categories", force: :cascade do |t|
@@ -436,7 +437,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
-  add_foreign_key "orders", "users", column: "referral_skillmaster_id"
+  add_foreign_key "orders", "users", column: "referral_user_id"
   add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
@@ -450,10 +451,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_12_140414) do
   add_foreign_key "reviews", "users"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
-  add_foreign_key "skillmaster_rewards", "users"
   add_foreign_key "sub_platforms", "platforms"
   add_foreign_key "user_platforms", "platforms"
   add_foreign_key "user_platforms", "users"
+  add_foreign_key "user_rewards", "users"
   add_foreign_key "users_categories", "categories"
   add_foreign_key "users_categories", "users"
 end

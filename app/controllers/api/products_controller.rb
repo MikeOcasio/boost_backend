@@ -31,7 +31,7 @@ module Api
           :prod_attr_cats,
           { children: %i[category platforms prod_attr_cats] }
         ).joins(:category)
-                          .where(parent_id: nil) # Only get parent products
+                          .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
 
         # Apply search if present
         if search_query.present?
@@ -43,10 +43,17 @@ module Api
         products = products.where(category_id: category_id) if category_id.present?
 
         # Filter by platform
-        products = products.joins(:platforms).where(platforms: { id: platform_id }) if platform_id.present?
+        if platform_id.present?
+          products = products.left_joins(:platforms).where(platforms: { id: platform_id })
+        end
 
         # Filter by product attribute
-        products = products.joins(:prod_attr_cats).where(prod_attr_cats: { id: attribute_id }) if attribute_id.present?
+        if attribute_id.present?
+          products = products.left_joins(:prod_attr_cats).where(prod_attr_cats: { id: attribute_id })
+        end
+
+        # Apply distinct AFTER all joins and filters
+        products = products.distinct
 
         # Apply status filters
         unless get_all
@@ -59,7 +66,7 @@ module Api
           end
         end
 
-        products = products.distinct.page(page).per(per_page)
+        products = products.page(page).per(per_page)
         product_map = products.index_by(&:id)
 
         {
@@ -105,6 +112,31 @@ module Api
         # If no products found, return a not found message
         render json: { message: 'No products found for this platform' }, status: :not_found
       end
+    end
+
+    def by_category
+      @category = Category.find(params[:category_id])
+      page = params[:page] || 1
+      per_page = params[:per_page] || 12
+
+      @products = @category.products
+                           .includes(:platforms, :category, :prod_attr_cats,
+                                     { children: %i[platforms category prod_attr_cats] })
+                           .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
+                           .distinct
+                           .page(page).per(per_page)
+
+      render json: {
+        products: @products.map { |product| recursive_json(product) },
+        meta: {
+          current_page: @products.current_page,
+          total_pages: @products.total_pages,
+          total_count: @products.total_count,
+          per_page: @products.limit_value
+        }
+      }, status: :ok
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Category not found' }, status: :not_found
     end
 
     # POST /products
