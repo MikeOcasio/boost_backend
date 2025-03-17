@@ -10,4 +10,3 @@ log/
 
 /config/credentials.yml.enc
 /config/master.key
-.rubocop.yml
