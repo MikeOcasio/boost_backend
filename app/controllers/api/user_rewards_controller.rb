@@ -6,12 +6,14 @@ module Api
     def index
       render json: {
         completion: {
-          points: current_user.completion_points,
+          total_points: current_user.completion_points,
+          available_points: current_user.available_completion_points,
           next_threshold: current_user.next_completion_reward,
           rewards: UserReward::COMPLETION_THRESHOLDS
         },
         referral: {
-          points: current_user.referral_points,
+          total_points: current_user.referral_points,
+          available_points: current_user.available_referral_points,
           next_threshold: current_user.next_referral_reward,
           rewards: UserReward::REFERRAL_THRESHOLDS,
           referral_link: current_user.referral_link
@@ -22,11 +24,17 @@ module Api
 
     def claim
       reward = current_user.user_rewards.find(params[:id])
-      if reward.update(status: 'claimed', claimed_at: Time.current)
-        render json: reward
-      else
-        render json: { errors: reward.errors }, status: :unprocessable_entity
+
+      ActiveRecord::Base.transaction do
+        if current_user.deduct_points(reward.points, reward.reward_type)
+          reward.update!(status: 'claimed', claimed_at: Time.current)
+          render json: reward
+        else
+          render json: { error: 'Insufficient points' }, status: :unprocessable_entity
+        end
       end
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Reward not found' }, status: :not_found
     end
 
     private

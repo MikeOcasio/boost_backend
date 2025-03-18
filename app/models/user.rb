@@ -154,11 +154,28 @@ class User < ApplicationRecord
   end
 
   def completion_points
-    completed_orders.sum(:points)
+    total_completion_points
+  end
+
+  def available_completion_points
+    read_attribute(:available_completion_points) || 0
   end
 
   def referral_points
-    referrals.where('total >= ?', 10.00).count * 10
+    total_referral_points
+  end
+
+  def available_referral_points
+    read_attribute(:available_referral_points) || 0
+  end
+
+  def deduct_points(amount, type)
+    case type
+    when 'completion'
+      update!(available_completion_points: available_completion_points - amount)
+    when 'referral'
+      update!(available_referral_points: available_referral_points - amount)
+    end
   end
 
   def next_completion_reward
