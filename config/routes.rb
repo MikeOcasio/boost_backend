@@ -14,6 +14,10 @@ Rails.application.routes.draw do
   post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
 
   namespace :users do
+    # Add these routes outside of the members resource
+    get 'skillmasters', to: 'members#skillmasters'
+    get 'skillmasters/:id', to: 'members#show_skillmaster'
+
     resources :members, path: 'member-data', only: %i[index create show update destroy] do
       member do
         get :platforms
