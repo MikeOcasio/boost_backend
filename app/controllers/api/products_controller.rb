@@ -104,6 +104,40 @@ module Api
       render json: @products.map { |product| recursive_json(product) }, status: :ok
     end
 
+    def search
+      search_query = params[:search]&.downcase
+      return render json: { error: 'Search query is required' }, status: :bad_request if search_query.blank?
+
+      @products = Product.includes(:platforms, :category, :prod_attr_cats, :children)
+                         .where('
+          LOWER(products.name) LIKE :query OR
+          LOWER(products.description) LIKE :query OR
+          LOWER(products.tag_line) LIKE :query OR
+          CAST(products.price AS TEXT) LIKE :query
+        ', query: "%#{search_query}%")
+                         .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
+                         .distinct
+
+      if @products.any?
+        render json: {
+          products: @products.map { |product| recursive_json(product) },
+          meta: {
+            total_count: @products.count,
+            search_query: search_query
+          }
+        }, status: :ok
+      else
+        render json: {
+          products: [],
+          meta: {
+            total_count: 0,
+            search_query: search_query,
+            message: 'No products found matching your search criteria'
+          }
+        }, status: :ok
+      end
+    end
+
     def by_platform
       platform_id = params[:platform_id]
       platform = Platform.find_by(id: platform_id)
