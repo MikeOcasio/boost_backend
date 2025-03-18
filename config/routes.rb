@@ -84,6 +84,7 @@ Rails.application.routes.draw do
       collection do
         get 'by_platforms/:platform_id', to: 'products#by_platform'
         get 'by_category/:category_id', to: 'products#by_category'
+        get 'most_popular', to: 'products#most_popular'
       end
       member do
         get :platforms

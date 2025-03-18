@@ -95,6 +95,15 @@ module Api
       render json: recursive_json(@product)
     end
 
+    def most_popular
+      @products = Product.where(most_popular: true)
+                         .includes(:platforms, :category, :prod_attr_cats, :children)
+                         .where('products.parent_id IS NULL OR EXISTS (SELECT 1 FROM products children WHERE children.parent_id = products.id)')
+                         .distinct
+
+      render json: @products.map { |product| recursive_json(product) }, status: :ok
+    end
+
     def by_platform
       platform_id = params[:platform_id]
       platform = Platform.find_by(id: platform_id)
