@@ -134,6 +134,10 @@ Rails.application.routes.draw do
     resources :broadcast_messages, only: %i[index create]
 
     resources :user_rewards, only: [:index] do
+      collection do
+        post :award_completion_points
+        post :award_referral_points
+      end
       member do
         post :claim
       end
