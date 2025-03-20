@@ -14,6 +14,10 @@ Rails.application.routes.draw do
   post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
 
   namespace :users do
+    # Add these routes outside of the members resource
+    get 'skillmasters', to: 'members#skillmasters'
+    get 'skillmasters/:id', to: 'members#show_skillmaster'
+
     resources :members, path: 'member-data', only: %i[index create show update destroy] do
       member do
         get :platforms
@@ -80,6 +84,8 @@ Rails.application.routes.draw do
       collection do
         get 'by_platforms/:platform_id', to: 'products#by_platform'
         get 'by_category/:category_id', to: 'products#by_category'
+        get 'most_popular', to: 'products#most_popular'
+        get 'search', to: 'products#search'
       end
       member do
         get :platforms
@@ -129,7 +135,11 @@ Rails.application.routes.draw do
 
     resources :broadcast_messages, only: %i[index create]
 
-    resources :skillmaster_rewards, only: [:index] do
+    resources :user_rewards, only: [:index] do
+      collection do
+        post :award_completion_points
+        post :award_referral_points
+      end
       member do
         post :claim
       end
@@ -142,6 +152,17 @@ Rails.application.routes.draw do
         get 'website', to: 'reviews#index', defaults: { type: 'website' }
         get 'orders', to: 'reviews#index', defaults: { type: 'order' }
       end
+    end
+
+    resources :support, only: [] do
+      collection do
+        get :available_skillmasters
+        post :create_urgent_chat
+      end
+    end
+
+    namespace :staff do
+      resources :user_profiles, only: [:show]
     end
   end
 end

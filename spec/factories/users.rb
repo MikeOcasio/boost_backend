@@ -99,5 +99,21 @@ FactoryBot.define do
     factory :dev do
       role { 'dev' }
     end
+
+    factory :c_support do
+      role { 'c_support' }
+    end
+
+    factory :manager do
+      role { 'manager' }
+    end
+
+    trait :c_support do
+      role { 'c_support' }
+    end
+
+    trait :manager do
+      role { 'manager' }
+    end
   end
 end
