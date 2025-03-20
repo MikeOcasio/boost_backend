@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
+ActiveRecord::Schema[7.0].define(version: 2025_03_18_061519) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -244,6 +244,15 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "product_categories", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_product_categories_on_category_id"
+    t.index ["product_id"], name: "index_product_categories_on_product_id"
+  end
+
   create_table "product_platforms", force: :cascade do |t|
     t.bigint "product_id", null: false
     t.bigint "platform_id", null: false
@@ -258,7 +267,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
     t.text "description"
     t.decimal "price"
     t.string "image"
-    t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_priority", default: false
@@ -270,12 +278,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
+    t.bigint "category_id"
     t.boolean "is_dropdown", default: false
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
     t.bigint "parent_id"
-    t.index ["category_id"], name: "index_products_on_category_id"
     t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
@@ -334,11 +342,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
   end
 
   create_table "sub_platforms", force: :cascade do |t|
-    t.bigint "platform_id", null: false
     t.string "name", null: false
+    t.bigint "platform_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
     t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
@@ -403,6 +410,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
     t.string "rememberable_value"
     t.boolean "otp_setup_complete"
     t.string "two_factor_method", default: "email"
+    t.integer "available_completion_points", default: 0
+    t.integer "available_referral_points", default: 0
+    t.integer "total_completion_points", default: 0
+    t.integer "total_referral_points", default: 0
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
     t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
@@ -443,9 +454,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_13_221846) do
   add_foreign_key "platform_credentials", "users"
   add_foreign_key "preferred_skill_masters", "preferred_skill_masters"
   add_foreign_key "preferred_skill_masters", "users"
+  add_foreign_key "product_categories", "categories"
+  add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
-  add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "reviews", "orders"
   add_foreign_key "reviews", "users"
