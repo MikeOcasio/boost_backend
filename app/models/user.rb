@@ -150,7 +150,15 @@ class User < ApplicationRecord
   end
 
   def referral_link
-    "#{Rails.application.routes.url_helpers.root_url}?ref=#{id}"
+    if Rails.env.development? || Rails.env.test?
+      host = 'localhost:3000'
+      protocol = 'http'
+    else
+      host = 'ravenboost.com' # Production domain
+      protocol = 'https'
+    end
+
+    "#{protocol}://#{host}?ref=#{id}"
   end
 
   def completion_points
