@@ -29,6 +29,7 @@ class Order < ApplicationRecord
   ].freeze
 
   scope :graveyard_orders, -> { where(assigned_skill_master_id: nil) }
+  scope :completed, -> { where(state: 'complete') }
 
   belongs_to :user
   belongs_to :platform_credential

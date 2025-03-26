@@ -31,6 +31,12 @@ module Api
       @review = current_user.reviews.new(review_params)
       @review.verified_purchase = verify_purchase
 
+      # Special handling for website reviews
+      if params[:review][:review_type] == 'website'
+        @review.reviewable_id = Website.instance.id
+        @review.reviewable_type = 'Website'
+      end
+
       if @review.save
         render json: @review, status: :created
       else
@@ -41,36 +47,46 @@ module Api
     private
 
     def review_params
-      params.require(:review).permit(:rating, :content, :review_type, :order_id)
-            .merge(reviewable_type: get_reviewable_type, reviewable_id: params[:reviewable_id])
+      # Store review_type in a local variable to avoid recursion
+      review_type = params[:review][:review_type]
+
+      params.require(:review)
+            .permit(:rating, :content, :review_type, :order_id)
+            .merge(reviewable_type: get_reviewable_type(review_type),
+                   reviewable_id: params[:reviewable_id])
     end
 
     def verify_purchase_eligibility
-      return if params[:review_type] == 'website'
+      return if params[:review][:review_type] == 'website'
 
-      return if current_user.orders.completed.exists?
+      # Change from .completed to .where(state: 'complete')
+      return if current_user.orders.where(state: 'complete').exists?
 
       render json: { error: 'Must have completed orders to review' }, status: :forbidden
     end
 
+    # Also update verify_purchase to avoid the same issue
     def verify_purchase
-      case review_params[:review_type]
+      review_type = params[:review][:review_type]
+
+      case review_type
       when 'product'
-        current_user.orders.completed.joins(:products)
+        current_user.orders.where(state: 'complete').joins(:products)
                     .exists?(products: { id: params[:reviewable_id] })
       when 'skillmaster'
-        current_user.orders.completed
+        current_user.orders.where(state: 'complete')
                     .exists?(assigned_skill_master_id: params[:reviewable_id])
       when 'order'
-        current_user.orders.completed
-                    .exists?(id: review_params[:order_id])
+        current_user.orders.where(state: 'complete')
+                    .exists?(id: params[:review][:order_id])
       else
         false
       end
     end
 
-    def get_reviewable_type
-      case review_params[:review_type]
+    # Modified to accept review_type as a parameter
+    def get_reviewable_type(review_type)
+      case review_type
       when 'product' then 'Product'
       when 'skillmaster' then 'User'
       when 'website' then 'Website'
