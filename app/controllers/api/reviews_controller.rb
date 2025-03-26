@@ -1,6 +1,9 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!, except: %i[index show]
+    # Require authentication for all actions that create or modify reviews
+    before_action :authenticate_user!
+    # Only allow public access to viewing reviews
+    skip_before_action :authenticate_user!, only: %i[index show]
     before_action :set_review, only: %i[show destroy]
     before_action :verify_purchase_eligibility, only: [:create]
 
@@ -29,11 +32,17 @@ module Api
 
     def create
       @review = current_user.reviews.new(review_params)
-      @review.verified_purchase = verify_purchase
+
+      # Verify the user can actually review this entity
+      unless verify_purchase
+        return render json: { error: "You cannot review this #{params[:review][:review_type]}" }, status: :forbidden
+      end
+
+      @review.verified_purchase = true
 
       # Special handling for website reviews
       if params[:review][:review_type] == 'website'
-        @review.reviewable_id = Website.instance.id
+        @review.reviewable_id = 1
         @review.reviewable_type = 'Website'
       end
 
@@ -42,6 +51,46 @@ module Api
       else
         render json: { errors: @review.errors }, status: :unprocessable_entity
       end
+    end
+
+    # Add new endpoints
+
+    # GET /api/reviews/reviewable_entities
+    # Returns all entities the current user can review
+    def reviewable_entities
+      completed_orders = current_user.orders.where(state: 'complete').includes(:products)
+
+      render json: {
+        orders: completed_orders.map do |order|
+          {
+            id: order.id,
+            internal_id: order.internal_id,
+            completed_at: order.updated_at
+          }
+        end,
+        skillmasters: completed_orders.map do |order|
+          next if order.assigned_skill_master_id.blank?
+
+          skillmaster = User.find_by(id: order.assigned_skill_master_id)
+          next unless skillmaster
+
+          {
+            id: skillmaster.id,
+            name: "#{skillmaster.first_name} #{skillmaster.last_name}",
+            order_id: order.id
+          }
+        end.compact.uniq { |s| s[:id] },
+        products: completed_orders.flat_map do |order|
+          order.products.map do |product|
+            {
+              id: product.id,
+              name: product.name,
+              order_id: order.id
+            }
+          end
+        end.uniq { |p| p[:id] },
+        can_review_website: completed_orders.any?
+      }
     end
 
     private
@@ -71,14 +120,21 @@ module Api
 
       case review_type
       when 'product'
-        current_user.orders.where(state: 'complete').joins(:products)
+        # Check if product was in a completed order
+        current_user.orders.where(state: 'complete')
+                    .joins(:products)
                     .exists?(products: { id: params[:reviewable_id] })
       when 'skillmaster'
+        # Check if skillmaster completed an order for this user
         current_user.orders.where(state: 'complete')
                     .exists?(assigned_skill_master_id: params[:reviewable_id])
       when 'order'
+        # Check if this is user's own completed order
         current_user.orders.where(state: 'complete')
                     .exists?(id: params[:review][:order_id])
+      when 'website'
+        # Allow website review if user has any completed order
+        current_user.orders.where(state: 'complete').exists?
       else
         false
       end
@@ -88,7 +144,7 @@ module Api
     def get_reviewable_type(review_type)
       case review_type
       when 'product' then 'Product'
-      when 'skillmaster' then 'User'
+      when 'skillmaster', 'user' then 'User'
       when 'website' then 'Website'
       when 'order' then 'Order'
       end

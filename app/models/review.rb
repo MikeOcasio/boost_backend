@@ -5,7 +5,7 @@ class Review < ApplicationRecord
 
   validates :rating, presence: true, inclusion: { in: 1..5 }
   validates :content, presence: true, length: { minimum: 10, maximum: 1000 }
-  validates :review_type, presence: true, inclusion: { in: %w[product order user website] }
+  validates :review_type, presence: true, inclusion: { in: %w[product order user website skillmaster] }
   validates :user_id, uniqueness: {
     scope: %i[reviewable_type reviewable_id],
     message: 'has already reviewed this item'
