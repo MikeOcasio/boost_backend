@@ -1,7 +1,7 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!
-    before_action :set_review, only: %i[show update destroy]
+    before_action :authenticate_user!, except: %i[index show]
+    before_action :set_review, only: %i[show destroy]
     before_action :verify_purchase_eligibility, only: [:create]
 
     def index
@@ -13,7 +13,13 @@ module Api
                 when 'website'
                   Review.where(review_type: 'website')
                 when 'order'
-                  current_user.reviews.where(review_type: 'order')
+                  Order.find(params[:order_id]).reviews
+                when 'customer'
+                  # Get reviews about this customer (as a skillmaster)
+                  User.find(params[:customer_id]).received_reviews
+                else
+                  # Allow filtering by user who wrote the review
+                  params[:user_id] ? Review.where(user_id: params[:user_id]) : Review.all
                 end
 
       render json: reviews.includes(:user).as_json(include: {
