@@ -151,6 +151,7 @@ Rails.application.routes.draw do
         get 'skillmaster/:skillmaster_id', to: 'reviews#index', defaults: { type: 'skillmaster' }
         get 'website', to: 'reviews#index', defaults: { type: 'website' }
         get 'orders', to: 'reviews#index', defaults: { type: 'order' }
+        get 'reviewable_entities', to: 'reviews#reviewable_entities'
       end
     end
 
