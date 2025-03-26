@@ -10,13 +10,25 @@ module Api
     def index
       reviews = case params[:type]
                 when 'product'
-                  Product.find(params[:product_id]).reviews
+                  if params[:product_id].present?
+                    Product.find(params[:product_id]).reviews
+                  else
+                    Review.where(reviewable_type: 'Product')
+                  end
                 when 'skillmaster'
-                  User.find(params[:skillmaster_id]).reviews.where(review_type: 'skillmaster')
+                  if params[:skillmaster_id].present?
+                    User.find(params[:skillmaster_id]).reviews.where(review_type: 'user')
+                  else
+                    Review.where(review_type: 'user')
+                  end
                 when 'website'
                   Review.where(review_type: 'website')
                 when 'order'
-                  Order.find(params[:order_id]).reviews
+                  if params[:order_id].present?
+                    Order.find(params[:order_id]).reviews
+                  else
+                    Review.where(review_type: 'order')
+                  end
                 when 'customer'
                   # Get reviews about this customer (as a skillmaster)
                   User.find(params[:customer_id]).received_reviews
