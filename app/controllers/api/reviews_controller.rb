@@ -132,21 +132,29 @@ module Api
 
       case review_type
       when 'product'
-        # Check if product was in a completed order
-        current_user.orders.where(state: 'complete')
-                    .joins(:products)
-                    .exists?(products: { id: params[:reviewable_id] })
-      when 'skillmaster'
-        # Check if skillmaster completed an order for this user
-        current_user.orders.where(state: 'complete')
-                    .exists?(assigned_skill_master_id: params[:reviewable_id])
+        # Check if user has completed orders with this product
+        result = current_user.orders.where(state: 'complete')
+                             .joins(:products)
+                             .exists?(products: { id: params[:reviewable_id] })
+        Rails.logger.info("Product review verification: #{result} for product #{params[:reviewable_id]}")
+        result
+      when 'user'
+        # Check if user has worked with this skillmaster
+        result = current_user.orders.where(state: 'complete')
+                             .exists?(assigned_skill_master_id: params[:reviewable_id])
+        Rails.logger.info("Skillmaster review verification: #{result} for skillmaster #{params[:reviewable_id]}")
+        result
       when 'order'
-        # Check if this is user's own completed order
-        current_user.orders.where(state: 'complete')
-                    .exists?(id: params[:review][:order_id])
+        # Check if user owns this order
+        result = current_user.orders.where(state: 'complete')
+                             .exists?(id: params[:review][:order_id])
+        Rails.logger.info("Order review verification: #{result} for order #{params[:review][:order_id]}")
+        result
       when 'website'
         # Allow website review if user has any completed order
-        current_user.orders.where(state: 'complete').exists?
+        result = current_user.orders.where(state: 'complete').exists?
+        Rails.logger.info("Website review verification: #{result}")
+        result
       else
         false
       end
