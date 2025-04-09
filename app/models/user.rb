@@ -41,6 +41,7 @@ class User < ApplicationRecord
   has_many :reviews, dependent: :destroy
   has_many :received_reviews, as: :reviewable, class_name: 'Review'
   has_many :written_reviews, class_name: 'Review'
+  has_many :review_moderations, dependent: :destroy
 
   before_validation :set_default_role, on: :create
   # ---------------
@@ -51,6 +52,7 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: true
   validates :role, presence: true, inclusion: { in: ROLE_LIST }
   validate :password_complexity
+  validate :ensure_not_banned, on: :create
 
   scope :active, -> { where(deleted_at: nil) }
 
@@ -247,5 +249,15 @@ class User < ApplicationRecord
 
   def staff?
     skillmaster? || admin? || dev? || c_support? || manager?
+  end
+
+  def banned?
+    banned_at.present?
+  end
+
+  private
+
+  def ensure_not_banned
+    errors.add(:base, 'Your account has been banned due to policy violations') if banned?
   end
 end

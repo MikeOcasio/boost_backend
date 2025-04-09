@@ -164,6 +164,12 @@ Rails.application.routes.draw do
 
     namespace :staff do
       resources :user_profiles, only: [:show]
+      resources :review_moderations, only: [:create]
+      resources :reviews, only: [:index] do
+        member do
+          post :moderate
+        end
+      end
     end
   end
 end

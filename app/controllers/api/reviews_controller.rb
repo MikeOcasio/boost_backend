@@ -43,6 +43,11 @@ module Api
     end
 
     def create
+      # Check if user is banned
+      if current_user.banned?
+        return render json: { error: 'Your account has been banned due to policy violations' }, status: :forbidden
+      end
+
       @review = current_user.reviews.new(review_params)
 
       # Verify the user can actually review this entity

@@ -1,0 +1,15 @@
+# config/schedule.yml
+contractor_balance_sync:
+  cron: "0 0 * * *"  # Every day at midnight
+  class: "ContractorBalanceSyncWorker"
+  queue: default
+
+contractor_payout:
+  cron: "0 1 * * 1"  # Every Monday at 1am
+  class: "ContractorPayoutWorker"
+  queue: default
+
+payout_status_sync:
+  cron: "0 */4 * * *"  # Every 4 hours
+  class: "PayoutStatusSyncWorker"
+  queue: default

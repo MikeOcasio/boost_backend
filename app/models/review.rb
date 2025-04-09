@@ -2,6 +2,8 @@ class Review < ApplicationRecord
   belongs_to :user
   belongs_to :reviewable, polymorphic: true
   belongs_to :order, optional: true
+  belongs_to :moderated_by, class_name: 'User', optional: true
+  has_one :moderation, class_name: 'ReviewModeration', dependent: :destroy
 
   validates :rating, presence: true, inclusion: { in: 1..5 }
   validates :content, presence: true, length: { minimum: 10, maximum: 1000 }
@@ -18,6 +20,13 @@ class Review < ApplicationRecord
   validate :validate_review_permissions
   # Custom validation to ensure proper associations
   validate :validate_required_associations
+  # Add validation to prevent banned users from creating reviews
+  validate :user_not_banned
+
+  # Add method to check if moderated
+  def moderated?
+    moderated_at.present?
+  end
 
   private
 
@@ -90,5 +99,9 @@ class Review < ApplicationRecord
     when 'website'
       # No specific ID required for website reviews
     end
+  end
+
+  def user_not_banned
+    errors.add(:base, 'Your account has been banned due to policy violations') if user&.banned?
   end
 end
