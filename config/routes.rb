@@ -1,3 +1,5 @@
+require 'sidekiq/web'
+
 Rails.application.routes.draw do
   root to: 'application#health_check'
 
@@ -9,6 +11,10 @@ Rails.application.routes.draw do
     passwords: 'users/passwords',
     two_factor_authentication: 'users/two_factor_authentication'
   }
+
+  authenticate :user, lambda { |user| user.admin? || user.dev? } do
+    mount Sidekiq::Web => '/sidekiq'
+  end
 
   # Custom route for updating 2FA method
   post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
