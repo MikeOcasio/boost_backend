@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
+ActiveRecord::Schema[7.0].define(version: 2025_04_09_213159) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -122,6 +122,18 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.index ["ticket_number"], name: "index_chats_on_ticket_number", unique: true
   end
 
+  create_table "contractors", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "stripe_account_id"
+    t.integer "available_balance", default: 0
+    t.integer "pending_balance", default: 0
+    t.datetime "last_synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stripe_account_id"], name: "index_contractors_on_stripe_account_id", unique: true
+    t.index ["user_id"], name: "index_contractors_on_user_id"
+  end
+
   create_table "graveyards", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -188,6 +200,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
+  end
+
+  create_table "payouts", force: :cascade do |t|
+    t.bigint "contractor_id", null: false
+    t.string "stripe_payout_id"
+    t.integer "amount"
+    t.string "currency", default: "usd"
+    t.string "status"
+    t.jsonb "metadata"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contractor_id"], name: "index_payouts_on_contractor_id"
+    t.index ["stripe_payout_id"], name: "index_payouts_on_stripe_payout_id", unique: true
   end
 
   create_table "platform_credentials", force: :cascade do |t|
@@ -297,6 +322,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.index ["code"], name: "index_promotions_on_code", unique: true
   end
 
+  create_table "review_moderations", force: :cascade do |t|
+    t.bigint "review_id", null: false
+    t.bigint "moderator_id", null: false
+    t.bigint "user_id", null: false
+    t.text "reason", null: false
+    t.boolean "strike_applied", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["moderator_id"], name: "index_review_moderations_on_moderator_id"
+    t.index ["review_id"], name: "index_review_moderations_on_review_id"
+    t.index ["user_id"], name: "index_review_moderations_on_user_id"
+  end
+
   create_table "reviews", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "reviewable_type", null: false
@@ -308,6 +346,9 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.boolean "verified_purchase", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "moderated_at"
+    t.text "moderation_reason"
+    t.bigint "moderated_by_id"
     t.index ["order_id"], name: "index_reviews_on_order_id"
     t.index ["reviewable_type", "reviewable_id"], name: "index_reviews_on_reviewable"
     t.index ["user_id", "reviewable_type", "reviewable_id"], name: "index_unique_order_reviews", unique: true, where: "((review_type)::text = 'order'::text)"
@@ -414,6 +455,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.integer "available_referral_points", default: 0
     t.integer "total_completion_points", default: 0
     t.integer "total_referral_points", default: 0
+    t.integer "strikes", default: 0, null: false
+    t.datetime "banned_at"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
     t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
@@ -445,6 +488,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
   add_foreign_key "chats", "orders"
   add_foreign_key "chats", "users", column: "initiator_id"
   add_foreign_key "chats", "users", column: "recipient_id"
+  add_foreign_key "contractors", "users"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"
@@ -455,6 +499,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
   add_foreign_key "orders", "users", column: "referral_user_id"
+  add_foreign_key "payouts", "contractors"
   add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"
@@ -465,8 +510,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
   add_foreign_key "products", "products", column: "parent_id"
+  add_foreign_key "review_moderations", "reviews", on_delete: :cascade
+  add_foreign_key "review_moderations", "users"
+  add_foreign_key "review_moderations", "users", column: "moderator_id"
   add_foreign_key "reviews", "orders"
   add_foreign_key "reviews", "users"
+  add_foreign_key "reviews", "users", column: "moderated_by_id"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "sub_platforms", "platforms"

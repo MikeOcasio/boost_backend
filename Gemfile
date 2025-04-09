@@ -35,6 +35,10 @@ gem 'devise-two-factor'
 gem 'rbnacl'
 gem 'kaminari'
 
+gem 'sidekiq', '~> 7.1'
+gem 'sidekiq-cron', '~> 1.10'  # For scheduled jobs
+gem 'redis', '~> 5.0'          # Required by Sidekiq
+
 gem 'rotp'
 gem 'rqrcode'
 
