@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
+ActiveRecord::Schema[7.0].define(version: 2025_05_12_211055) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -120,6 +120,15 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
     t.index ["order_id"], name: "index_chats_on_order_id"
     t.index ["recipient_id"], name: "index_chats_on_recipient_id"
     t.index ["ticket_number"], name: "index_chats_on_ticket_number", unique: true
+  end
+
+  create_table "contractors", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.datetime "last_payout_requested_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "stripe_account_id"
+    t.index ["user_id"], name: "index_contractors_on_user_id"
   end
 
   create_table "graveyards", force: :cascade do |t|
@@ -445,6 +454,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_03_26_151316) do
   add_foreign_key "chats", "orders"
   add_foreign_key "chats", "users", column: "initiator_id"
   add_foreign_key "chats", "users", column: "recipient_id"
+  add_foreign_key "contractors", "users"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "users", column: "sender_id"
   add_foreign_key "notifications", "users"

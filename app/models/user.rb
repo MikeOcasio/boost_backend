@@ -41,6 +41,7 @@ class User < ApplicationRecord
   has_many :reviews, dependent: :destroy
   has_many :received_reviews, as: :reviewable, class_name: 'Review'
   has_many :written_reviews, class_name: 'Review'
+  has_one :contractor, dependent: :destroy
 
   before_validation :set_default_role, on: :create
   # ---------------
@@ -53,6 +54,7 @@ class User < ApplicationRecord
   validate :password_complexity
 
   scope :active, -> { where(deleted_at: nil) }
+  scope :skillmaster, -> { where(role: 'skillmaster') }
 
   # Methods
   # ---------------
