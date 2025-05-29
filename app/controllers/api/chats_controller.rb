@@ -24,7 +24,8 @@ class Api::ChatsController < ApplicationController
           first_name: chat.initiator.first_name,
           last_name: chat.initiator.last_name,
           email: chat.initiator.email,
-          role: chat.initiator.role
+          role: chat.initiator.role,
+          image_url: chat.initiator.image_url
         },
         recipient: if chat.recipient
                      {
@@ -32,7 +33,8 @@ class Api::ChatsController < ApplicationController
                        first_name: chat.recipient.first_name,
                        last_name: chat.recipient.last_name,
                        email: chat.recipient.email,
-                       role: chat.recipient.role
+                       role: chat.recipient.role,
+                       image_url: chat.recipient.image_url
                      }
                    else
                      nil
@@ -43,7 +45,8 @@ class Api::ChatsController < ApplicationController
             first_name: participant.first_name,
             last_name: participant.last_name,
             email: participant.email,
-            role: participant.role
+            role: participant.role,
+            image_url: participant.image_url
           }
         end,
         last_message: if last_message
@@ -56,7 +59,8 @@ class Api::ChatsController < ApplicationController
                             id: last_message.sender.id,
                             first_name: last_message.sender.first_name,
                             last_name: last_message.sender.last_name,
-                            role: last_message.sender.role
+                            role: last_message.sender.role,
+                            image_url: last_message.sender.image_url
                           }
                         }
                       else
