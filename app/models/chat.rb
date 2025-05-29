@@ -8,6 +8,9 @@ class Chat < ApplicationRecord
 
   validates :chat_type, presence: true, inclusion: { in: %w[direct group support] }
   validates :status, presence: true, inclusion: { in: %w[active archived] }
+  validates :initiator_id,
+            uniqueness: { scope: %i[recipient_id chat_type], message: 'Chat already exists between these users' }
+  validate :prevent_self_chat
 
   before_create :generate_ticket_number, if: :support_chat?
   before_create :validate_chat_permissions
@@ -31,6 +34,12 @@ class Chat < ApplicationRecord
   end
 
   private
+
+  def prevent_self_chat
+    return unless initiator_id.present? && recipient_id.present? && initiator_id == recipient_id
+
+    errors.add(:recipient_id, 'cannot be the same as the initiator')
+  end
 
   def generate_ticket_number
     self.ticket_number = "TICKET-#{Time.current.to_i}-#{SecureRandom.hex(4).upcase}"
