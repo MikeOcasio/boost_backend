@@ -1,6 +1,8 @@
 class Api::ChatsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat, only: %i[show update archive]
+  before_action :verify_chat_access, only: %i[show update archive]
+  before_action :verify_chat_access, only: %i[show update archive]
 
   def index
     @chats = Chat.includes(:messages, :participants, :initiator, :recipient)
@@ -73,7 +75,65 @@ class Api::ChatsController < ApplicationController
   end
 
   def show
-    render json: @chat, include: [:messages]
+    # Get messages with proper sender information
+    messages = @chat.messages.includes(:sender).order(created_at: :asc).map do |message|
+      {
+        id: message.id,
+        content: message.content,
+        created_at: message.created_at,
+        read: message.read,
+        sender: {
+          id: message.sender.id,
+          first_name: message.sender.first_name,
+          last_name: message.sender.last_name,
+          role: message.sender.role,
+          image_url: message.sender.image_url
+        }
+      }
+    end
+
+    chat_data = {
+      id: @chat.id,
+      chat_type: @chat.chat_type,
+      title: @chat.title,
+      status: @chat.status,
+      ticket_number: @chat.ticket_number,
+      created_at: @chat.created_at,
+      updated_at: @chat.updated_at,
+      initiator: {
+        id: @chat.initiator.id,
+        first_name: @chat.initiator.first_name,
+        last_name: @chat.initiator.last_name,
+        email: @chat.initiator.email,
+        role: @chat.initiator.role,
+        image_url: @chat.initiator.image_url
+      },
+      recipient: if @chat.recipient
+                   {
+                     id: @chat.recipient.id,
+                     first_name: @chat.recipient.first_name,
+                     last_name: @chat.recipient.last_name,
+                     email: @chat.recipient.email,
+                     role: @chat.recipient.role,
+                     image_url: @chat.recipient.image_url
+                   }
+                 else
+                   nil
+                 end,
+      participants: @chat.participants.map do |participant|
+        {
+          id: participant.id,
+          first_name: participant.first_name,
+          last_name: participant.last_name,
+          email: participant.email,
+          role: participant.role,
+          image_url: participant.image_url
+        }
+      end,
+      messages: messages
+    }
+
+    render json: chat_data, status: :ok
   end
 
   def create
@@ -109,6 +169,10 @@ class Api::ChatsController < ApplicationController
 
       if existing_chat
         Rails.logger.info "Found existing chat: #{existing_chat.id}"
+
+        # Ensure the existing chat has proper participants
+        ensure_chat_participants(existing_chat)
+
         render json: existing_chat, status: :ok
         return
       end
@@ -155,6 +219,12 @@ class Api::ChatsController < ApplicationController
     @chat = Chat.find(params[:id])
   end
 
+  def verify_chat_access
+    return if @chat.chat_participants.exists?(user_id: current_user.id)
+
+    render json: { error: 'You do not have access to this chat' }, status: :forbidden
+  end
+
   def chat_params
     # Allow recipient_id both nested and at top level for flexibility
     permitted_params = params.require(:chat).permit(
@@ -174,21 +244,48 @@ class Api::ChatsController < ApplicationController
   end
 
   def create_initial_participants
-    case @chat.chat_type
-    when 'group'
-      # Add all specified participants
-      (params[:chat][:participant_ids] || []).each do |user_id|
-        @chat.chat_participants.create(user_id: user_id)
-      end
-      # Add initiator if not already included
-      @chat.chat_participants.create(user_id: current_user.id) unless @chat.participant_ids.include?(current_user.id)
-    when 'direct', 'support'
-      @chat.chat_participants.create(user_id: @chat.initiator_id)
-      @chat.chat_participants.create(user_id: @chat.recipient_id)
-    end
+    ensure_chat_participants(@chat)
   end
 
   def accessible_chat_ids
     ChatParticipant.where(user_id: current_user.id).pluck(:chat_id)
+  end
+
+  def verify_chat_access
+    return if accessible_chat_ids.include?(@chat.id)
+
+    render json: { error: 'Access denied' }, status: :forbidden
+  end
+
+  def ensure_chat_participants(chat)
+    # Check if participants exist, if not create them
+    existing_participants = chat.chat_participants.pluck(:user_id)
+
+    case chat.chat_type
+    when 'direct', 'support'
+      required_participants = [chat.initiator_id, chat.recipient_id].compact
+      missing_participants = required_participants - existing_participants
+
+      missing_participants.each do |user_id|
+        Rails.logger.info "Adding missing participant #{user_id} to chat #{chat.id}"
+        chat.chat_participants.create!(user_id: user_id)
+      end
+    when 'group'
+      # For group chats, add all specified participants plus initiator
+      required_participants = [chat.initiator_id]
+
+      # Add participants from params if this is during creation
+      if params[:chat]&.[](:participant_ids).present?
+        required_participants += params[:chat][:participant_ids].map(&:to_i)
+      end
+
+      required_participants = required_participants.uniq
+      missing_participants = required_participants - existing_participants
+
+      missing_participants.each do |user_id|
+        Rails.logger.info "Adding missing participant #{user_id} to group chat #{chat.id}"
+        chat.chat_participants.create!(user_id: user_id)
+      end
+    end
   end
 end

@@ -9,19 +9,23 @@ module ApplicationCable
     private
 
     def find_verified_user
-      token = request.headers[:HTTP_AUTHORIZATION]&.split(' ')&.last
-      if token
-        jwt_payload = JWT.decode(
-          token,
-          Rails.application.credentials.devise_jwt_secret_key,
-          true,
-          { algorithm: 'HS256' }
-        )
-        User.find(jwt_payload[0]['sub'])
+      user_id = request.params[:user_id]
+      chat_id = request.params[:chat_id]
+
+      return reject_unauthorized_connection unless user_id && chat_id
+
+      user = User.find_by(id: user_id)
+      chat = Chat.find_by(id: chat_id)
+
+      return reject_unauthorized_connection unless user && chat
+
+      # Verify user is a participant in the chat
+      if chat.chat_participants.exists?(user_id: user.id)
+        user
       else
         reject_unauthorized_connection
       end
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+    rescue ActiveRecord::RecordNotFound
       reject_unauthorized_connection
     end
   end

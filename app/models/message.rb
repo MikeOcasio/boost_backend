@@ -14,12 +14,27 @@ class Message < ApplicationRecord
     ChatChannel.broadcast_to(
       chat,
       {
-        id: id,
-        content: content,
-        sender_id: sender_id,
-        created_at: created_at,
-        sender_name: sender.first_name
+        type: 'new_message',
+        **serialize_message_data
       }
     )
+  end
+
+  def serialize_message_data
+    {
+      id: id,
+      content: content,
+      created_at: created_at,
+      updated_at: updated_at,
+      read: read,
+      sender: {
+        id: sender.id,
+        first_name: sender.first_name,
+        last_name: sender.last_name,
+        email: sender.email,
+        role: sender.role,
+        image_url: sender.image_url
+      }
+    }
   end
 end
