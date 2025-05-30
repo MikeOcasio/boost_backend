@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_05_12_211055) do
+ActiveRecord::Schema[7.0].define(version: 2025_05_30_041503) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -128,6 +128,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_05_12_211055) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "stripe_account_id"
+    t.decimal "available_balance", precision: 10, scale: 2, default: "0.0"
+    t.decimal "pending_balance", precision: 10, scale: 2, default: "0.0"
+    t.decimal "total_earned", precision: 10, scale: 2, default: "0.0"
+    t.datetime "last_withdrawal_at"
     t.index ["user_id"], name: "index_contractors_on_user_id"
   end
 
@@ -193,9 +197,17 @@ ActiveRecord::Schema[7.0].define(version: 2025_05_12_211055) do
     t.string "order_data", default: [], array: true
     t.bigint "referral_user_id"
     t.integer "points", default: 0
+    t.string "stripe_session_id"
+    t.string "stripe_payment_intent_id"
+    t.string "payment_status"
+    t.datetime "payment_captured_at"
+    t.decimal "skillmaster_earned", precision: 10, scale: 2
+    t.decimal "company_earned", precision: 10, scale: 2
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"
+    t.index ["stripe_payment_intent_id"], name: "index_orders_on_stripe_payment_intent_id"
+    t.index ["stripe_session_id"], name: "index_orders_on_stripe_session_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
@@ -423,6 +435,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_05_12_211055) do
     t.integer "available_referral_points", default: 0
     t.integer "total_completion_points", default: 0
     t.integer "total_referral_points", default: 0
+    t.string "stripe_customer_id"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
     t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"

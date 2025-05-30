@@ -121,15 +121,36 @@ Rails.application.routes.draw do
     resources :platform_credentials, only: %i[show create update destroy]
 
     resources :payments, only: [] do
-      post 'create_checkout_session', on: :collection
+      collection do
+        post :create_checkout_session
+        post :create_payment_intent
+        post :complete_payment
+        get :session_status
+        post :webhook
+      end
+    end
+
+    resources :wallet, only: [] do
+      collection do
+        get :show
+        post :withdraw
+        post :move_pending_to_available
+        post :create_stripe_account
+        get :account_status
+      end
     end
 
     resource :app_status, only: %i[show update], controller: 'app_status'
 
     resources :chats, only: %i[index show create] do
-      resources :messages, only: %i[create]
+      resources :messages, only: %i[index create]
       member do
         post :archive
+        # WebSocket related endpoints
+        get :connection_info, to: 'chat_web_socket#connection_info'
+        get :active_connections, to: 'chat_web_socket#active_connections'
+        post :broadcast_admin_message, to: 'chat_web_socket#broadcast_admin_message'
+        post :force_disconnect_all, to: 'chat_web_socket#force_disconnect_all'
       end
     end
 
@@ -162,8 +183,37 @@ Rails.application.routes.draw do
       end
     end
 
+    # Payment routes
+    resources :payments, only: [] do
+      collection do
+        post :create_checkout_session
+        post :create_payment_intent
+        post :webhook
+      end
+    end
+
+    # Wallet routes for skillmasters
+    get '/wallet/show', to: 'wallet#show'
+    resources :wallet, only: [] do
+      collection do
+        post :withdraw
+        post :create_stripe_account
+      end
+    end
+
     namespace :staff do
       resources :user_profiles, only: [:show]
     end
+
+    namespace :admin do
+      resources :payments, only: [:index] do
+        collection do
+          get :contractors
+          post :force_balance_move
+          get :payment_details
+        end
+      end
+    end
   end
+  mount ActionCable.server => '/cable'
 end

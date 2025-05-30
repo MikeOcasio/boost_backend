@@ -250,4 +250,17 @@ class User < ApplicationRecord
   def staff?
     skillmaster? || admin? || dev? || c_support? || manager?
   end
+
+  # Check if user can have a contractor account
+  def can_have_contractor_account?
+    skillmaster? || admin? || dev?
+  end
+
+  # Ensure contractor account exists for eligible users
+  def ensure_contractor_account!
+    return unless can_have_contractor_account?
+    return if contractor.present?
+    
+    create_contractor!
+  end
 end

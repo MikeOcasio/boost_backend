@@ -32,7 +32,8 @@ class Order < ApplicationRecord
   scope :completed, -> { where(state: 'complete') }
 
   belongs_to :user
-  belongs_to :platform_credential
+  belongs_to :platform_credential, optional: true
+  belongs_to :assigned_skill_master, class_name: 'User', optional: true
   has_many :order_products, dependent: :destroy
   has_many :products, through: :order_products
   has_one :promotion
@@ -40,6 +41,7 @@ class Order < ApplicationRecord
 
   before_save :assign_platform_credentials
   before_create :generate_internal_id
+  after_update :capture_payment_if_completed
 
   validates :state, inclusion: { in: VALID_STATES }
   validates :internal_id, uniqueness: true
@@ -93,5 +95,13 @@ class Order < ApplicationRecord
 
   def skill_master_assigned?
     assigned_skill_master_id.present?
+  end
+
+  private
+
+  def capture_payment_if_completed
+    if saved_change_to_state? && state == 'complete' && stripe_payment_intent_id.present?
+      CapturePaymentJob.perform_later(id)
+    end
   end
 end
