@@ -136,6 +136,8 @@ class Api::ChatsController < ApplicationController
     render json: chat_data, status: :ok
   end
 
+  
+
   def create
     Rails.logger.info "Chat creation params: #{params.inspect}"
 
@@ -213,6 +215,108 @@ class Api::ChatsController < ApplicationController
     end
   end
 
+  def send_message
+    @chat = Chat.find(params[:id])
+    
+    # Verify user has access to this chat
+    unless @chat.chat_participants.exists?(user_id: current_user.id)
+      render json: { error: 'Access denied' }, status: :forbidden
+      return
+    end
+
+    @message = @chat.messages.build(message_params)
+    @message.sender = current_user
+
+    if @message.save
+      # Prepare message data for broadcasting
+      message_data = {
+        id: @message.id,
+        content: @message.content,
+        created_at: @message.created_at,
+        read: @message.read,
+        chat_id: @message.chat_id,
+        sender: {
+          id: @message.sender.id,
+          first_name: @message.sender.first_name,
+          last_name: @message.sender.last_name,
+          role: @message.sender.role,
+          image_url: @message.sender.image_url
+        }
+      }
+
+      # Broadcast via WebSocket if available
+      begin
+        # Use ActionCable to broadcast to the chat channel
+        ActionCable.server.broadcast("chat_#{@chat.id}", {
+          type: 'new_message',
+          message: message_data
+        })
+        
+        Rails.logger.info "Successfully broadcasted message to chat_#{@chat.id}"
+      rescue => e
+        Rails.logger.error "Failed to broadcast message: #{e.message}"
+      end
+
+      render json: {
+        message: message_data
+      }, status: :created
+    else
+      render json: { errors: @message.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  def new_messages
+  @chat = Chat.find(params[:id])
+  
+  unless @chat.chat_participants.exists?(user_id: current_user.id)
+    render json: { error: 'Access denied' }, status: :forbidden
+    return
+  end
+
+  last_message_id = params[:last_message_id].to_i
+  
+  new_messages = @chat.messages.includes(:sender)
+                     .where('id > ?', last_message_id)
+                     .order(created_at: :asc)
+                     .map do |message|
+    {
+      id: message.id,
+      content: message.content,
+      created_at: message.created_at,
+      read: message.read,
+      sender: {
+        id: message.sender.id,
+        first_name: message.sender.first_name,
+        last_name: message.sender.last_name,
+        role: message.sender.role,
+        image_url: message.sender.image_url
+      }
+    }
+  end
+
+   render json: { messages: new_messages }, status: :ok
+  end
+
+  def connection_info
+    @chat = Chat.find(params[:id])
+    
+    # Verify user has access to this chat
+    unless @chat.chat_participants.exists?(user_id: current_user.id)
+      render json: { error: 'Access denied' }, status: :forbidden
+      return
+    end
+
+    # Return WebSocket URL and channel info
+    websocket_url = Rails.application.config.action_cable.url || "ws://localhost:3000/cable"
+    
+    render json: {
+      websocket_url: websocket_url,
+      channel: "ChatChannel",
+      chat_id: @chat.id,
+      user_id: current_user.id
+    }
+  end
+
   private
 
   def set_chat
@@ -241,6 +345,10 @@ class Api::ChatsController < ApplicationController
     end
 
     permitted_params
+  end
+
+  def message_params
+    params.require(:message).permit(:content)
   end
 
   def create_initial_participants

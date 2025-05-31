@@ -1,128 +1,167 @@
 class ChatChannel < ApplicationCable::Channel
-  include MessageSerializationConcern
-
   def subscribed
-    @chat = Chat.find(params[:chat_id])
+    chat_id = params[:chat_id]
+    user_id = params[:user_id]
+    
+    Rails.logger.info "User #{user_id} attempting to subscribe to chat #{chat_id}"
+    
+    begin
+      # Find the chat and verify user has access
+      @chat = Chat.find(chat_id)
+      
+      # Check if the current user is a participant in this chat
+      unless @chat.chat_participants.exists?(user_id: user_id)
+        Rails.logger.warn "User #{user_id} denied access to chat #{chat_id}"
+        reject
+        return
+      end
 
-    # Check if the current user is a participant in this chat
-    unless @chat.chat_participants.exists?(user_id: current_user.id)
+      # Subscribe to the chat stream
+      stream_from "chat_#{@chat.id}"
+      Rails.logger.info "User #{user_id} successfully subscribed to chat_#{@chat.id}"
+      
+      # Send welcome message to confirm connection
+      transmit({
+        type: 'welcome',
+        message: 'Connected to chat',
+        chat_id: @chat.id,
+        timestamp: Time.current
+      })
+
+    rescue ActiveRecord::RecordNotFound
+      Rails.logger.error "Chat #{chat_id} not found"
       reject
-      return
+    rescue => e
+      Rails.logger.error "Error in ChatChannel subscription: #{e.message}"
+      reject
     end
-
-    stream_for @chat
-    Rails.logger.info "User #{current_user.id} subscribed to chat #{@chat.id}"
-
-    # Notify other participants that user came online
-    broadcast_user_status('online')
   end
 
   def unsubscribed
-    Rails.logger.info "User #{current_user.id} unsubscribed from chat channel"
-
-    # Notify other participants that user went offline
-    broadcast_user_status('offline') if @chat
-
+    if @chat
+      Rails.logger.info "User unsubscribed from chat #{@chat.id}"
+    else
+      Rails.logger.info "User unsubscribed from chat channel"
+    end
     stop_all_streams
   end
 
-  # Handle sending messages via WebSocket
-  def send_message(data)
+  def receive(data)
+    Rails.logger.info "Received data in ChatChannel: #{data}"
+    
+    case data['type']
+    when 'join_chat'
+      Rails.logger.info "User joining chat: #{data['chat_id']}"
+      # Handle join chat if needed
+      
+    when 'send_message'
+      handle_send_message(data)
+      
+    when 'typing'
+      handle_typing(data)
+      
+    when 'mark_as_read'
+      handle_mark_as_read(data)
+      
+    when 'message_sent'
+      Rails.logger.info "Message sent confirmation: #{data['message_id']}"
+      # Handle message sent confirmation if needed
+      
+    else
+      Rails.logger.info "Unknown message type: #{data['type']}"
+    end
+  end
+
+  private
+
+  def handle_send_message(data)
     return unless @chat
     return transmit_error('Missing message content') if data['content'].blank?
 
     message = @chat.messages.build(
       content: data['content'].strip,
-      sender: current_user
+      sender_id: data['user_id']
     )
 
     if message.save
-      # Message will be broadcast via the after_create_commit callback in the Message model
-      Rails.logger.info "Message sent via WebSocket by user #{current_user.id} in chat #{@chat.id}"
+      # Prepare message data for broadcasting
+      message_data = {
+        id: message.id,
+        content: message.content,
+        created_at: message.created_at,
+        read: message.read,
+        chat_id: message.chat_id,
+        sender: {
+          id: message.sender.id,
+          first_name: message.sender.first_name,
+          last_name: message.sender.last_name,
+          role: message.sender.role,
+          image_url: message.sender.image_url
+        }
+      }
+
+      # Broadcast to all subscribers of this chat
+      ActionCable.server.broadcast("chat_#{@chat.id}", {
+        type: 'new_message',
+        message: message_data
+      })
+
+      Rails.logger.info "Message sent via WebSocket and broadcasted to chat_#{@chat.id}"
 
       # Send success confirmation to sender
       transmit({
-                 type: 'message_sent',
-                 message_id: message.id,
-                 timestamp: Time.current
-               })
+        type: 'message_sent',
+        message_id: message.id,
+        temp_id: data['temp_id'],
+        message: message_data,
+        timestamp: Time.current
+      })
     else
       transmit_error('Failed to send message', message.errors.full_messages)
     end
   end
 
-  # Handle typing indicators
-  def typing(data)
+  def handle_typing(data)
     return unless @chat
 
-    ChatWebSocketService.broadcast_typing_indicator(@chat, current_user, data['is_typing'])
+    # Broadcast typing indicator to other participants
+    ActionCable.server.broadcast("chat_#{@chat.id}", {
+      type: 'typing',
+      user_id: data['user_id'],
+      is_typing: data['is_typing'],
+      timestamp: Time.current
+    })
   end
 
-  # Mark messages as read
-  def mark_as_read(data)
+  def handle_mark_as_read(data)
     return unless @chat
 
     message_ids = data['message_ids'] || []
     return if message_ids.empty?
 
     # Only mark messages as read that weren't sent by the current user
-    updated_count = @chat.messages.where(id: message_ids).where.not(sender: current_user).update_all(read: true)
+    updated_count = @chat.messages
+                         .where(id: message_ids)
+                         .where.not(sender_id: data['user_id'])
+                         .update_all(read: true)
 
-    return unless updated_count > 0
-
-    # Use the service to broadcast read receipts
-    ChatWebSocketService.broadcast_read_receipts(@chat, message_ids, current_user)
-  end
-
-  # Load message history (for pagination)
-  def load_messages(data)
-    return unless @chat
-
-    page = [data['page'].to_i, 1].max
-    per_page = [[data['per_page'].to_i, 50].min, 10].max # Between 10 and 50
-
-    messages = @chat.messages
-                    .includes(:sender)
-                    .order(created_at: :desc)
-                    .limit(per_page)
-                    .offset((page - 1) * per_page)
-
-    messages_data = messages.reverse.map do |message|
-      serialize_message(message)
+    if updated_count > 0
+      # Broadcast read receipts to other participants
+      ActionCable.server.broadcast("chat_#{@chat.id}", {
+        type: 'messages_read',
+        message_ids: message_ids,
+        read_by_user_id: data['user_id'],
+        timestamp: Time.current
+      })
     end
-
-    transmit({
-               type: 'message_history',
-               messages: messages_data,
-               page: page,
-               per_page: per_page,
-               has_more: messages.count == per_page
-             })
-  end
-
-  private
-
-  def broadcast_user_status(status)
-    ChatWebSocketService.broadcast_user_status(@chat, current_user, status)
   end
 
   def transmit_error(message, details = [])
     transmit({
-               type: 'error',
-               message: message,
-               details: details,
-               timestamp: Time.current
-             })
-  end
-
-  def serialize_message(message)
-    {
-      id: message.id,
-      content: message.content,
-      created_at: message.created_at,
-      updated_at: message.updated_at,
-      read: message.read,
-      sender: serialize_user(message.sender)
-    }
+      type: 'error',
+      message: message,
+      details: details,
+      timestamp: Time.current
+    })
   end
 end
