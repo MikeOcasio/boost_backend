@@ -1,7 +1,9 @@
 class Api::ChatsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_chat, only: %i[show update archive close reopen]
-  before_action :verify_chat_access, only: %i[show update archive close reopen]
+  before_action :set_chat,
+                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count]
+  before_action :verify_chat_access,
+                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count]
 
   def index
     @chats = Chat.includes(:messages, :participants, :initiator, :recipient)
@@ -378,6 +380,80 @@ class Api::ChatsController < ApplicationController
     }
   end
 
+  def chat_states
+    # Get comprehensive chat state information for the frontend
+    render json: get_chat_states(@chat), status: :ok
+  end
+
+  def mark_messages_read
+    message_ids = params[:message_ids] || []
+
+    if message_ids.empty?
+      render json: { error: 'No message IDs provided' }, status: :unprocessable_entity
+      return
+    end
+
+    # Only mark messages as read that weren't sent by the current user
+    updated_count = @chat.messages
+                         .where(id: message_ids)
+                         .where.not(sender_id: current_user.id)
+                         .update_all(read: true)
+
+    if updated_count > 0
+      # Broadcast read receipts to other participants via WebSocket
+      broadcast_chat_state_change('messages_read', {
+                                    message_ids: message_ids,
+                                    read_by_user_id: current_user.id
+                                  })
+    end
+
+    render json: {
+      messages_marked_read: updated_count,
+      updated_message_ids: message_ids
+    }, status: :ok
+  end
+
+  def set_typing_status
+    is_typing = params[:is_typing] == true || params[:is_typing] == 'true'
+
+    # Broadcast typing status to other participants
+    broadcast_chat_state_change('typing', {
+                                  user_id: current_user.id,
+                                  is_typing: is_typing,
+                                  user_name: "#{current_user.first_name} #{current_user.last_name}"
+                                })
+
+    render json: {
+      typing_status_set: true,
+      is_typing: is_typing
+    }, status: :ok
+  end
+
+  def unread_count
+    # Count unread messages for current user in this chat
+    unread_count = @chat.messages
+                        .where.not(sender_id: current_user.id)
+                        .where(read: false)
+                        .count
+
+    render json: {
+      unread_count: unread_count,
+      chat_id: @chat.id
+    }, status: :ok
+  end
+
+  def all_chat_states
+    # Get states for all chats the user has access to
+    chat_ids = accessible_chat_ids
+    chats_with_states = Chat.includes(:messages, :participants, :initiator, :recipient)
+                            .where(id: chat_ids)
+                            .map do |chat|
+      get_chat_states(chat)
+    end
+
+    render json: { chats: chats_with_states }, status: :ok
+  end
+
   private
 
   def set_chat
@@ -466,6 +542,82 @@ class Api::ChatsController < ApplicationController
     Rails.logger.info "Successfully broadcasted #{event_type} to chat_#{@chat.id}"
   rescue StandardError => e
     Rails.logger.error "Failed to broadcast #{event_type}: #{e.message}"
+  end
+
+  def get_chat_states(chat)
+    # Get current user's unread message count for this chat
+    unread_count = chat.messages
+                       .where.not(sender_id: current_user.id)
+                       .where(read: false)
+                       .count
+
+    # Get the last message details
+    last_message = chat.messages.includes(:sender).order(created_at: :desc).first
+
+    # Get read receipts for recent messages (last 50)
+    recent_messages = chat.messages.includes(:sender)
+                          .order(created_at: :desc)
+                          .limit(50)
+
+    message_read_states = recent_messages.map do |message|
+      {
+        message_id: message.id,
+        is_read: message.read,
+        sent_by_current_user: message.sender_id == current_user.id,
+        sender: {
+          id: message.sender.id,
+          name: "#{message.sender.first_name} #{message.sender.last_name}"
+        }
+      }
+    end
+
+    # Get participant info
+    other_participants = chat.participants.where.not(id: current_user.id)
+
+    {
+      chat_id: chat.id,
+      chat_status: chat.status,
+      unread_count: unread_count,
+      total_message_count: chat.messages.count,
+      last_message: if last_message
+                      {
+                        id: last_message.id,
+                        content: last_message.content,
+                        created_at: last_message.created_at,
+                        is_read: last_message.read,
+                        sent_by_current_user: last_message.sender_id == current_user.id,
+                        sender: {
+                          id: last_message.sender.id,
+                          name: "#{last_message.sender.first_name} #{last_message.sender.last_name}",
+                          role: last_message.sender.role
+                        }
+                      }
+                    else
+                      nil
+                    end,
+      participants: other_participants.map do |participant|
+        {
+          id: participant.id,
+          name: "#{participant.first_name} #{participant.last_name}",
+          role: participant.role,
+          image_url: participant.image_url,
+          is_online: false # This could be enhanced with real online status
+        }
+      end,
+      message_read_states: message_read_states,
+      current_user_id: current_user.id,
+      can_send_messages: chat.active?,
+      lifecycle_info: {
+        can_close: chat.can_close?,
+        can_reopen: chat.can_reopen?,
+        is_active: chat.active?,
+        is_closed: chat.closed?,
+        is_locked: chat.locked?,
+        closed_at: chat.closed_at,
+        reopened_at: chat.reopened_at,
+        reopen_count: chat.reopen_count
+      }
+    }
   end
 
   def format_chat_response(chat)

@@ -148,11 +148,19 @@ Rails.application.routes.draw do
         post :archive
         post :close
         post :reopen
+        # Chat state endpoints for frontend UI
+        get :chat_states
+        post :mark_messages_read
+        post :set_typing_status
+        get :unread_count
         # WebSocket related endpoints
         get :connection_info, to: 'chat_web_socket#connection_info'
         get :active_connections, to: 'chat_web_socket#active_connections'
         post :broadcast_admin_message, to: 'chat_web_socket#broadcast_admin_message'
         post :force_disconnect_all, to: 'chat_web_socket#force_disconnect_all'
+      end
+      collection do
+        get :all_chat_states
       end
     end
 
