@@ -21,16 +21,15 @@ class ChatChannel < ApplicationCable::Channel
       Rails.logger.info "User #{user_id} successfully subscribed to chat_#{@chat.id}"
       # Send welcome message to confirm connection
       transmit({
-        type: 'welcome',
-        message: 'Connected to chat',
-        chat_id: @chat.id,
-        timestamp: Time.current
-      })
-
+                 type: 'welcome',
+                 message: 'Connected to chat',
+                 chat_id: @chat.id,
+                 timestamp: Time.current
+               })
     rescue ActiveRecord::RecordNotFound
       Rails.logger.error "Chat #{chat_id} not found"
       reject
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error "Error in ChatChannel subscription: #{e.message}"
       reject
     end
@@ -40,7 +39,7 @@ class ChatChannel < ApplicationCable::Channel
     if @chat
       Rails.logger.info "User unsubscribed from chat #{@chat.id}"
     else
-      Rails.logger.info "User unsubscribed from chat channel"
+      Rails.logger.info 'User unsubscribed from chat channel'
     end
     stop_all_streams
   end
@@ -82,11 +81,11 @@ class ChatChannel < ApplicationCable::Channel
   def handle_send_message(data)
     return unless @chat
     return transmit_error('Missing message content') if data['content'].blank?
-    
+
     # Check if chat is active (not closed or locked)
     unless @chat.active?
-      return transmit_error('Cannot send messages to an inactive chat', 
-                           ["Chat status: #{@chat.status}"])
+      return transmit_error('Cannot send messages to an inactive chat',
+                            ["Chat status: #{@chat.status}"])
     end
 
     message = @chat.messages.build(
@@ -113,20 +112,20 @@ class ChatChannel < ApplicationCable::Channel
 
       # Broadcast to all subscribers of this chat
       ActionCable.server.broadcast("chat_#{@chat.id}", {
-        type: 'new_message',
-        message: message_data
-      })
+                                     type: 'new_message',
+                                     message: message_data
+                                   })
 
       Rails.logger.info "Message sent via WebSocket and broadcasted to chat_#{@chat.id}"
 
       # Send success confirmation to sender
       transmit({
-        type: 'message_sent',
-        message_id: message.id,
-        temp_id: data['temp_id'],
-        message: message_data,
-        timestamp: Time.current
-      })
+                 type: 'message_sent',
+                 message_id: message.id,
+                 temp_id: data['temp_id'],
+                 message: message_data,
+                 timestamp: Time.current
+               })
     else
       transmit_error('Failed to send message', message.errors.full_messages)
     end
@@ -137,11 +136,11 @@ class ChatChannel < ApplicationCable::Channel
 
     # Broadcast typing indicator to other participants
     ActionCable.server.broadcast("chat_#{@chat.id}", {
-      type: 'typing',
-      user_id: data['user_id'],
-      is_typing: data['is_typing'],
-      timestamp: Time.current
-    })
+                                   type: 'typing',
+                                   user_id: data['user_id'],
+                                   is_typing: data['is_typing'],
+                                   timestamp: Time.current
+                                 })
   end
 
   def handle_mark_as_read(data)
@@ -156,15 +155,15 @@ class ChatChannel < ApplicationCable::Channel
                          .where.not(sender_id: data['user_id'])
                          .update_all(read: true)
 
-    if updated_count > 0
-      # Broadcast read receipts to other participants
-      ActionCable.server.broadcast("chat_#{@chat.id}", {
-        type: 'messages_read',
-        message_ids: message_ids,
-        read_by_user_id: data['user_id'],
-        timestamp: Time.current
-      })
-    end
+    return unless updated_count > 0
+
+    # Broadcast read receipts to other participants
+    ActionCable.server.broadcast("chat_#{@chat.id}", {
+                                   type: 'messages_read',
+                                   message_ids: message_ids,
+                                   read_by_user_id: data['user_id'],
+                                   timestamp: Time.current
+                                 })
   end
 
   def handle_close_chat(data)
@@ -174,13 +173,13 @@ class ChatChannel < ApplicationCable::Channel
     if @chat.close!
       # Broadcast chat closure to all participants
       ActionCable.server.broadcast("chat_#{@chat.id}", {
-        type: 'chat_closed',
-        chat_id: @chat.id,
-        status: @chat.status,
-        closed_at: @chat.closed_at,
-        closed_by: data['user_id'],
-        timestamp: Time.current
-      })
+                                     type: 'chat_closed',
+                                     chat_id: @chat.id,
+                                     status: @chat.status,
+                                     closed_at: @chat.closed_at,
+                                     closed_by: data['user_id'],
+                                     timestamp: Time.current
+                                   })
 
       Rails.logger.info "Chat #{@chat.id} closed via WebSocket by user #{data['user_id']}"
     else
@@ -195,14 +194,14 @@ class ChatChannel < ApplicationCable::Channel
     if @chat.reopen!
       # Broadcast chat reopening to all participants
       ActionCable.server.broadcast("chat_#{@chat.id}", {
-        type: 'chat_reopened',
-        chat_id: @chat.id,
-        status: @chat.status,
-        reopened_at: @chat.reopened_at,
-        reopen_count: @chat.reopen_count,
-        reopened_by: data['user_id'],
-        timestamp: Time.current
-      })
+                                     type: 'chat_reopened',
+                                     chat_id: @chat.id,
+                                     status: @chat.status,
+                                     reopened_at: @chat.reopened_at,
+                                     reopen_count: @chat.reopen_count,
+                                     reopened_by: data['user_id'],
+                                     timestamp: Time.current
+                                   })
 
       Rails.logger.info "Chat #{@chat.id} reopened via WebSocket by user #{data['user_id']}"
     else
@@ -212,10 +211,10 @@ class ChatChannel < ApplicationCable::Channel
 
   def transmit_error(message, details = [])
     transmit({
-      type: 'error',
-      message: message,
-      details: details,
-      timestamp: Time.current
-    })
+               type: 'error',
+               message: message,
+               details: details,
+               timestamp: Time.current
+             })
   end
 end

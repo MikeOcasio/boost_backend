@@ -43,7 +43,7 @@ class Chat < ApplicationRecord
 
   def reopen!
     return false if locked?
-    
+
     if closed? || archived?
       increment!(:reopen_count)
       update(status: 'active', reopened_at: Time.current)
@@ -92,8 +92,8 @@ class Chat < ApplicationRecord
   def generate_reference_id
     # Format: MMDDYYYY-Order_ID-Chat_ID
     return unless order_id.present?
-    
-    date_part = Time.current.strftime("%m%d%Y")
+
+    date_part = Time.current.strftime('%m%d%Y')
     ref_id = "#{date_part}-#{order_id}-#{id}"
     update_column(:reference_id, ref_id)
   end

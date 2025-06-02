@@ -114,11 +114,11 @@ class Order < ApplicationRecord
       chat.close!
       # Broadcast chat closure to WebSocket subscribers
       ActionCable.server.broadcast("chat_#{chat.id}", {
-        type: 'chat_closed',
-        message: 'Chat has been automatically closed because the order is complete.',
-        chat_id: chat.id,
-        closed_at: chat.closed_at
-      })
+                                     type: 'chat_closed',
+                                     message: 'Chat has been automatically closed because the order is complete.',
+                                     chat_id: chat.id,
+                                     closed_at: chat.closed_at
+                                   })
     end
   end
 end
