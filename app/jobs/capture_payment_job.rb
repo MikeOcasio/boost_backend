@@ -40,7 +40,6 @@ class CapturePaymentJob < ApplicationJob
       else
         Rails.logger.error "No contractor account found for skillmaster #{skillmaster.id} on order #{order.id}"
       end
-
     rescue Stripe::StripeError => e
       Rails.logger.error "Failed to capture payment for order #{order.id}: #{e.message}"
       # You might want to retry this job or send an alert

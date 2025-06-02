@@ -14,23 +14,23 @@ class Api::PaymentsController < ApplicationController
   def webhook
     # Handle Stripe webhooks for payment completion
     Stripe.api_key = STRIPE_API_KEY
-    
+
     begin
       sig_header = request.headers['Stripe-Signature']
       event = nil
 
       # Verify webhook signature (you should set this in Rails credentials)
       endpoint_secret = Rails.application.credentials.stripe[:webhook_secret]
-      
-      if endpoint_secret
-        event = Stripe::Webhook.construct_event(
-          request.body.read,
-          sig_header,
-          endpoint_secret
-        )
-      else
-        event = JSON.parse(request.body.read, symbolize_names: true)
-      end
+
+      event = if endpoint_secret
+                Stripe::Webhook.construct_event(
+                  request.body.read,
+                  sig_header,
+                  endpoint_secret
+                )
+              else
+                JSON.parse(request.body.read, symbolize_names: true)
+              end
 
       case event[:type]
       when 'checkout.session.completed'
@@ -73,13 +73,13 @@ class Api::PaymentsController < ApplicationController
       # Add products to order
       products.each do |product_data|
         # Only create order_product if the product exists
-        if Product.exists?(product_data[:id])
-          order.order_products.create!(
-            product_id: product_data[:id],
-            quantity: product_data[:quantity],
-            price: product_data[:price]
-          )
-        end
+        next unless Product.exists?(product_data[:id])
+
+        order.order_products.create!(
+          product_id: product_data[:id],
+          quantity: product_data[:quantity],
+          price: product_data[:price]
+        )
       end
 
       # Create line items for the checkout session
@@ -292,7 +292,7 @@ class Api::PaymentsController < ApplicationController
 
   def calculate_total_price(products, promotion)
     subtotal = products.sum { |p| (p[:price].to_f + p[:tax].to_f) * p[:quantity].to_i }
-    
+
     if promotion.present? && promotion[:discount_percentage].to_f.positive?
       discount = subtotal * (promotion[:discount_percentage].to_f / 100)
       subtotal - discount

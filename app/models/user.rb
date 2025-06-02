@@ -260,7 +260,7 @@ class User < ApplicationRecord
   def ensure_contractor_account!
     return unless can_have_contractor_account?
     return if contractor.present?
-    
+
     create_contractor!
   end
 end

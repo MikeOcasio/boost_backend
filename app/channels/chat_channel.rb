@@ -2,13 +2,13 @@ class ChatChannel < ApplicationCable::Channel
   def subscribed
     chat_id = params[:chat_id]
     user_id = params[:user_id]
-    
+
     Rails.logger.info "User #{user_id} attempting to subscribe to chat #{chat_id}"
-    
+
     begin
       # Find the chat and verify user has access
       @chat = Chat.find(chat_id)
-      
+
       # Check if the current user is a participant in this chat
       unless @chat.chat_participants.exists?(user_id: user_id)
         Rails.logger.warn "User #{user_id} denied access to chat #{chat_id}"
@@ -19,7 +19,6 @@ class ChatChannel < ApplicationCable::Channel
       # Subscribe to the chat stream
       stream_from "chat_#{@chat.id}"
       Rails.logger.info "User #{user_id} successfully subscribed to chat_#{@chat.id}"
-      
       # Send welcome message to confirm connection
       transmit({
         type: 'welcome',
@@ -48,25 +47,31 @@ class ChatChannel < ApplicationCable::Channel
 
   def receive(data)
     Rails.logger.info "Received data in ChatChannel: #{data}"
-    
+
     case data['type']
     when 'join_chat'
       Rails.logger.info "User joining chat: #{data['chat_id']}"
       # Handle join chat if needed
-      
+
     when 'send_message'
       handle_send_message(data)
-      
+
     when 'typing'
       handle_typing(data)
-      
+
     when 'mark_as_read'
       handle_mark_as_read(data)
-      
+
+    when 'close_chat'
+      handle_close_chat(data)
+
+    when 'reopen_chat'
+      handle_reopen_chat(data)
+
     when 'message_sent'
       Rails.logger.info "Message sent confirmation: #{data['message_id']}"
       # Handle message sent confirmation if needed
-      
+
     else
       Rails.logger.info "Unknown message type: #{data['type']}"
     end
@@ -77,6 +82,12 @@ class ChatChannel < ApplicationCable::Channel
   def handle_send_message(data)
     return unless @chat
     return transmit_error('Missing message content') if data['content'].blank?
+    
+    # Check if chat is active (not closed or locked)
+    unless @chat.active?
+      return transmit_error('Cannot send messages to an inactive chat', 
+                           ["Chat status: #{@chat.status}"])
+    end
 
     message = @chat.messages.build(
       content: data['content'].strip,
@@ -153,6 +164,49 @@ class ChatChannel < ApplicationCable::Channel
         read_by_user_id: data['user_id'],
         timestamp: Time.current
       })
+    end
+  end
+
+  def handle_close_chat(data)
+    return unless @chat
+    return unless @chat.can_close?
+
+    if @chat.close!
+      # Broadcast chat closure to all participants
+      ActionCable.server.broadcast("chat_#{@chat.id}", {
+        type: 'chat_closed',
+        chat_id: @chat.id,
+        status: @chat.status,
+        closed_at: @chat.closed_at,
+        closed_by: data['user_id'],
+        timestamp: Time.current
+      })
+
+      Rails.logger.info "Chat #{@chat.id} closed via WebSocket by user #{data['user_id']}"
+    else
+      transmit_error('Failed to close chat', @chat.errors.full_messages)
+    end
+  end
+
+  def handle_reopen_chat(data)
+    return unless @chat
+    return unless @chat.can_reopen?
+
+    if @chat.reopen!
+      # Broadcast chat reopening to all participants
+      ActionCable.server.broadcast("chat_#{@chat.id}", {
+        type: 'chat_reopened',
+        chat_id: @chat.id,
+        status: @chat.status,
+        reopened_at: @chat.reopened_at,
+        reopen_count: @chat.reopen_count,
+        reopened_by: data['user_id'],
+        timestamp: Time.current
+      })
+
+      Rails.logger.info "Chat #{@chat.id} reopened via WebSocket by user #{data['user_id']}"
+    else
+      transmit_error('Failed to reopen chat', @chat.errors.full_messages)
     end
   end
 

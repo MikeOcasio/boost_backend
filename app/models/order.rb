@@ -38,10 +38,12 @@ class Order < ApplicationRecord
   has_many :products, through: :order_products
   has_one :promotion
   has_many :reviews, dependent: :destroy
+  has_many :chats, dependent: :nullify
 
   before_save :assign_platform_credentials
   before_create :generate_internal_id
   after_update :capture_payment_if_completed
+  after_update :close_associated_chats_if_completed
 
   validates :state, inclusion: { in: VALID_STATES }
   validates :internal_id, uniqueness: true
@@ -100,8 +102,23 @@ class Order < ApplicationRecord
   private
 
   def capture_payment_if_completed
-    if saved_change_to_state? && state == 'complete' && stripe_payment_intent_id.present?
-      CapturePaymentJob.perform_later(id)
+    return unless saved_change_to_state? && state == 'complete' && stripe_payment_intent_id.present?
+
+    CapturePaymentJob.perform_later(id)
+  end
+
+  def close_associated_chats_if_completed
+    return unless saved_change_to_state? && state == 'complete'
+
+    chats.active.each do |chat|
+      chat.close!
+      # Broadcast chat closure to WebSocket subscribers
+      ActionCable.server.broadcast("chat_#{chat.id}", {
+        type: 'chat_closed',
+        message: 'Chat has been automatically closed because the order is complete.',
+        chat_id: chat.id,
+        closed_at: chat.closed_at
+      })
     end
   end
 end

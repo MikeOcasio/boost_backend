@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_05_30_041503) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_02_045123) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -115,10 +115,15 @@ ActiveRecord::Schema[7.0].define(version: 2025_05_30_041503) do
     t.string "ticket_number"
     t.string "status", default: "active"
     t.bigint "order_id"
+    t.string "reference_id"
+    t.integer "reopen_count", default: 0, null: false
+    t.datetime "closed_at"
+    t.datetime "reopened_at"
     t.index ["initiator_id", "recipient_id"], name: "index_chats_on_initiator_id_and_recipient_id", unique: true
     t.index ["initiator_id"], name: "index_chats_on_initiator_id"
     t.index ["order_id"], name: "index_chats_on_order_id"
     t.index ["recipient_id"], name: "index_chats_on_recipient_id"
+    t.index ["reference_id"], name: "index_chats_on_reference_id", unique: true
     t.index ["ticket_number"], name: "index_chats_on_ticket_number", unique: true
   end
 

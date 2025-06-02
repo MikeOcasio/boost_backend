@@ -7,16 +7,20 @@ class Chat < ApplicationRecord
   has_many :participants, through: :chat_participants, source: :user
 
   validates :chat_type, presence: true, inclusion: { in: %w[direct group support] }
-  validates :status, presence: true, inclusion: { in: %w[active archived] }
+  validates :status, presence: true, inclusion: { in: %w[active archived closed locked] }
   validates :initiator_id,
             uniqueness: { scope: %i[recipient_id chat_type], message: 'Chat already exists between these users' }
   validate :prevent_self_chat
+  validates :reopen_count, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
   before_create :generate_ticket_number, if: :support_chat?
   before_create :validate_chat_permissions
+  after_create :generate_reference_id
 
   scope :active, -> { where(status: 'active') }
   scope :archived, -> { where(status: 'archived') }
+  scope :closed, -> { where(status: 'closed') }
+  scope :locked, -> { where(status: 'locked') }
   scope :support_tickets, -> { where(chat_type: 'support') }
 
   validate :validate_direct_chat, if: -> { chat_type == 'direct' }
@@ -27,6 +31,46 @@ class Chat < ApplicationRecord
 
   def archive!
     update(status: 'archived')
+  end
+
+  def close!
+    update(status: 'closed', closed_at: Time.current)
+  end
+
+  def lock!
+    update(status: 'locked', closed_at: Time.current)
+  end
+
+  def reopen!
+    return false if locked?
+    
+    if closed? || archived?
+      increment!(:reopen_count)
+      update(status: 'active', reopened_at: Time.current)
+      true
+    else
+      false
+    end
+  end
+
+  def closed?
+    status == 'closed'
+  end
+
+  def locked?
+    status == 'locked'
+  end
+
+  def can_reopen?
+    closed? || archived?
+  end
+
+  def can_close?
+    active?
+  end
+
+  def active?
+    status == 'active'
   end
 
   def support_chat?
@@ -43,6 +87,15 @@ class Chat < ApplicationRecord
 
   def generate_ticket_number
     self.ticket_number = "TICKET-#{Time.current.to_i}-#{SecureRandom.hex(4).upcase}"
+  end
+
+  def generate_reference_id
+    # Format: MMDDYYYY-Order_ID-Chat_ID
+    return unless order_id.present?
+    
+    date_part = Time.current.strftime("%m%d%Y")
+    ref_id = "#{date_part}-#{order_id}-#{id}"
+    update_column(:reference_id, ref_id)
   end
 
   def validate_chat_permissions

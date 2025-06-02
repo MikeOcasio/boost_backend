@@ -19,12 +19,12 @@ RSpec.describe 'Payment System Integration', type: :request do
         { id: 1, name: 'Test Service', price: 100.0, tax: 10.0, quantity: 1 }
       ]
 
-      expect {
+      expect do
         post '/api/payments/create_checkout_session', params: {
           currency: 'usd',
           products: product_data
         }
-      }.to change(Order, :count).by(1)
+      end.to change(Order, :count).by(1)
 
       expect(response).to have_http_status(:created)
 
@@ -38,22 +38,21 @@ RSpec.describe 'Payment System Integration', type: :request do
   describe 'Payment Capture Job' do
     let(:order) do
       create(:order,
-        user: user,
-        assigned_skill_master: skillmaster,
-        state: 'complete',
-        stripe_payment_intent_id: 'pi_test123',
-        payment_captured_at: nil
-      )
+             user: user,
+             assigned_skill_master: skillmaster,
+             state: 'complete',
+             stripe_payment_intent_id: 'pi_test123',
+             payment_captured_at: nil)
     end
 
     it 'captures payment and splits funds when order is completed' do
       # Mock Stripe payment intent
-      payment_intent = double('PaymentIntent', amount: 10000) # $100.00 in cents
+      payment_intent = double('PaymentIntent', amount: 10_000) # $100.00 in cents
       allow(Stripe::PaymentIntent).to receive(:capture).and_return(payment_intent)
 
-      expect {
+      expect do
         CapturePaymentJob.perform_now(order.id)
-      }.to change { contractor.reload.pending_balance }.by(75.0)
+      end.to change { contractor.reload.pending_balance }.by(75.0)
 
       order.reload
       expect(order.payment_captured_at).to be_present

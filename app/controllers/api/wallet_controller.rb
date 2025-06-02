@@ -73,15 +73,15 @@ class Api::WalletController < ApplicationController
 
       # Create Stripe transfer to skillmaster's account
       transfer = Stripe::Transfer.create({
-        amount: (amount * 100).to_i, # Convert to cents
-        currency: 'usd',
-        destination: contractor.stripe_account_id,
-        metadata: {
-          user_id: current_user.id,
-          contractor_id: contractor.id,
-          withdrawal_date: Time.current.to_s
-        }
-      })
+                                           amount: (amount * 100).to_i, # Convert to cents
+                                           currency: 'usd',
+                                           destination: contractor.stripe_account_id,
+                                           metadata: {
+                                             user_id: current_user.id,
+                                             contractor_id: contractor.id,
+                                             withdrawal_date: Time.current.to_s
+                                           }
+                                         })
 
       # Update contractor balances
       contractor.transaction do
@@ -106,20 +106,18 @@ class Api::WalletController < ApplicationController
   end
 
   def move_pending_to_available
-    begin
-      contractor = current_user.contractor
-      amount_moved = contractor.move_pending_to_available
+    contractor = current_user.contractor
+    amount_moved = contractor.move_pending_to_available
 
-      render json: {
-        success: true,
-        message: 'Pending balance moved to available',
-        amount_moved: amount_moved,
-        available_balance: contractor.available_balance,
-        pending_balance: contractor.pending_balance
-      }, status: :ok
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
-    end
+    render json: {
+      success: true,
+      message: 'Pending balance moved to available',
+      amount_moved: amount_moved,
+      available_balance: contractor.available_balance,
+      pending_balance: contractor.pending_balance
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
   def create_stripe_account
@@ -128,16 +126,16 @@ class Api::WalletController < ApplicationController
     begin
       # Create Stripe Connect account for the skillmaster
       account = Stripe::Account.create({
-        type: 'express',
-        country: 'US', # You might want to make this configurable
-        email: current_user.email,
-        capabilities: {
-          transfers: { requested: true }
-        },
-        metadata: {
-          user_id: current_user.id
-        }
-      })
+                                         type: 'express',
+                                         country: 'US', # You might want to make this configurable
+                                         email: current_user.email,
+                                         capabilities: {
+                                           transfers: { requested: true }
+                                         },
+                                         metadata: {
+                                           user_id: current_user.id
+                                         }
+                                       })
 
       # Update or create contractor record
       if current_user.contractor
@@ -148,11 +146,11 @@ class Api::WalletController < ApplicationController
 
       # Create account link for onboarding
       account_link = Stripe::AccountLink.create({
-        account: account.id,
-        refresh_url: 'https://www.ravenboost.com/wallet/refresh',
-        return_url: 'https://www.ravenboost.com/wallet/success',
-        type: 'account_onboarding'
-      })
+                                                  account: account.id,
+                                                  refresh_url: 'https://www.ravenboost.com/wallet/refresh',
+                                                  return_url: 'https://www.ravenboost.com/wallet/success',
+                                                  type: 'account_onboarding'
+                                                })
 
       render json: {
         success: true,
@@ -195,21 +193,21 @@ class Api::WalletController < ApplicationController
   private
 
   def ensure_contractor_role
-    unless current_user.skillmaster? || current_user.admin? || current_user.dev?
-      render json: { success: false, error: 'Access denied' }, status: :forbidden
-    end
+    return if current_user.skillmaster? || current_user.admin? || current_user.dev?
+
+    render json: { success: false, error: 'Access denied' }, status: :forbidden
   end
 
   def ensure_contractor_account
     # Skip this check for create_stripe_account action
     return if action_name == 'create_stripe_account'
 
-    unless current_user.contractor&.stripe_account_id.present?
-      render json: {
-        success: false,
-        error: 'No contractor account found. Please create a Stripe account first.',
-        needs_stripe_account: true
-      }, status: :unprocessable_entity
-    end
+    return if current_user.contractor&.stripe_account_id.present?
+
+    render json: {
+      success: false,
+      error: 'No contractor account found. Please create a Stripe account first.',
+      needs_stripe_account: true
+    }, status: :unprocessable_entity
   end
 end

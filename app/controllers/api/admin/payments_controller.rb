@@ -5,9 +5,9 @@ class Api::Admin::PaymentsController < ApplicationController
   def index
     # Get payment overview
     orders_with_payments = Order.where.not(payment_captured_at: nil)
-                               .includes(:user, :assigned_skill_master)
-                               .order(payment_captured_at: :desc)
-                               .limit(50)
+                                .includes(:user, :assigned_skill_master)
+                                .order(payment_captured_at: :desc)
+                                .limit(50)
 
     total_revenue = orders_with_payments.sum(:company_earned) || 0
     total_paid_to_skillmasters = orders_with_payments.sum(:skillmaster_earned) || 0
@@ -37,8 +37,8 @@ class Api::Admin::PaymentsController < ApplicationController
   def contractors
     # List all contractors with their balance information
     contractors = Contractor.joins(:user)
-                           .includes(:user)
-                           .order('users.first_name ASC')
+                            .includes(:user)
+                            .order('users.first_name ASC')
 
     render json: {
       success: true,
@@ -105,22 +105,26 @@ class Api::Admin::PaymentsController < ApplicationController
         stripe_session_id: order.stripe_session_id,
         stripe_payment_intent_id: order.stripe_payment_intent_id
       },
-      stripe_payment_intent: payment_intent ? {
-        id: payment_intent.id,
-        amount: payment_intent.amount,
-        currency: payment_intent.currency,
-        status: payment_intent.status,
-        capture_method: payment_intent.capture_method,
-        created: Time.at(payment_intent.created)
-      } : nil
+      stripe_payment_intent: if payment_intent
+                               {
+                                 id: payment_intent.id,
+                                 amount: payment_intent.amount,
+                                 currency: payment_intent.currency,
+                                 status: payment_intent.status,
+                                 capture_method: payment_intent.capture_method,
+                                 created: Time.at(payment_intent.created)
+                               }
+                             else
+                               nil
+                             end
     }, status: :ok
   end
 
   private
 
   def ensure_admin_access
-    unless current_user.admin? || current_user.dev?
-      render json: { success: false, error: 'Access denied' }, status: :forbidden
-    end
+    return if current_user.admin? || current_user.dev?
+
+    render json: { success: false, error: 'Access denied' }, status: :forbidden
   end
 end

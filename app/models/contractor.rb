@@ -13,11 +13,13 @@ class Contractor < ApplicationRecord
 
   def can_withdraw?
     return true if last_withdrawal_at.nil?
+
     last_withdrawal_at < WITHDRAWAL_COOLDOWN_DAYS.days.ago
   end
 
   def days_until_next_withdrawal
     return 0 if can_withdraw?
+
     WITHDRAWAL_COOLDOWN_DAYS - (Date.current - last_withdrawal_at.to_date).to_i
   end
 

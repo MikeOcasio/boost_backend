@@ -142,13 +142,14 @@ Rails.application.routes.draw do
 
     resource :app_status, only: %i[show update], controller: 'app_status'
 
-    resources :chats do
+    resources :chats, only: %i[index show create] do
       resources :messages, only: %i[index create]
       member do
         post :archive
-        post :send_message
-        get :connection_info  # Add this line
+        post :close
+        post :reopen
         # WebSocket related endpoints
+        get :connection_info, to: 'chat_web_socket#connection_info'
         get :active_connections, to: 'chat_web_socket#active_connections'
         post :broadcast_admin_message, to: 'chat_web_socket#broadcast_admin_message'
         post :force_disconnect_all, to: 'chat_web_socket#force_disconnect_all'

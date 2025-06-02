@@ -1,8 +1,7 @@
 class Api::ChatsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_chat, only: %i[show update archive]
-  before_action :verify_chat_access, only: %i[show update archive]
-  before_action :verify_chat_access, only: %i[show update archive]
+  before_action :set_chat, only: %i[show update archive close reopen]
+  before_action :verify_chat_access, only: %i[show update archive close reopen]
 
   def index
     @chats = Chat.includes(:messages, :participants, :initiator, :recipient)
@@ -19,8 +18,17 @@ class Api::ChatsController < ApplicationController
         title: chat.title,
         status: chat.status,
         ticket_number: chat.ticket_number,
+        reference_id: chat.reference_id,
+        reopen_count: chat.reopen_count,
+        closed_at: chat.closed_at,
+        reopened_at: chat.reopened_at,
         created_at: chat.created_at,
         updated_at: chat.updated_at,
+        can_close: chat.can_close?,
+        can_reopen: chat.can_reopen?,
+        is_active: chat.active?,
+        is_closed: chat.closed?,
+        is_locked: chat.locked?,
         initiator: {
           id: chat.initiator.id,
           first_name: chat.initiator.first_name,
@@ -98,8 +106,17 @@ class Api::ChatsController < ApplicationController
       title: @chat.title,
       status: @chat.status,
       ticket_number: @chat.ticket_number,
+      reference_id: @chat.reference_id,
+      reopen_count: @chat.reopen_count,
+      closed_at: @chat.closed_at,
+      reopened_at: @chat.reopened_at,
       created_at: @chat.created_at,
       updated_at: @chat.updated_at,
+      can_close: @chat.can_close?,
+      can_reopen: @chat.can_reopen?,
+      is_active: @chat.active?,
+      is_closed: @chat.closed?,
+      is_locked: @chat.locked?,
       initiator: {
         id: @chat.initiator.id,
         first_name: @chat.initiator.first_name,
@@ -135,8 +152,6 @@ class Api::ChatsController < ApplicationController
 
     render json: chat_data, status: :ok
   end
-
-  
 
   def create
     Rails.logger.info "Chat creation params: #{params.inspect}"
@@ -215,12 +230,58 @@ class Api::ChatsController < ApplicationController
     end
   end
 
+  def close
+    unless @chat.can_close?
+      render json: { error: 'Chat cannot be closed in its current state' }, status: :unprocessable_entity
+      return
+    end
+
+    if @chat.close!
+      # Broadcast chat closure to all participants
+      broadcast_chat_state_change('chat_closed', {
+        closed_at: @chat.closed_at,
+        closed_by: current_user.id
+      })
+
+      render json: format_chat_response(@chat), status: :ok
+    else
+      render json: @chat.errors, status: :unprocessable_entity
+    end
+  end
+
+  def reopen
+    unless @chat.can_reopen?
+      render json: { error: 'Chat cannot be reopened' }, status: :unprocessable_entity
+      return
+    end
+
+    if @chat.reopen!
+      # Broadcast chat reopening to all participants
+      broadcast_chat_state_change('chat_reopened', {
+        reopened_at: @chat.reopened_at,
+        reopen_count: @chat.reopen_count,
+        reopened_by: current_user.id
+      })
+
+      render json: format_chat_response(@chat), status: :ok
+    else
+      render json: @chat.errors, status: :unprocessable_entity
+    end
+  end
+
   def send_message
     @chat = Chat.find(params[:id])
-    
+
     # Verify user has access to this chat
     unless @chat.chat_participants.exists?(user_id: current_user.id)
       render json: { error: 'Access denied' }, status: :forbidden
+      return
+    end
+
+    # Check if chat is active (not closed or locked)
+    unless @chat.active?
+      render json: { error: 'Cannot send messages to an inactive chat', 
+                     status: @chat.status }, status: :unprocessable_entity
       return
     end
 
@@ -251,7 +312,7 @@ class Api::ChatsController < ApplicationController
           type: 'new_message',
           message: message_data
         })
-        
+
         Rails.logger.info "Successfully broadcasted message to chat_#{@chat.id}"
       rescue => e
         Rails.logger.error "Failed to broadcast message: #{e.message}"
@@ -267,14 +328,14 @@ class Api::ChatsController < ApplicationController
 
   def new_messages
   @chat = Chat.find(params[:id])
-  
+
   unless @chat.chat_participants.exists?(user_id: current_user.id)
     render json: { error: 'Access denied' }, status: :forbidden
     return
   end
 
   last_message_id = params[:last_message_id].to_i
-  
+
   new_messages = @chat.messages.includes(:sender)
                      .where('id > ?', last_message_id)
                      .order(created_at: :asc)
@@ -299,7 +360,7 @@ class Api::ChatsController < ApplicationController
 
   def connection_info
     @chat = Chat.find(params[:id])
-    
+
     # Verify user has access to this chat
     unless @chat.chat_participants.exists?(user_id: current_user.id)
       render json: { error: 'Access denied' }, status: :forbidden
@@ -308,7 +369,7 @@ class Api::ChatsController < ApplicationController
 
     # Return WebSocket URL and channel info
     websocket_url = Rails.application.config.action_cable.url || "ws://localhost:3000/cable"
-    
+
     render json: {
       websocket_url: websocket_url,
       channel: "ChatChannel",
@@ -359,12 +420,6 @@ class Api::ChatsController < ApplicationController
     ChatParticipant.where(user_id: current_user.id).pluck(:chat_id)
   end
 
-  def verify_chat_access
-    return if accessible_chat_ids.include?(@chat.id)
-
-    render json: { error: 'Access denied' }, status: :forbidden
-  end
-
   def ensure_chat_participants(chat)
     # Check if participants exist, if not create them
     existing_participants = chat.chat_participants.pluck(:user_id)
@@ -395,5 +450,43 @@ class Api::ChatsController < ApplicationController
         chat.chat_participants.create!(user_id: user_id)
       end
     end
+  end
+
+  def broadcast_chat_state_change(event_type, additional_data = {})
+    # Broadcast via WebSocket if available
+    begin
+      ActionCable.server.broadcast("chat_#{@chat.id}", {
+        type: event_type,
+        chat_id: @chat.id,
+        status: @chat.status,
+        **additional_data,
+        timestamp: Time.current
+      })
+
+      Rails.logger.info "Successfully broadcasted #{event_type} to chat_#{@chat.id}"
+    rescue => e
+      Rails.logger.error "Failed to broadcast #{event_type}: #{e.message}"
+    end
+  end
+
+  def format_chat_response(chat)
+    {
+      id: chat.id,
+      chat_type: chat.chat_type,
+      title: chat.title,
+      status: chat.status,
+      ticket_number: chat.ticket_number,
+      reference_id: chat.reference_id,
+      reopen_count: chat.reopen_count,
+      closed_at: chat.closed_at,
+      reopened_at: chat.reopened_at,
+      created_at: chat.created_at,
+      updated_at: chat.updated_at,
+      can_close: chat.can_close?,
+      can_reopen: chat.can_reopen?,
+      is_active: chat.active?,
+      is_closed: chat.closed?,
+      is_locked: chat.locked?
+    }
   end
 end
