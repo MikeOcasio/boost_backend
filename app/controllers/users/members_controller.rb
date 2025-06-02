@@ -34,6 +34,17 @@ module Users
       end
     end
 
+    # GET /users/members/:id
+    def show
+      @user = User.find_by(id: params[:id])
+
+      if @user
+        render json: @user.as_json.merge({ sub_platforms: @user.sub_platforms_info }), status: :ok
+      else
+        render json: { error: 'User not found.' }, status: :not_found
+      end
+    end
+
     # GET /users/members/skillmasters/:id
     def show_skillmaster
       # Find the skillmaster by the provided ID
