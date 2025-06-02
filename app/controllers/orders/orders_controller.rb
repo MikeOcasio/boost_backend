@@ -18,15 +18,17 @@ module Orders
                  end
 
         render json: {
-          orders: orders.as_json(
+          orders: orders.includes(:user).as_json(
             include: {
               products: {
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id user_id state created_at total_price assigned_skill_master_id internal_id platform promo_data
+            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data
                      order_data]
           ).map do |order|
+            # Find the actual order object to get the user
+            order_object = orders.find { |o| o.id == order['id'] }
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
             skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
@@ -37,6 +39,13 @@ module Orders
                 id: skill_master_info&.id,
                 gamer_tag: skill_master_info&.gamer_tag,
                 first_name: skill_master_info&.first_name
+              },
+              user: {
+                id: order_object&.user&.id,
+                first_name: order_object&.user&.first_name,
+                last_name: order_object&.user&.last_name,
+                email: order_object&.user&.email,
+                role: order_object&.user&.role
               }
             ) # Add platform info or nil
           end
@@ -309,6 +318,7 @@ module Orders
 
     def render_view
       skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
+      user_info = User.find_by(id: @order.user_id)
 
       render json: {
         order: @order.as_json(
@@ -317,11 +327,18 @@ module Orders
               only: %i[id name price tax]
             }
           },
-          only: %i[id user_id state created_at total_price internal_id promo_data order_data]
+          only: %i[id state created_at total_price internal_id promo_data order_data]
         ).merge(
           platform: {
             id: @order.platform,
             name: Platform.find(@order.platform).name
+          },
+          user: {
+            id: user_info&.id,
+            first_name: user_info&.first_name,
+            last_name: user_info&.last_name,
+            email: user_info&.email,
+            role: user_info&.role
           }
         ),
         platform_credentials: @order.platform_credential.as_json(
