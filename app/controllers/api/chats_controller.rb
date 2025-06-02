@@ -454,6 +454,30 @@ class Api::ChatsController < ApplicationController
     render json: { chats: chats_with_states }, status: :ok
   end
 
+  def find_by_reference_id
+    reference_id = params[:reference_id]
+
+    if reference_id.blank?
+      render json: { error: 'Reference ID is required' }, status: :unprocessable_entity
+      return
+    end
+
+    chat = Chat.find_by(reference_id: reference_id)
+
+    unless chat
+      render json: { error: 'Chat not found with the provided reference ID' }, status: :not_found
+      return
+    end
+
+    # Verify user has access to this chat
+    unless chat.chat_participants.exists?(user_id: current_user.id)
+      render json: { error: 'You do not have access to this chat' }, status: :forbidden
+      return
+    end
+
+    render json: format_chat_response(chat), status: :ok
+  end
+
   private
 
   def set_chat

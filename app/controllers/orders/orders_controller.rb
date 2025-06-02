@@ -24,7 +24,8 @@ module Orders
                 only: %i[id name price tax image quantity]
               }
             },
-            only: %i[id state created_at total_price assigned_skill_master_id internal_id platform promo_data order_data]
+            only: %i[id user_id state created_at total_price assigned_skill_master_id internal_id platform promo_data
+                     order_data]
           ).map do |order|
             platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
             # Fetch skill master info
@@ -34,7 +35,8 @@ module Orders
               platform: { id: platform.id, name: platform.name },
               skill_master: {
                 id: skill_master_info&.id,
-                gamer_tag: skill_master_info&.gamer_tag
+                gamer_tag: skill_master_info&.gamer_tag,
+                first_name: skill_master_info&.first_name
               }
             ) # Add platform info or nil
           end
@@ -94,7 +96,6 @@ module Orders
         render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
     end
-
 
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
@@ -316,7 +317,7 @@ module Orders
               only: %i[id name price tax]
             }
           },
-          only: %i[id state created_at total_price internal_id promo_data order_data]
+          only: %i[id user_id state created_at total_price internal_id promo_data order_data]
         ).merge(
           platform: {
             id: @order.platform,
@@ -337,7 +338,8 @@ module Orders
         ),
         skill_master: {
           id: skill_master_info&.id,
-          gamer_tag: skill_master_info&.gamer_tag
+          gamer_tag: skill_master_info&.gamer_tag,
+          first_name: skill_master_info&.first_name
         }
       }
     end
@@ -402,6 +404,7 @@ module Orders
         end
       end
     end
+
     # Set the order for actions that require it
     def set_order
       @order = Order.includes(:products, :user).find(params[:id])
