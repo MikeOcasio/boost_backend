@@ -320,6 +320,31 @@ class Api::ChatsController < ApplicationController
         Rails.logger.error "Failed to broadcast message: #{e.message}"
       end
 
+      # Send notifications to other participants
+      begin
+        other_participants = @chat.participants.where.not(id: current_user.id)
+
+        other_participants.each do |participant|
+          # Broadcast notification to each participant's notification channel
+          ActionCable.server.broadcast("notifications_user_#{participant.id}", {
+                                         type: 'new_message_notification',
+                                         message: message_data,
+                                         chat: {
+                                           id: @chat.id,
+                                           title: @chat.title,
+                                           chat_type: @chat.chat_type,
+                                           ticket_number: @chat.ticket_number
+                                         },
+                                         unread_count: get_user_total_unread_count(participant.id),
+                                         timestamp: Time.current
+                                       })
+        end
+
+        Rails.logger.info "Successfully sent notifications to #{other_participants.count} participants"
+      rescue StandardError => e
+        Rails.logger.error "Failed to send notifications: #{e.message}"
+      end
+
       render json: {
         message: message_data
       }, status: :created
@@ -405,6 +430,19 @@ class Api::ChatsController < ApplicationController
                                     message_ids: message_ids,
                                     read_by_user_id: current_user.id
                                   })
+
+      # Also broadcast notification update to the current user's notification channel
+      begin
+        ActionCable.server.broadcast("notifications_user_#{current_user.id}", {
+                                       type: 'messages_marked_read',
+                                       chat_id: @chat.id,
+                                       marked_count: updated_count,
+                                       unread_count: get_user_total_unread_count(current_user.id),
+                                       timestamp: Time.current
+                                     })
+      rescue StandardError => e
+        Rails.logger.error "Failed to broadcast notification update: #{e.message}"
+      end
     end
 
     render json: {
@@ -439,6 +477,105 @@ class Api::ChatsController < ApplicationController
     render json: {
       unread_count: unread_count,
       chat_id: @chat.id
+    }, status: :ok
+  end
+
+  def unread_messages
+    # Get all unread messages across all chats for the current user
+    chats_with_unread = Chat.includes(:messages, :participants, :initiator, :recipient)
+                            .joins(:messages)
+                            .where(id: accessible_chat_ids)
+                            .where(messages: {
+                                     sender_id: User.where.not(id: current_user.id),
+                                     read: false
+                                   })
+                            .distinct
+
+    unread_data = chats_with_unread.map do |chat|
+      unread_messages = chat.messages.includes(:sender)
+                            .where.not(sender_id: current_user.id)
+                            .where(read: false)
+                            .order(created_at: :desc)
+
+      {
+        chat_id: chat.id,
+        chat_title: chat.title,
+        chat_type: chat.chat_type,
+        ticket_number: chat.ticket_number,
+        unread_count: unread_messages.count,
+        messages: unread_messages.map do |message|
+          {
+            id: message.id,
+            content: message.content,
+            created_at: message.created_at,
+            sender: {
+              id: message.sender.id,
+              first_name: message.sender.first_name,
+              last_name: message.sender.last_name,
+              role: message.sender.role,
+              image_url: message.sender.image_url
+            }
+          }
+        end
+      }
+    end
+
+    total_unread_count = unread_data.sum { |chat| chat[:unread_count] }
+
+    render json: {
+      total_unread_count: total_unread_count,
+      chats: unread_data
+    }, status: :ok
+  end
+
+  def mark_all_messages_read
+    # Mark all unread messages as read for the current user across all their chats
+    updated_count = 0
+
+    accessible_chat_ids.each do |chat_id|
+      chat = Chat.find(chat_id)
+      count = chat.messages
+                  .where.not(sender_id: current_user.id)
+                  .where(read: false)
+                  .update_all(read: true)
+      updated_count += count
+
+      # Broadcast read receipts to other participants if any messages were updated
+      next unless count > 0
+
+      message_ids = chat.messages
+                        .where.not(sender_id: current_user.id)
+                        .where(read: true)
+                        .pluck(:id)
+
+      # Broadcast via WebSocket if available
+      begin
+        ActionCable.server.broadcast("chat_#{chat_id}", {
+                                       type: 'messages_read',
+                                       message_ids: message_ids,
+                                       read_by_user_id: current_user.id,
+                                       timestamp: Time.current
+                                     })
+      rescue StandardError => e
+        Rails.logger.error "Failed to broadcast read receipts: #{e.message}"
+      end
+
+      # Also broadcast to the user's notification channel
+      begin
+        ActionCable.server.broadcast("notifications_user_#{current_user.id}", {
+                                       type: 'messages_marked_read',
+                                       chat_id: chat_id,
+                                       marked_count: count,
+                                       timestamp: Time.current
+                                     })
+      rescue StandardError => e
+        Rails.logger.error "Failed to broadcast notification update: #{e.message}"
+      end
+    end
+
+    render json: {
+      total_messages_marked_read: updated_count,
+      timestamp: Time.current
     }, status: :ok
   end
 
@@ -663,5 +800,14 @@ class Api::ChatsController < ApplicationController
       is_closed: chat.closed?,
       is_locked: chat.locked?
     }
+  end
+
+  def get_user_total_unread_count(user_id)
+    # Count unread messages across all chats for a specific user
+    Message.joins(:chat)
+           .joins('INNER JOIN chat_participants cp ON cp.chat_id = chats.id')
+           .where('cp.user_id = ? AND messages.sender_id != ? AND messages.read = false',
+                  user_id, user_id)
+           .count
   end
 end

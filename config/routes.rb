@@ -161,6 +161,8 @@ Rails.application.routes.draw do
       end
       collection do
         get :all_chat_states
+        get :unread_messages
+        post :mark_all_messages_read
         get 'find_by_reference/:reference_id', to: 'chats#find_by_reference_id', as: 'find_by_reference'
       end
     end
