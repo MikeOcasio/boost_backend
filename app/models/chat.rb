@@ -57,6 +57,10 @@ class Chat < ApplicationRecord
     status == 'closed'
   end
 
+  def archived?
+    status == 'archived'
+  end
+
   def locked?
     status == 'locked'
   end
