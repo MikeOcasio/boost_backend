@@ -1,9 +1,11 @@
 class Api::ChatsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat,
-                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count]
+                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count
+                         send_message]
   before_action :verify_chat_access,
-                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count]
+                only: %i[show update archive close reopen chat_states mark_messages_read set_typing_status unread_count
+                         send_message]
 
   def index
     @chats = Chat.includes(:messages, :participants, :initiator, :recipient)

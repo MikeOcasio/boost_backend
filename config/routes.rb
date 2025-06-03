@@ -137,6 +137,8 @@ Rails.application.routes.draw do
         post :move_pending_to_available
         post :create_stripe_account
         get :account_status
+        get :supported_countries
+        get :balance
       end
     end
 
@@ -148,6 +150,7 @@ Rails.application.routes.draw do
         post :archive
         post :close
         post :reopen
+        post :send_message
         # Chat state endpoints for frontend UI
         get :chat_states
         post :mark_messages_read
@@ -202,15 +205,6 @@ Rails.application.routes.draw do
         post :create_checkout_session
         post :create_payment_intent
         post :webhook
-      end
-    end
-
-    # Wallet routes for skillmasters
-    get '/wallet/show', to: 'wallet#show'
-    resources :wallet, only: [] do
-      collection do
-        post :withdraw
-        post :create_stripe_account
       end
     end
 
