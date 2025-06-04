@@ -241,6 +241,134 @@ class Api::WalletController < ApplicationController
     render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
+  def transaction_history
+    Stripe.api_key = STRIPE_API_KEY
+
+    begin
+      # Get all completed orders for this skillmaster with payment information
+      completed_orders = Order.joins(:user)
+                              .where(assigned_skill_master_id: current_user.id, state: 'complete')
+                              .where.not(payment_captured_at: nil)
+                              .includes(:products, :user)
+                              .order(payment_captured_at: :desc)
+                              .limit(50) # Limit to recent 50 transactions
+
+      if completed_orders.empty?
+        return render json: {
+          success: true,
+          message: 'No transaction history found',
+          transactions: []
+        }, status: :ok
+      end
+
+      # Build transaction history with detailed information
+      transactions = completed_orders.map do |order|
+        {
+          transaction_id: order.id,
+          order_id: order.internal_id,
+          type: 'payment_received',
+          customer_name: "#{order.user.first_name} #{order.user.last_name}",
+          customer_email: order.user.email,
+          amount_earned: order.skillmaster_earned || 0,
+          total_order_amount: order.total_price || 0,
+          products: order.products.map { |p| { name: p.name, price: p.price } },
+          order_status: order.state,
+          payment_captured_at: order.payment_captured_at,
+          created_at: order.created_at,
+          stripe_payment_intent_id: order.stripe_payment_intent_id
+        }
+      end
+
+      render json: {
+        success: true,
+        message: "Found #{transactions.count} transactions",
+        transactions: transactions,
+        summary: {
+          total_transactions: transactions.count,
+          total_earned: transactions.sum { |t| t[:amount_earned] },
+          period: {
+            from: transactions.last&.dig(:payment_captured_at),
+            to: transactions.first&.dig(:payment_captured_at)
+          }
+        }
+      }, status: :ok
+    rescue StandardError => e
+      render json: {
+        success: false,
+        error: 'Failed to retrieve transaction history',
+        details: e.message
+      }, status: :internal_server_error
+    end
+  end
+
+  def withdrawal_history
+    Stripe.api_key = STRIPE_API_KEY
+
+    begin
+      contractor = current_user.contractor
+
+      # Get transfer history from Stripe for this contractor's account
+      transfers = Stripe::Transfer.list({
+                                          destination: contractor.stripe_account_id,
+                                          limit: 50 # Limit to recent 50 withdrawals
+                                        })
+
+      if transfers.data.empty?
+        return render json: {
+          success: true,
+          message: 'No withdrawal history found',
+          withdrawals: []
+        }, status: :ok
+      end
+
+      # Build withdrawal history with detailed information
+      withdrawals = transfers.data.map do |transfer|
+        {
+          withdrawal_id: transfer.id,
+          amount: transfer.amount / 100.0, # Convert from cents to dollars
+          currency: transfer.currency.upcase,
+          status: transfer.status || 'completed',
+          created_at: Time.at(transfer.created),
+          description: transfer.description,
+          metadata: transfer.metadata&.to_hash || {},
+          destination_account: transfer.destination,
+          # Additional Stripe transfer details
+          transfer_group: transfer.transfer_group,
+          source_transaction: transfer.source_transaction
+        }
+      end
+
+      # Calculate summary statistics
+      total_withdrawn = withdrawals.sum { |w| w[:amount] }
+      successful_withdrawals = withdrawals.select { |w| w[:status] == 'completed' || w[:status] == 'paid' }
+
+      render json: {
+        success: true,
+        message: "Found #{withdrawals.count} withdrawals",
+        withdrawals: withdrawals,
+        summary: {
+          total_withdrawals: withdrawals.count,
+          successful_withdrawals: successful_withdrawals.count,
+          total_amount_withdrawn: total_withdrawn,
+          last_withdrawal: withdrawals.first&.dig(:created_at),
+          first_withdrawal: withdrawals.last&.dig(:created_at)
+        }
+      }, status: :ok
+    rescue Stripe::StripeError => e
+      render json: {
+        success: false,
+        error: 'Failed to retrieve withdrawal history from Stripe',
+        details: e.message
+      }, status: :unprocessable_entity
+    rescue StandardError => e
+      render json: {
+        success: false,
+        error: 'Failed to retrieve withdrawal history',
+        details: e.message
+      }, status: :internal_server_error
+    end
+  end
+
   private
 
   def ensure_contractor_role
@@ -250,8 +378,9 @@ class Api::WalletController < ApplicationController
   end
 
   def ensure_contractor_account
-    # Skip this check for create_stripe_account, supported_countries, and balance actions
-    return if action_name.in?(['create_stripe_account', 'supported_countries', 'balance'])
+    # Skip this check for create_stripe_account, supported_countries, balance, transaction_history, and withdrawal_history actions
+    return if action_name.in?(%w[create_stripe_account supported_countries balance transaction_history
+                                 withdrawal_history])
 
     return if current_user.contractor&.stripe_account_id.present?
 

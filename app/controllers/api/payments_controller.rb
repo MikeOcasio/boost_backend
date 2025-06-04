@@ -234,8 +234,8 @@ class Api::PaymentsController < ApplicationController
 
       # Calculate split amounts (75% to skillmaster, 25% to company)
       total_amount = payment_intent.amount / 100.0 # Convert from cents
-      skillmaster_amount = total_amount * 0.75
-      company_amount = total_amount * 0.25
+      skillmaster_amount = total_amount * 0.60
+      company_amount = total_amount * 0.40
 
       # Find skillmaster's contractor record
       skillmaster = User.find(order.assigned_skill_master_id)

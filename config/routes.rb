@@ -139,6 +139,8 @@ Rails.application.routes.draw do
         get :account_status
         get :supported_countries
         get :balance
+        get :transaction_history
+        get :withdrawal_history
       end
     end
 

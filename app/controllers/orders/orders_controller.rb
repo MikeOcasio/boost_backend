@@ -230,6 +230,8 @@ module Orders
     # POST orders/info/:id/pick_up_order
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
     # Skill masters can only pick up orders that match their platform.
+
+    #! contractor gets assigned in stripe to order.
     def pick_up_order
       # Check user role and determine the skill master ID
       if current_user.role == 'admin' || current_user.role == 'dev'
