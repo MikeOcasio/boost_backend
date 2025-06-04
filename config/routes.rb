@@ -55,11 +55,16 @@ Rails.application.routes.draw do
     resources :orders, path: 'info', only: %i[index show create update destroy] do
       member do
         post 'pick_up_order' # POST /orders/:id/pick_up_order
-        get 'download_invoice'  # GET /orders/:id/download_invoice
+        get 'download_invoice' # GET /orders/:id/download_invoice
+        post 'verify_completion' # POST /orders/:id/verify_completion
+        post 'admin_approve' # POST /orders/:id/admin_approve
+        post 'admin_approve_completion' # POST /orders/:id/admin_approve_completion
+        post 'admin_reject_completion' # POST /orders/:id/admin_reject_completion
       end
 
       collection do
-        get 'graveyard_orders'  # GET /orders/graveyard_orders
+        get 'graveyard_orders' # GET /orders/graveyard_orders
+        get 'pending_review' # GET /orders/pending_review
       end
     end
   end

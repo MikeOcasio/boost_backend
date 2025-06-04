@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_02_045123) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_04_191610) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -208,6 +208,13 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_02_045123) do
     t.datetime "payment_captured_at"
     t.decimal "skillmaster_earned", precision: 10, scale: 2
     t.decimal "company_earned", precision: 10, scale: 2
+    t.datetime "customer_verified_at"
+    t.datetime "admin_reviewed_at"
+    t.integer "admin_reviewer_id"
+    t.datetime "submitted_for_review_at"
+    t.text "skillmaster_submission_notes"
+    t.text "admin_approval_notes"
+    t.text "admin_rejection_notes"
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"

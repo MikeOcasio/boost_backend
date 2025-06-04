@@ -3,6 +3,9 @@ class Contractor < ApplicationRecord
 
   validates :stripe_account_id, uniqueness: true, allow_blank: true
 
+  after_create :process_retroactive_payments_if_stripe_account_added
+  after_update :process_retroactive_payments_if_stripe_account_added
+
   # Add these new columns in a migration
   # available_balance: decimal, default: 0.0
   # pending_balance: decimal, default: 0.0
@@ -48,5 +51,23 @@ class Contractor < ApplicationRecord
   # Check if contractor has a valid Stripe account
   def stripe_account_ready?
     stripe_account_id.present?
+  end # Outlier XX: Process retroactive payments when Stripe account is added
+
+  def process_retroactive_payments_if_stripe_account_added
+    # Handle both create (new contractor with stripe_account_id) and update (adding stripe_account_id to existing contractor)
+    stripe_account_added = if persisted? && saved_changes.key?('stripe_account_id')
+                             # Update case: stripe_account_id was changed
+                             saved_change_to_stripe_account_id? && stripe_account_id.present?
+                           else
+                             # Create case: new record with stripe_account_id
+                             stripe_account_id.present?
+                           end
+
+    return unless stripe_account_added
+
+    Rails.logger.info "Stripe account added for contractor #{id} (user: #{user_id}). Processing retroactive payments..."
+
+    # Queue job to process retroactive payments
+    ProcessRetroactivePaymentsJob.perform_later(id)
   end
 end

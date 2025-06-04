@@ -1,7 +1,9 @@
 module Orders
   class OrdersController < ApplicationController
     before_action :authenticate_user!
-    before_action :set_order, only: %i[show update destroy pick_up_order]
+    before_action :set_order,
+                  only: %i[show update destroy pick_up_order admin_approve_completion admin_reject_completion verify_completion
+                           admin_approve pending_review]
 
     # GET /orders/info
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
@@ -60,10 +62,10 @@ module Orders
     # Skill masters can only see their own assigned orders with platform credentials.
     # Admins and devs can see all orders.
     def show
-      if current_user&.id == @order.user_id
-        render_view
-      elsif current_user&.id == @order.assigned_skill_master_id &&
-            (current_user&.role == 'skillmaster' || current_user&.role.in?(%w[admin dev]))
+      if current_user&.id == @order.user_id ||
+         (current_user&.id == @order.assigned_skill_master_id &&
+          current_user&.role == 'skillmaster') ||
+         current_user&.role.in?(%w[admin dev])
         render_view
       else
         render_unauthorized
@@ -75,7 +77,7 @@ module Orders
       session_id = params[:session_id]
 
       if current_user.role == 'dev'
-        @order = Order.new(order_params)
+        @order = Order.new(order_params.merge(state: 'open'))
         @order.platform = params[:platform] if params[:platform].present?
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
         @order.order_data = params[:order_data] if params[:order_data].present?
@@ -123,8 +125,8 @@ module Orders
                             status: :unprocessable_entity
             end
           when 'complete'
-            if @order.may_complete_order?
-              @order.complete_order!
+            if @order.may_mark_complete?
+              @order.mark_complete!
             else
               return render json: { success: false, message: 'Order cannot be marked as complete.' },
                             status: :unprocessable_entity
@@ -149,7 +151,7 @@ module Orders
         end
 
       elsif current_user.role == 'skillmaster'
-        # Skill masters can only update the state
+        # Skill masters can update the state and submit completion notes
         if order_params.key?(:state)
           case order_params[:state]
           when 'in_progress'
@@ -161,9 +163,15 @@ module Orders
                      status: :unprocessable_entity
             end
           when 'complete'
-            if @order.may_complete_order?
-              @order.complete_order!
-              render json: @order
+            # Skillmaster can mark work as complete - but payment requires admin approval
+            if @order.may_mark_complete?
+              @order.mark_complete!
+              @order.update!(submitted_for_review_at: Time.current)
+              render json: {
+                success: true,
+                message: 'Work completed successfully. Payment pending admin approval.',
+                order: @order.as_json(only: %i[id state submitted_for_review_at])
+              }
             else
               render json: { success: false, message: 'Order cannot be marked as complete.' },
                      status: :unprocessable_entity
@@ -177,7 +185,8 @@ module Orders
                      status: :unprocessable_entity
             end
           else
-            render json: { success: false, message: 'Invalid state transition.' }, status: :unprocessable_entity
+            render json: { success: false, message: 'Invalid state transition for skillmaster.' },
+                   status: :unprocessable_entity
           end
         else
           render json: { success: false, message: 'State parameter is required.' }, status: :unprocessable_entity
@@ -231,7 +240,7 @@ module Orders
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
     # Skill masters can only pick up orders that match their platform.
 
-    #! contractor gets assigned in stripe to order.
+    # ! contractor gets assigned in stripe to order.
     def pick_up_order
       # Check user role and determine the skill master ID
       if current_user.role == 'admin' || current_user.role == 'dev'
@@ -268,6 +277,196 @@ module Orders
       else
         render json: { success: false, message: 'Failed to pick up the order.' }, status: :unprocessable_entity
       end
+    end
+
+    # POST /orders/info/:id/admin_approve_completion
+    # Admin approves payment release for completed work (NEW WORKFLOW)
+    def admin_approve_completion
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      unless @order.complete?
+        return render json: { success: false, message: 'Order must be completed before payment can be approved.' },
+                      status: :unprocessable_entity
+      end
+
+      if @order.admin_reviewed_at.present?
+        return render json: { success: false, message: 'Payment has already been reviewed by admin.' },
+                      status: :unprocessable_entity
+      end
+
+      # Mark as admin approved and trigger payment
+      @order.update!(
+        admin_reviewed_at: Time.current,
+        admin_reviewer_id: current_user.id,
+        admin_approval_notes: params[:notes] # Optional notes from admin
+      )
+
+      # Trigger payment capture since admin has approved
+      CapturePaymentJob.perform_later(@order.id) if @order.stripe_payment_intent_id.present?
+
+      render json: {
+        success: true,
+        message: 'Payment approved by admin. Payment will be processed.',
+        order: @order.as_json(only: %i[id state admin_reviewed_at])
+      }
+    end
+
+    # POST /orders/info/:id/admin_reject_completion
+    # Admin rejects payment and sends order back to in_progress (NEW WORKFLOW)
+    def admin_reject_completion
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      unless @order.complete?
+        return render json: { success: false, message: 'Order must be completed before it can be rejected.' },
+                      status: :unprocessable_entity
+      end
+
+      if @order.admin_reviewed_at.present?
+        return render json: { success: false, message: 'Payment has already been reviewed by admin.' },
+                      status: :unprocessable_entity
+      end
+
+      # Send order back to in_progress for rework
+      if @order.may_reject_and_rework?
+        @order.reject_and_rework!
+        @order.update!(
+          admin_reviewed_at: Time.current,
+          admin_reviewer_id: current_user.id,
+          admin_rejection_notes: params[:notes] || 'Work needs improvement before payment approval.',
+          submitted_for_review_at: nil # Clear submission timestamp
+        )
+
+        render json: {
+          success: true,
+          message: 'Work rejected. Skillmaster has been notified to make improvements.',
+          order: @order.as_json(only: %i[id state admin_reviewed_at admin_rejection_notes])
+        }
+      else
+        render json: {
+          success: false,
+          message: 'Order cannot be rejected at this time.'
+        }, status: :unprocessable_entity
+      end
+    end
+
+    # POST /orders/info/:id/verify_completion
+    # Customer verifies that the order was completed successfully (UPDATED FOR NEW WORKFLOW)
+    def verify_completion
+      unless current_user.id == @order.user_id
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      unless @order.complete?
+        return render json: { success: false, message: 'Order is not completed yet.' }, status: :unprocessable_entity
+      end
+
+      verification_status = params[:verified] # true/false
+
+      if verification_status.to_s == 'true'
+        # Customer confirms completion - order stays complete and will move to available balance after 7 days
+        @order.update!(customer_verified_at: Time.current)
+        render json: {
+          success: true,
+          message: 'Order completion verified by customer.',
+          order: @order.as_json(only: %i[id state customer_verified_at])
+        }
+      elsif @order.may_mark_in_review?
+        # Customer disputes completion - move to in_review state
+        @order.mark_in_review!
+        @order.update!(customer_verified_at: nil)
+
+        # TODO: Send notification to admin for investigation
+        Rails.logger.info "Order #{@order.id} moved to in_review - customer disputed completion"
+
+        render json: {
+          success: true,
+          message: 'Order marked for review. An admin will investigate.',
+          order: @order.as_json(only: %i[id state])
+        }
+      else
+        render json: {
+          success: false,
+          message: 'Order cannot be marked for review at this time.'
+        }, status: :unprocessable_entity
+      end
+    end
+
+    # POST /orders/info/:id/admin_approve
+    # Admin approves order after review (moves from in_review back to complete)
+    def admin_approve
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      unless @order.in_review?
+        return render json: { success: false, message: 'Order is not in review state.' }, status: :unprocessable_entity
+      end
+
+      if @order.may_approve_completion?
+        @order.approve_completion!
+        @order.update!(
+          admin_reviewed_at: Time.current,
+          admin_reviewer_id: current_user.id,
+          customer_verified_at: Time.current # Set this so payment can be processed
+        )
+
+        render json: {
+          success: true,
+          message: 'Order approved by admin.',
+          order: @order.as_json(only: %i[id state admin_reviewed_at customer_verified_at])
+        }
+      else
+        render json: {
+          success: false,
+          message: 'Order cannot be approved at this time.'
+        }, status: :unprocessable_entity
+      end
+    end
+
+    # GET /orders/info/pending_review
+    # Get orders that need admin review (UPDATED FOR NEW WORKFLOW)
+    def pending_review
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      # Get completed orders needing payment approval and orders in dispute review
+      review_orders = Order.where(
+        "(state = 'complete' AND admin_reviewed_at IS NULL AND submitted_for_review_at IS NOT NULL) OR state = 'in_review'"
+      ).includes(:user, :assigned_skill_master, :products)
+                           .order(updated_at: :desc)
+
+      render json: {
+        success: true,
+        orders: review_orders.map do |order|
+          {
+            id: order.id,
+            internal_id: order.internal_id,
+            state: order.state,
+            total_price: order.total_price,
+            updated_at: order.updated_at,
+            submitted_for_review_at: order.submitted_for_review_at,
+            skillmaster_submission_notes: order.skillmaster_submission_notes,
+            admin_rejection_notes: order.admin_rejection_notes,
+            review_type: order.state == 'complete' ? 'payment_approval' : 'dispute_review',
+            customer: {
+              id: order.user.id,
+              name: "#{order.user.first_name} #{order.user.last_name}",
+              email: order.user.email
+            },
+            skillmaster: {
+              id: order.assigned_skill_master&.id,
+              name: order.assigned_skill_master&.first_name,
+              gamer_tag: order.assigned_skill_master&.gamer_tag
+            },
+            products: order.products.map { |p| { name: p.name, price: p.price } }
+          }
+        end
+      }
     end
 
     # GET /orders/info/:id/download_invoice
@@ -366,14 +565,15 @@ module Orders
     def process_stripe_checkout(session_id)
       session = Stripe::Checkout::Session.retrieve(session_id)
       if session.payment_status == 'paid'
-        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil))
+        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil, state: 'open'))
         @order.platform = params[:platform] if params[:platform].present?
         @order.promo_data = params[:promo_data] if params[:promo_data].present?
         @order.order_data = params[:order_data] if params[:order_data].present?
 
         if assign_platform_credentials(@order, params[:platform]) && @order.save
           add_products_to_order(@order, params[:product_ids])
-          @order.update(total_price: calculate_order_totals(params[:order_data]))
+          totals = calculate_order_totals(params[:order_data])
+          @order.update(total_price: totals[:total_price])
 
           render json: { success: true, order_id: @order.id }, status: :created
         else
@@ -454,7 +654,6 @@ module Orders
 
       total_price = 0
       total_tax = 0
-      promo_discount = 0
 
       # Parse the order_data array and sum up prices and taxes
       order_data.each do |item|

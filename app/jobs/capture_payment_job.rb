@@ -15,10 +15,10 @@ class CapturePaymentJob < ApplicationJob
       # Capture the payment
       payment_intent = Stripe::PaymentIntent.capture(order.stripe_payment_intent_id)
 
-      # Calculate split amounts (75% to skillmaster, 25% to company)
+      # Get split amounts from order (already calculated when payment intent was created)
       total_amount = payment_intent.amount / 100.0 # Convert from cents
-      skillmaster_amount = total_amount * 0.75
-      company_amount = total_amount * 0.25
+      skillmaster_amount = order.skillmaster_earned || (total_amount * 0.60)
+      company_amount = order.company_earned || (total_amount * 0.40)
 
       # Find skillmaster's contractor record
       skillmaster = User.find(order.assigned_skill_master_id)
@@ -38,7 +38,15 @@ class CapturePaymentJob < ApplicationJob
 
         Rails.logger.info "Payment captured for order #{order.id}: $#{total_amount} (Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount})"
       else
-        Rails.logger.error "No contractor account found for skillmaster #{skillmaster.id} on order #{order.id}"
+        # If no contractor account exists, still capture payment but note missing contractor
+        order.update!(
+          payment_captured_at: Time.current,
+          payment_status: 'captured',
+          skillmaster_earned: skillmaster_amount,
+          company_earned: company_amount
+        )
+
+        Rails.logger.warn "Payment captured for order #{order.id} but no contractor account found for skillmaster #{skillmaster.id}. Payment will be held until contractor account is created."
       end
     rescue Stripe::StripeError => e
       Rails.logger.error "Failed to capture payment for order #{order.id}: #{e.message}"

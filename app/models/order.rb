@@ -26,6 +26,7 @@ class Order < ApplicationRecord
     disputed
     re_assigned
     complete
+    in_review
   ].freeze
 
   scope :graveyard_orders, -> { where(assigned_skill_master_id: nil) }
@@ -42,8 +43,10 @@ class Order < ApplicationRecord
 
   before_save :assign_platform_credentials
   before_create :generate_internal_id
-  after_update :capture_payment_if_completed
+  after_update :create_payment_intent_if_assigned
+  # Payment capture is now handled manually in controller after admin approval
   after_update :close_associated_chats_if_completed
+  after_update :update_payment_intent_contractor_if_reassigned
 
   validates :state, inclusion: { in: VALID_STATES }
   validates :internal_id, uniqueness: true
@@ -57,6 +60,7 @@ class Order < ApplicationRecord
     state :disputed
     state :re_assigned
     state :complete
+    state :in_review
 
     # Define state transitions
     event :assign do
@@ -73,15 +77,31 @@ class Order < ApplicationRecord
     end
 
     event :mark_disputed do
-      transitions from: %i[assigned in_progress delayed], to: :disputed
+      transitions from: %i[assigned in_progress delayed complete], to: :disputed
     end
 
     event :re_assign do
       transitions from: %i[assigned in_progress disputed delayed], to: :re_assigned
     end
 
-    event :complete_order do
+    event :mark_complete do
+      # Skillmaster marks work as complete (but payment requires admin approval)
       transitions from: %i[in_progress delayed], to: :complete
+    end
+
+    event :reject_and_rework do
+      # Admin rejects completed work and sends back for rework
+      transitions from: :complete, to: :in_progress
+    end
+
+    event :mark_in_review do
+      # Customer disputes after completion
+      transitions from: :complete, to: :in_review
+    end
+
+    event :resolve_dispute do
+      # Admin resolves customer dispute
+      transitions from: :in_review, to: :complete
     end
   end
 
@@ -101,24 +121,29 @@ class Order < ApplicationRecord
 
   private
 
-  def capture_payment_if_completed
-    return unless saved_change_to_state? && state == 'complete' && stripe_payment_intent_id.present?
+  def create_payment_intent_if_assigned
+    return unless saved_change_to_state? && state == 'assigned' && assigned_skill_master_id.present?
 
-    CapturePaymentJob.perform_later(id)
+    # Create payment intent when order is assigned to skillmaster
+    CreatePaymentIntentJob.perform_later(id)
   end
 
   def close_associated_chats_if_completed
     return unless saved_change_to_state? && state == 'complete'
 
-    chats.active.each do |chat|
-      chat.close!
-      # Broadcast chat closure to WebSocket subscribers
-      ActionCable.server.broadcast("chat_#{chat.id}", {
-                                     type: 'chat_closed',
-                                     message: 'Chat has been automatically closed because the order is complete.',
-                                     chat_id: chat.id,
-                                     closed_at: chat.closed_at
-                                   })
-    end
+    chats.update_all(status: 'closed')
+  end
+
+  # Outlier X: Update payment intent contractor ID when order is reassigned
+  def update_payment_intent_contractor_if_reassigned
+    return unless saved_change_to_assigned_skill_master_id? && stripe_payment_intent_id.present?
+
+    # Only update if the order has been reassigned to a different skillmaster
+    return unless assigned_skill_master_id.present?
+
+    Rails.logger.info "Order #{id} reassigned from skillmaster #{assigned_skill_master_id_was} to #{assigned_skill_master_id}"
+
+    # Queue job to update payment intent metadata
+    UpdatePaymentIntentJob.perform_later(id, assigned_skill_master_id)
   end
 end
