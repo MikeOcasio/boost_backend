@@ -3,7 +3,7 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order,
                   only: %i[show update destroy pick_up_order admin_approve_completion admin_reject_completion verify_completion
-                           admin_approve pending_review]
+                           admin_approve]
 
     # GET /orders/info
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
@@ -36,7 +36,7 @@ module Orders
             skill_master_info = User.find_by(id: order['assigned_skill_master_id'])
 
             order.merge(
-              platform: { id: platform.id, name: platform.name },
+              platform: platform ? { id: platform.id, name: platform.name } : nil,
               skill_master: {
                 id: skill_master_info&.id,
                 gamer_tag: skill_master_info&.gamer_tag,
@@ -231,7 +231,7 @@ module Orders
           only: %i[id state created_at total_price internal_id platform order_data promo_data]
         ).map do |order|
           platform = Platform.find_by(id: order['platform']) # Use find_by to avoid exceptions
-          order.merge(platform: { id: platform.id, name: platform.name }) # Add platform info or nil
+          order.merge(platform: platform ? { id: platform.id, name: platform.name } : nil) # Add platform info or nil
         end
       }
     end
