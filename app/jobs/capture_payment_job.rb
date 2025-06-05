@@ -9,7 +9,7 @@ class CapturePaymentJob < ApplicationJob
     # Only capture if order is complete and payment hasn't been captured yet
     return unless order.complete? && order.stripe_payment_intent_id.present? && order.payment_captured_at.nil?
 
-    Stripe.api_key = Rails.application.credentials.stripe[:secret_key]
+    Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
 
     begin
       # Capture the payment
@@ -17,8 +17,8 @@ class CapturePaymentJob < ApplicationJob
 
       # Get split amounts from order (already calculated when payment intent was created)
       total_amount = payment_intent.amount / 100.0 # Convert from cents
-      skillmaster_amount = order.skillmaster_earned || (total_amount * 0.60)
-      company_amount = order.company_earned || (total_amount * 0.40)
+      skillmaster_amount = order.skillmaster_earned || (total_amount * 0.65)
+      company_amount = order.company_earned || (total_amount * 0.35)
 
       # Find skillmaster's contractor record
       skillmaster = User.find(order.assigned_skill_master_id)

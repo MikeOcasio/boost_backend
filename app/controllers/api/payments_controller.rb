@@ -3,7 +3,7 @@ require 'stripe'
 class Api::PaymentsController < ApplicationController
   before_action :authenticate_user!
 
-  STRIPE_API_KEY = Rails.application.credentials.stripe[:secret_key]
+  STRIPE_API_KEY = Rails.application.credentials.stripe[:test_secret]
 
   if STRIPE_API_KEY.nil?
     Rails.logger.info('Stripe API Key not found. Please set STRIPE_API_KEY environment variable.')

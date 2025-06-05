@@ -9,7 +9,7 @@ class CreatePaymentIntentJob < ApplicationJob
     # Only create payment intent if order is assigned and doesn't have one yet
     return unless order.assigned? && order.assigned_skill_master_id.present? && order.stripe_payment_intent_id.blank?
 
-    Stripe.api_key = Rails.application.credentials.stripe[:secret_key]
+    Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
 
     begin
       # Find the skillmaster and their contractor account
@@ -21,8 +21,8 @@ class CreatePaymentIntentJob < ApplicationJob
 
       # Calculate amounts (60% to skillmaster, 40% to business)
       total_amount = (order.total_price * 100).to_i # Convert to cents
-      skillmaster_amount = (order.total_price * 0.60 * 100).to_i
-      business_amount = (order.total_price * 0.40 * 100).to_i
+      skillmaster_amount = (order.total_price * 0.65 * 100).to_i
+      business_amount = (order.total_price * 0.35 * 100).to_i
 
       # Payment intent parameters
       payment_intent_params = {
@@ -40,12 +40,26 @@ class CreatePaymentIntentJob < ApplicationJob
         }
       }
 
-      # Add transfer data if contractor account exists
+      # Check if contractor account is ready for transfers
+      transfer_capable = false
       if contractor&.stripe_account_id.present?
-        payment_intent_params[:transfer_data] = {
-          destination: contractor.stripe_account_id,
-          amount: skillmaster_amount
-        }
+        begin
+          # Check if the account can accept transfers
+          account = Stripe::Account.retrieve(contractor.stripe_account_id)
+          transfer_capable = account.capabilities&.transfers == 'active'
+
+          if transfer_capable
+            payment_intent_params[:transfer_data] = {
+              destination: contractor.stripe_account_id,
+              amount: skillmaster_amount
+            }
+            Rails.logger.info "Adding transfer data for contractor #{contractor.stripe_account_id}"
+          else
+            Rails.logger.warn "Contractor #{contractor.stripe_account_id} does not have transfer capabilities enabled. Will handle transfer manually."
+          end
+        rescue Stripe::StripeError => e
+          Rails.logger.warn "Could not verify contractor account capabilities: #{e.message}. Will handle transfer manually."
+        end
       end
 
       # Create the payment intent

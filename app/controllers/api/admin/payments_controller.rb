@@ -83,7 +83,7 @@ class Api::Admin::PaymentsController < ApplicationController
 
     payment_intent = nil
     if order.stripe_payment_intent_id.present?
-      Stripe.api_key = Rails.application.credentials.stripe[:secret_key]
+      Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
       begin
         payment_intent = Stripe::PaymentIntent.retrieve(order.stripe_payment_intent_id)
       rescue Stripe::StripeError => e

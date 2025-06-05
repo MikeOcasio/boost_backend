@@ -9,7 +9,7 @@ class UpdatePaymentIntentJob < ApplicationJob
     # Ensure we have a payment intent to update
     return unless order.stripe_payment_intent_id.present?
 
-    Stripe.api_key = Rails.application.credentials.stripe[:secret_key]
+    Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
 
     begin
       # Get the new skillmaster and their contractor account
