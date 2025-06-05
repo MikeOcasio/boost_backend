@@ -114,8 +114,8 @@ class Api::PaymentsController < ApplicationController
                                                    line_items: line_items,
                                                    mode: 'payment',
                                                    customer_email: current_user.email,
-                                                   success_url: 'https://www.ravenboost.com/checkout/success?session_id={CHECKOUT_SESSION_ID}',
-                                                   cancel_url: 'https://www.ravenboost.com/checkout',
+                                                   success_url: 'http://localhost:3001/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+                                                   cancel_url: 'http://localhost:3001/checkout',
                                                    discounts: discounts,
                                                    payment_intent_data: {
                                                      capture_method: 'manual', # Hold the payment
@@ -178,12 +178,24 @@ class Api::PaymentsController < ApplicationController
       # Retrieve the Stripe session
       session = Stripe::Checkout::Session.retrieve(session_id)
 
-      # Check if payment was successful
-      unless session.payment_status == 'paid'
+      # Log session details for debugging
+      Rails.logger.info "Session details: payment_status=#{session.payment_status}, status=#{session.status}"
+
+      # Check if payment was successful - Stripe uses different status fields
+      # session.payment_status can be: 'paid', 'unpaid', 'no_payment_required'
+      # session.status can be: 'open', 'complete', 'expired'
+      #
+      # According to Stripe docs, status=complete with payment_status=unpaid can be valid
+      # when "the payment funds are not yet available in your account" but checkout is complete
+      payment_successful = session.status == 'complete' || session.payment_status == 'paid'
+
+      unless payment_successful
+        Rails.logger.warn "Payment not successful: payment_status=#{session.payment_status}, status=#{session.status}"
         return render json: {
           success: false,
           error: 'Payment was not successful.',
-          payment_status: session.payment_status
+          payment_status: session.payment_status,
+          session_status: session.status
         }, status: :unprocessable_entity
       end
 
@@ -191,33 +203,48 @@ class Api::PaymentsController < ApplicationController
       order = Order.find_by(stripe_session_id: session_id)
 
       if order.nil?
-        return render json: {
-          success: false,
-          error: 'Order not found for this session.'
-        }, status: :not_found
+        Rails.logger.warn "Order not found for session: #{session_id}, attempting to create order from session metadata"
+
+        # Try to create the order from session metadata if it doesn't exist
+        # This handles cases where the frontend calls this endpoint before the webhook creates the order
+        order = create_order_from_session(session)
+
+        if order.nil?
+          Rails.logger.error "Failed to create order from session: #{session_id}"
+          return render json: {
+            success: false,
+            error: 'Order not found for this session and could not be created.'
+          }, status: :not_found
+        end
       end
 
       # Verify the order belongs to the current user
       unless order.user_id == current_user.id
+        Rails.logger.warn "Unauthorized access: user #{current_user.id} trying to access order #{order.id} belonging to user #{order.user_id}"
         return render json: {
           success: false,
           error: 'Unauthorized access to order.'
         }, status: :forbidden
       end
 
+      Rails.logger.info "Successfully retrieved order #{order.id} for session #{session_id}"
+
       render json: {
         success: true,
         order_id: order.id,
         internal_id: order.internal_id,
         payment_status: session.payment_status,
+        session_status: session.status,
         order_state: order.state
       }, status: :ok
     rescue Stripe::StripeError => e
+      Rails.logger.error "Stripe error in order_id_from_session: #{e.message}"
       render json: {
         success: false,
         error: "Stripe error: #{e.message}"
       }, status: :unprocessable_entity
     rescue StandardError => e
+      Rails.logger.error "Server error in order_id_from_session: #{e.message}"
       render json: {
         success: false,
         error: "Server error: #{e.message}"
@@ -433,5 +460,63 @@ class Api::PaymentsController < ApplicationController
       user.update!(stripe_customer_id: customer.id)
       customer.id
     end
+  end
+
+  # Helper method to create order from Stripe session metadata
+  # This handles cases where the frontend calls order_id_from_session before the webhook creates the order
+  def create_order_from_session(session)
+    metadata = session.metadata
+
+    # Verify session belongs to current user
+    return nil unless metadata['user_id'].to_i == current_user.id
+
+    # Check if order already exists (double-check to avoid race conditions)
+    existing_order = Order.find_by(stripe_session_id: session.id)
+    return existing_order if existing_order.present?
+
+    # Parse metadata
+    platform_id = metadata['platform_id']
+    total_price = metadata['total_price'].to_f
+    promo_data = metadata['promo_data'] ? JSON.parse(metadata['promo_data']) : nil
+    order_data = metadata['order_data'] ? JSON.parse(metadata['order_data']) : nil
+    products = JSON.parse(metadata['products'])
+
+    # Create the order
+    order = Order.create!(
+      user: current_user,
+      total_price: total_price,
+      state: 'open',
+      platform: platform_id,
+      promo_data: promo_data,
+      order_data: order_data,
+      stripe_session_id: session.id
+    )
+
+    # Assign platform credentials if platform is provided
+    if platform_id.present?
+      platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform_id)
+      order.update!(platform_credential: platform_credential) if platform_credential
+    end
+
+    # Add products to order with proper validation
+    products.each do |product_data|
+      # Only create order_product if the product exists
+      next unless Product.exists?(product_data['id'])
+
+      order.order_products.create!(
+        product_id: product_data['id'],
+        quantity: product_data['quantity'],
+        price: product_data['price']
+      )
+    end
+
+    # Store the payment intent ID if available
+    order.update!(stripe_payment_intent_id: session.payment_intent) if session.payment_intent.present?
+
+    Rails.logger.info "Successfully created order #{order.id} from session #{session.id}"
+    order
+  rescue StandardError => e
+    Rails.logger.error "Error creating order from session #{session.id}: #{e.message}"
+    nil
   end
 end
