@@ -563,27 +563,75 @@ module Orders
     end
 
     def process_stripe_checkout(session_id)
+      Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
+      
       session = Stripe::Checkout::Session.retrieve(session_id)
       if session.payment_status == 'paid'
-        # Find the existing order created during checkout session creation
-        @order = Order.find_by(stripe_session_id: session_id)
-        
-        if @order.nil?
-          return render json: { success: false, message: 'Order not found for this session.' }, status: :not_found
+        # Check if order already exists for this session
+        existing_order = Order.find_by(stripe_session_id: session_id)
+        if existing_order.present?
+          # Order already created, verify ownership and return
+          if existing_order.user_id != current_user.id
+            return render json: { success: false, message: 'Unauthorized access to order.' }, status: :forbidden
+          end
+          return render json: { success: true, order_id: existing_order.id }, status: :ok
         end
 
-        # Verify the order belongs to the current user
-        if @order.user_id != current_user.id
-          return render json: { success: false, message: 'Unauthorized access to order.' }, status: :forbidden
+        # Extract order data from session metadata
+        metadata = session.metadata
+        if metadata.blank? || metadata['user_id'].to_i != current_user.id
+          return render json: { success: false, message: 'Invalid session data or user mismatch.' }, status: :unprocessable_entity
         end
 
-        # Order already exists and is properly configured, just return success
-        render json: { success: true, order_id: @order.id }, status: :ok
+        # Parse stored data
+        platform_id = metadata['platform_id']
+        total_price = metadata['total_price'].to_f
+        promo_data = metadata['promo_data'] ? JSON.parse(metadata['promo_data']) : nil
+        order_data = metadata['order_data'] ? JSON.parse(metadata['order_data']) : nil
+        products = JSON.parse(metadata['products'])
+
+        # Create order after successful payment
+        @order = Order.create!(
+          user: current_user,
+          total_price: total_price,
+          state: 'open',
+          platform: platform_id,
+          promo_data: promo_data,
+          order_data: order_data,
+          stripe_session_id: session_id
+        )
+
+        # Assign platform credentials if platform is provided
+        if platform_id.present?
+          platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform_id)
+          @order.update!(platform_credential: platform_credential) if platform_credential
+        end
+
+        # Add products to order with proper validation
+        products.each do |product_data|
+          # Only create order_product if the product exists
+          next unless Product.exists?(product_data['id'])
+
+          @order.order_products.create!(
+            product_id: product_data['id'],
+            quantity: product_data['quantity'],
+            price: product_data['price']
+          )
+        end
+
+        # Get the payment intent from the session and store it
+        if session.payment_intent.present?
+          @order.update!(stripe_payment_intent_id: session.payment_intent)
+        end
+
+        render json: { success: true, order_id: @order.id }, status: :created
       else
         render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
       end
     rescue Stripe::InvalidRequestError => e
       render json: { success: false, message: e.message }, status: :unprocessable_entity
+    rescue StandardError => e
+      render json: { success: false, message: "Order creation failed: #{e.message}" }, status: :internal_server_error
     end
 
     def render_unauthorized

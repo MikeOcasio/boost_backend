@@ -56,7 +56,6 @@ class Api::PaymentsController < ApplicationController
       currency = params[:currency]
       products = params[:products] || []
       promotion = params[:promotion]
-      platform = params[:platform]
       promo_data = params[:promo_data]
       order_data = params[:order_data]
 
@@ -66,36 +65,17 @@ class Api::PaymentsController < ApplicationController
                       status: :unprocessable_entity
       end
 
-      # Create order first with all necessary fields
-      order = Order.create!(
-        user: current_user,
-        total_price: calculate_total_price(products, promotion),
-        state: 'open',
-        platform: platform,
-        promo_data: promo_data,
-        order_data: order_data
-      )
+      # Extract platform from the first product with support for different data structures
+      platform_id = extract_platform_id_from_products(products)
 
-      # Assign platform credentials if platform is provided
-      if platform.present?
-        platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform)
-        order.update!(platform_credential: platform_credential) if platform_credential
-      end
+      # Validate and normalize product data
+      normalized_products = normalize_product_data(products)
 
-      # Add products to order
-      products.each do |product_data|
-        # Only create order_product if the product exists
-        next unless Product.exists?(product_data[:id])
-
-        order.order_products.create!(
-          product_id: product_data[:id],
-          quantity: product_data[:quantity],
-          price: product_data[:price]
-        )
-      end
+      # Calculate total price for the session
+      total_price = calculate_total_price(normalized_products, promotion)
 
       # Create line items for the checkout session
-      line_items = products.map do |product|
+      line_items = normalized_products.map do |product|
         image_url = product[:image] && !product[:image].match?(/\.webp$/) ? product[:image] : 'https://www.ravenboost.com/logo.svg'
 
         {
@@ -105,9 +85,9 @@ class Api::PaymentsController < ApplicationController
               name: product[:name] || 'Product Name',
               images: [image_url]
             },
-            unit_amount: ((product[:price].to_f + product[:tax].to_f) * 100).to_i
+            unit_amount: ((product[:price] + product[:tax]) * 100).to_i
           },
-          quantity: product[:quantity].to_i
+          quantity: product[:quantity]
         }
       end
 
@@ -118,27 +98,34 @@ class Api::PaymentsController < ApplicationController
         }
       end
 
+      # Store all order data in session metadata for order creation after payment
+      session_metadata = {
+        user_id: current_user.id,
+        platform_id: platform_id,
+        total_price: total_price,
+        promo_data: promo_data ? promo_data.to_json : nil,
+        order_data: order_data ? order_data.to_json : nil,
+        products: normalized_products.to_json
+      }.compact
+
       # Create the checkout session with payment_intent_data to capture manually
       session = Stripe::Checkout::Session.create({
                                                    payment_method_types: ['card'],
                                                    line_items: line_items,
                                                    mode: 'payment',
                                                    customer_email: current_user.email,
-                                                   success_url: "https://www.ravenboost.com/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=#{order.id}",
+                                                   success_url: 'https://www.ravenboost.com/checkout/success?session_id={CHECKOUT_SESSION_ID}',
                                                    cancel_url: 'https://www.ravenboost.com/checkout',
                                                    discounts: discounts,
                                                    payment_intent_data: {
                                                      capture_method: 'manual', # Hold the payment
-                                                     metadata: { order_id: order.id }
+                                                     metadata: session_metadata
                                                    },
-                                                   metadata: { order_id: order.id }
+                                                   metadata: session_metadata
                                                  })
 
-      # Store session ID in order
-      order.update!(stripe_session_id: session.id)
-
       # Return the session ID (which can be used to redirect the customer)
-      render json: { success: true, sessionId: session.id, order_id: order.id }, status: :created
+      render json: { success: true, sessionId: session.id }, status: :created
     rescue Stripe::StripeError => e
       render json: { success: false, error: e.message }, status: :unprocessable_entity
     rescue StandardError => e
@@ -286,15 +273,18 @@ class Api::PaymentsController < ApplicationController
   private
 
   def handle_checkout_completed(session)
+    # Find order by session ID (order should exist now, created in process_stripe_checkout)
     order = Order.find_by(stripe_session_id: session[:id])
     return unless order
 
-    # Get the payment intent from the session
-    payment_intent = Stripe::PaymentIntent.retrieve(session[:payment_intent])
-    order.update!(stripe_payment_intent_id: payment_intent.id)
+    # Get the payment intent from the session and ensure it's stored
+    return unless session[:payment_intent].present? && order.stripe_payment_intent_id.blank?
+
+    order.update!(stripe_payment_intent_id: session[:payment_intent])
   end
 
   def handle_payment_succeeded(payment_intent)
+    # Find order by payment intent ID
     order = Order.find_by(stripe_payment_intent_id: payment_intent[:id])
     return unless order
 
@@ -303,7 +293,7 @@ class Api::PaymentsController < ApplicationController
   end
 
   def calculate_total_price(products, promotion)
-    subtotal = products.sum { |p| (p[:price].to_f + p[:tax].to_f) * p[:quantity].to_i }
+    subtotal = products.sum { |p| (p[:price] + p[:tax]) * p[:quantity] }
 
     if promotion.present? && promotion[:discount_percentage].to_f.positive?
       discount = subtotal * (promotion[:discount_percentage].to_f / 100)
@@ -311,6 +301,59 @@ class Api::PaymentsController < ApplicationController
     else
       subtotal
     end
+  end
+
+  def extract_platform_id_from_products(products)
+    # Try different ways to extract platform ID from product data
+    first_product = products.first
+    return nil if first_product.nil?
+
+    # Handle nested platform object structure
+    if first_product[:platform].is_a?(Hash)
+      first_product[:platform][:id] || first_product[:platform]['id']
+    elsif first_product['platform'].is_a?(Hash)
+      first_product['platform']['id'] || first_product['platform'][:id]
+    # Handle direct platform ID
+    elsif first_product[:platform_id].present?
+      first_product[:platform_id]
+    elsif first_product['platform_id'].present?
+      first_product['platform_id']
+    # Handle string platform reference
+    elsif first_product[:platform].is_a?(String) || first_product[:platform].is_a?(Integer)
+      first_product[:platform]
+    elsif first_product['platform'].is_a?(String) || first_product['platform'].is_a?(Integer)
+      first_product['platform']
+    else
+      nil
+    end
+  end
+
+  def normalize_product_data(products)
+    products.map do |product|
+      # Convert string/symbol keys to symbols and normalize data types
+      normalized = product.is_a?(Hash) ? product.with_indifferent_access : product
+
+      {
+        id: normalized[:id] || normalized['id'],
+        name: normalized[:name] || normalized['name'] || 'Product Name',
+        price: normalize_decimal_value(normalized[:price] || normalized['price'] || 0),
+        tax: normalize_decimal_value(normalized[:tax] || normalized['tax'] || 0),
+        quantity: normalize_integer_value(normalized[:quantity] || normalized['quantity'] || 1),
+        image: normalized[:image] || normalized['image']
+      }
+    end
+  end
+
+  def normalize_decimal_value(value)
+    return value.to_f if value.is_a?(String) || value.is_a?(Numeric)
+
+    0.0
+  end
+
+  def normalize_integer_value(value)
+    return value.to_i if value.is_a?(String) || value.is_a?(Numeric)
+
+    1
   end
 
   def find_or_create_stripe_customer(user)
