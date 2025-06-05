@@ -14,10 +14,6 @@ Rails.application.routes.draw do
   post 'users/two_factor_authentication/update_method', to: 'users/two_factor_authentication#update_method'
 
   namespace :users do
-    # Add these routes outside of the members resource
-    get 'skillmasters', to: 'members#skillmasters'
-    get 'skillmasters/:id', to: 'members#show_skillmaster'
-
     resources :members, path: 'member-data', only: %i[index create show update destroy] do
       member do
         get :platforms
@@ -25,6 +21,7 @@ Rails.application.routes.draw do
         delete :remove_platform
         post :lock, to: 'members#lock_user'
         post :unlock, to: 'members#unlock_user'
+        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
       end
 
       collection do
@@ -33,12 +30,11 @@ Rails.application.routes.draw do
         patch 'update_password', to: 'members#update_password'
         get 'user_exists', to: 'members#user_exists'
       end
-
-      member do
-        get 'skillmasters/:id', to: 'members#show_skillmaster', as: 'show_skillmaster'
-        delete 'ban', to: 'members#destroy_and_ban', as: 'destroy_and_ban'
-      end
     end
+
+    # Skillmaster routes (consolidated)
+    get 'skillmasters', to: 'members#skillmasters'
+    get 'skillmasters/:id', to: 'members#show_skillmaster'
 
     # Change the two_factor_authentication route to 2fa
     resource :two_factor_authentication, only: [:show], controller: 'two_factor_authentication', path: '2fa' do
@@ -99,8 +95,8 @@ Rails.application.routes.draw do
       end
     end
 
-    # Categories routes
-    resources :categories do
+    # Categories routes (consolidated)
+    resources :categories, only: %i[index show create update destroy] do
       member do
         get :products # Get products for a specific category
       end
@@ -112,8 +108,6 @@ Rails.application.routes.draw do
         get :products
       end
     end
-    # Resources for categories with limited actions
-    resources :categories, only: %i[index show create update destroy]
 
     resources :promotions do
       collection do
@@ -125,6 +119,7 @@ Rails.application.routes.draw do
 
     resources :platform_credentials, only: %i[show create update destroy]
 
+    # Payment routes (consolidated)
     resources :payments, only: [] do
       collection do
         post :create_checkout_session
@@ -203,15 +198,6 @@ Rails.application.routes.draw do
       collection do
         get :available_skillmasters
         post :create_urgent_chat
-      end
-    end
-
-    # Payment routes
-    resources :payments, only: [] do
-      collection do
-        post :create_checkout_session
-        post :create_payment_intent
-        post :webhook
       end
     end
 
