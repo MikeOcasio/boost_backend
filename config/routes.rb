@@ -126,6 +126,7 @@ Rails.application.routes.draw do
         post :create_payment_intent
         post :complete_payment
         get :session_status
+        get :order_id_from_session
         post :webhook
       end
     end

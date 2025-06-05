@@ -160,6 +160,71 @@ class Api::PaymentsController < ApplicationController
     render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 
+  # GET /api/payments/order_id_from_session
+  # Retrieve order ID after successful payment using session ID
+  def order_id_from_session
+    Stripe.api_key = STRIPE_API_KEY
+
+    begin
+      session_id = params[:session_id]
+
+      if session_id.blank?
+        return render json: {
+          success: false,
+          error: 'Session ID is required.'
+        }, status: :unprocessable_entity
+      end
+
+      # Retrieve the Stripe session
+      session = Stripe::Checkout::Session.retrieve(session_id)
+
+      # Check if payment was successful
+      unless session.payment_status == 'paid'
+        return render json: {
+          success: false,
+          error: 'Payment was not successful.',
+          payment_status: session.payment_status
+        }, status: :unprocessable_entity
+      end
+
+      # Find the order by session ID
+      order = Order.find_by(stripe_session_id: session_id)
+
+      if order.nil?
+        return render json: {
+          success: false,
+          error: 'Order not found for this session.'
+        }, status: :not_found
+      end
+
+      # Verify the order belongs to the current user
+      unless order.user_id == current_user.id
+        return render json: {
+          success: false,
+          error: 'Unauthorized access to order.'
+        }, status: :forbidden
+      end
+
+      render json: {
+        success: true,
+        order_id: order.id,
+        internal_id: order.internal_id,
+        payment_status: session.payment_status,
+        order_state: order.state
+      }, status: :ok
+    rescue Stripe::StripeError => e
+      render json: {
+        success: false,
+        error: "Stripe error: #{e.message}"
+      }, status: :unprocessable_entity
+    rescue StandardError => e
+      render json: {
+        success: false,
+        error: "Server error: #{e.message}"
+      }, status: :internal_server_error
+    end
+  end
+
   def create_payment_intent
     Stripe.api_key = STRIPE_API_KEY
 
