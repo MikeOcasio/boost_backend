@@ -565,20 +565,20 @@ module Orders
     def process_stripe_checkout(session_id)
       session = Stripe::Checkout::Session.retrieve(session_id)
       if session.payment_status == 'paid'
-        @order = Order.new(order_params.merge(user_id: current_user.id, assigned_skill_master_id: nil, state: 'open'))
-        @order.platform = params[:platform] if params[:platform].present?
-        @order.promo_data = params[:promo_data] if params[:promo_data].present?
-        @order.order_data = params[:order_data] if params[:order_data].present?
-
-        if assign_platform_credentials(@order, params[:platform]) && @order.save
-          add_products_to_order(@order, params[:product_ids])
-          totals = calculate_order_totals(params[:order_data])
-          @order.update(total_price: totals[:total_price])
-
-          render json: { success: true, order_id: @order.id }, status: :created
-        else
-          render json: { success: false, errors: @order.errors.full_messages }, status: :unprocessable_entity
+        # Find the existing order created during checkout session creation
+        @order = Order.find_by(stripe_session_id: session_id)
+        
+        if @order.nil?
+          return render json: { success: false, message: 'Order not found for this session.' }, status: :not_found
         end
+
+        # Verify the order belongs to the current user
+        if @order.user_id != current_user.id
+          return render json: { success: false, message: 'Unauthorized access to order.' }, status: :forbidden
+        end
+
+        # Order already exists and is properly configured, just return success
+        render json: { success: true, order_id: @order.id }, status: :ok
       else
         render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
       end

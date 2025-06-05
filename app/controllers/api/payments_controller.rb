@@ -56,6 +56,9 @@ class Api::PaymentsController < ApplicationController
       currency = params[:currency]
       products = params[:products] || []
       promotion = params[:promotion]
+      platform = params[:platform]
+      promo_data = params[:promo_data]
+      order_data = params[:order_data]
 
       # Check if currency and products are present
       if currency.nil? || products.empty?
@@ -63,12 +66,21 @@ class Api::PaymentsController < ApplicationController
                       status: :unprocessable_entity
       end
 
-      # Create order first
+      # Create order first with all necessary fields
       order = Order.create!(
         user: current_user,
         total_price: calculate_total_price(products, promotion),
-        state: 'open'
+        state: 'open',
+        platform: platform,
+        promo_data: promo_data,
+        order_data: order_data
       )
+
+      # Assign platform credentials if platform is provided
+      if platform.present?
+        platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform)
+        order.update!(platform_credential: platform_credential) if platform_credential
+      end
 
       # Add products to order
       products.each do |product_data|
