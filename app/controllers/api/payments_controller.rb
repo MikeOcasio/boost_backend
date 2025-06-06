@@ -383,7 +383,20 @@ class Api::PaymentsController < ApplicationController
     order = Order.find_by(stripe_payment_intent_id: payment_intent[:id])
     return unless order
 
-    # Payment succeeded but we don't capture until order is complete
+    # Calculate earnings if not already calculated
+    if order.skillmaster_earned.nil? || order.company_earned.nil?
+      skillmaster_amount = order.total_price * 0.65
+      company_amount = order.total_price * 0.35
+      
+      order.update!(
+        skillmaster_earned: skillmaster_amount,
+        company_earned: company_amount
+      )
+      
+      Rails.logger.info "Order #{order.id} payment succeeded - calculated earnings: Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount}"
+    end
+
+    # Payment succeeded but we don't capture until admin approves completion
     order.update!(payment_status: 'authorized')
   end
 

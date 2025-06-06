@@ -44,7 +44,7 @@ class Order < ApplicationRecord
   before_save :assign_platform_credentials
   before_create :generate_internal_id
   after_update :create_payment_intent_if_assigned
-  # Payment capture is now handled manually in controller after admin approval
+  after_update :add_earnings_to_pending_if_completed
   after_update :close_associated_chats_if_completed
   after_update :update_payment_intent_contractor_if_reassigned
 
@@ -55,7 +55,6 @@ class Order < ApplicationRecord
   # Completion data validations - only required when order is complete
   validates :before_image, presence: true, if: :completion_images_required?
   validates :after_image, presence: true, if: :completion_images_required?
-  validates :completion_data, presence: true, if: :completion_data_required?
 
   aasm column: 'state' do
     state :open, initial: true
@@ -152,8 +151,38 @@ class Order < ApplicationRecord
   def create_payment_intent_if_assigned
     return unless saved_change_to_state? && state == 'assigned' && assigned_skill_master_id.present?
 
-    # Create payment intent when order is assigned to skillmaster
+    # Calculate earnings if not already calculated
+    if skillmaster_earned.nil? || company_earned.nil?
+      skillmaster_amount = total_price * 0.65
+      company_amount = total_price * 0.35
+
+      update_columns(
+        skillmaster_earned: skillmaster_amount,
+        company_earned: company_amount
+      )
+
+      Rails.logger.info "Order #{id} assigned - calculated earnings: Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount}"
+    end
+
+    # Create payment intent when order is assigned to skillmaster (only if none exists)
     CreatePaymentIntentJob.perform_later(id)
+  end
+
+  def add_earnings_to_pending_if_completed
+    return unless saved_change_to_state? && state == 'complete' && assigned_skill_master_id.present?
+
+    # Only move to pending balance when skillmaster marks complete FOR THE FIRST TIME
+    # Use submitted_for_review_at to track if earnings were already processed
+    # Payment capture happens later during admin approval
+    skillmaster = User.find(assigned_skill_master_id)
+    if skillmaster&.contractor && skillmaster_earned.present? && submitted_for_review_at.blank?
+      # First time completion - add earnings to pending balance and mark submission time
+      skillmaster.contractor.add_to_pending_balance(skillmaster_earned)
+      update_column(:submitted_for_review_at, Time.current)
+      Rails.logger.info "Order #{id} completed - moved $#{skillmaster_earned} to skillmaster's pending balance (first completion)"
+    elsif submitted_for_review_at.present?
+      Rails.logger.info "Order #{id} completed again - earnings already processed at #{submitted_for_review_at}, skipping balance update"
+    end
   end
 
   def close_associated_chats_if_completed

@@ -7,7 +7,10 @@ class CreatePaymentIntentJob < ApplicationJob
     order = Order.find(order_id)
 
     # Only create payment intent if order is assigned and doesn't have one yet
+    # Most orders should already have a PaymentIntent from checkout - this is mainly for edge cases
     return unless order.assigned? && order.assigned_skill_master_id.present? && order.stripe_payment_intent_id.blank?
+
+    Rails.logger.info "Creating PaymentIntent for order #{order.id} - no existing PaymentIntent found"
 
     Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
 
@@ -19,7 +22,7 @@ class CreatePaymentIntentJob < ApplicationJob
       # Create or find Stripe customer for the order user
       customer = find_or_create_stripe_customer(order.user)
 
-      # Calculate amounts (60% to skillmaster, 40% to business)
+      # Calculate amounts (65% to skillmaster, 35% to business)
       total_amount = (order.total_price * 100).to_i # Convert to cents
       skillmaster_amount = (order.total_price * 0.65 * 100).to_i
       business_amount = (order.total_price * 0.35 * 100).to_i
@@ -29,19 +32,19 @@ class CreatePaymentIntentJob < ApplicationJob
         amount: total_amount,
         currency: 'usd',
         customer: customer.id,
-        capture_method: 'manual', # Manual capture - will capture when order completes
+        capture_method: 'manual', # Manual capture - will capture when admin approves
         metadata: {
           order_id: order.id,
           internal_id: order.internal_id,
           skillmaster_id: skillmaster.id,
           skillmaster_amount: skillmaster_amount,
           business_amount: business_amount,
-          user_id: order.user_id
+          user_id: order.user_id,
+          created_by: 'CreatePaymentIntentJob'
         }
       }
 
       # Check if contractor account is ready for transfers
-      transfer_capable = false
       if contractor&.stripe_account_id.present?
         begin
           # Check if the account can accept transfers
@@ -65,7 +68,7 @@ class CreatePaymentIntentJob < ApplicationJob
       # Create the payment intent
       payment_intent = Stripe::PaymentIntent.create(payment_intent_params)
 
-      # Update order with payment intent ID
+      # Update order with payment intent ID and earnings
       order.update!(
         stripe_payment_intent_id: payment_intent.id,
         skillmaster_earned: skillmaster_amount / 100.0, # Store as dollars

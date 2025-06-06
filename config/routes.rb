@@ -61,6 +61,7 @@ Rails.application.routes.draw do
       collection do
         get 'graveyard_orders' # GET /orders/graveyard_orders
         get 'pending_review' # GET /orders/pending_review
+        get 'customer_unverified' # GET /orders/customer_unverified
       end
     end
   end

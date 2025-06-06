@@ -6,12 +6,24 @@ class CapturePaymentJob < ApplicationJob
   def perform(order_id)
     order = Order.find(order_id)
 
-    # Only capture if order is complete and payment hasn't been captured yet
-    return unless order.complete? && order.stripe_payment_intent_id.present? && order.payment_captured_at.nil?
+    # Only capture if order is complete, admin has reviewed, and payment hasn't been captured yet
+    unless order.complete? && order.admin_reviewed_at.present? && order.stripe_payment_intent_id.present? && order.payment_captured_at.nil?
+      Rails.logger.warn "Cannot capture payment for order #{order.id}: order must be complete (#{order.complete?}), admin reviewed (#{order.admin_reviewed_at.present?}), have payment intent (#{order.stripe_payment_intent_id.present?}), and not already captured (#{order.payment_captured_at.nil?})"
+      return
+    end
 
     Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
 
     begin
+      # First, retrieve the payment intent to check its status
+      payment_intent = Stripe::PaymentIntent.retrieve(order.stripe_payment_intent_id)
+
+      # Check if the payment intent is in a capturable state
+      unless payment_intent.status == 'requires_capture'
+        Rails.logger.warn "Cannot capture payment for order #{order.id}: PaymentIntent status is '#{payment_intent.status}'. Expected 'requires_capture'. Payment may not have been authorized yet."
+        return
+      end
+
       # Capture the payment
       payment_intent = Stripe::PaymentIntent.capture(order.stripe_payment_intent_id)
 
@@ -35,16 +47,16 @@ class CapturePaymentJob < ApplicationJob
       contractor = skillmaster.contractor
 
       if contractor.present?
-        # Add to skillmaster's pending balance (will be moved to available when admin approves)
-        contractor.add_to_pending_balance(skillmaster_amount)
+        # Move the earnings from pending to available balance since admin approved
+        approved_amount = contractor.approve_and_move_to_available(skillmaster_amount)
 
-        # Update order with payment completion (don't overwrite earnings - they're already correct)
+        # Update order with payment completion
         order.update!(
           payment_captured_at: Time.current,
           payment_status: 'captured'
         )
 
-        Rails.logger.info "Payment captured for order #{order.id}: $#{total_amount} (Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount}) - Added to pending balance"
+        Rails.logger.info "Payment captured for order #{order.id}: $#{total_amount} (Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount}) - Moved $#{approved_amount} to available balance"
       else
         # If no contractor account exists, still capture payment but note missing contractor
         order.update!(

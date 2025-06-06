@@ -15,8 +15,10 @@ class Api::WalletController < ApplicationController
       contractor = current_user.contractor
 
       # Get completed orders for this skillmaster
+      # Exclude orders where the current user is both skillmaster AND customer
       completed_orders = Order.joins(:user)
                               .where(assigned_skill_master_id: current_user.id, state: 'complete')
+                              .where.not(user_id: current_user.id)
                               .includes(:products, :user)
                               .order(updated_at: :desc)
 
@@ -246,9 +248,11 @@ class Api::WalletController < ApplicationController
 
     begin
       # Get all completed orders for this skillmaster with payment information
+      # Exclude orders where the current user is both skillmaster AND customer
       completed_orders = Order.joins(:user)
                               .where(assigned_skill_master_id: current_user.id, state: 'complete')
-                              .where.not(payment_captured_at: nil)
+                              .where.not(user_id: current_user.id)
+                              # .where.not(payment_captured_at: nil)
                               .includes(:products, :user)
                               .order(payment_captured_at: :desc)
                               .limit(50) # Limit to recent 50 transactions

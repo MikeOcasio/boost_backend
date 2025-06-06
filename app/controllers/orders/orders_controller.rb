@@ -351,6 +351,7 @@ module Orders
     # POST /orders/info/:id/admin_approve_completion
     # Admin approves payment release for completed work (NEW WORKFLOW)
     def admin_approve_completion
+      byebug
       unless current_user.role.in?(%w[admin dev])
         return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
@@ -360,31 +361,31 @@ module Orders
                       status: :unprocessable_entity
       end
 
+      unless @order.customer_verified_at.present?
+        return render json: { success: false, message: 'Order must be verified by customer before admin can approve payment.' },
+                      status: :unprocessable_entity
+      end
+
       if @order.admin_reviewed_at.present?
         return render json: { success: false, message: 'Payment has already been reviewed by admin.' },
                       status: :unprocessable_entity
       end
 
-      # Mark as admin approved and trigger payment
+      # Mark as admin approved
       @order.update!(
         admin_reviewed_at: Time.current,
         admin_reviewer_id: current_user.id,
-        admin_approval_notes: params[:notes] # Optional notes from admin
+        admin_approval_notes: params[:notes]
       )
 
-      # Trigger payment capture since admin has approved
-      CapturePaymentJob.perform_later(@order.id) if @order.stripe_payment_intent_id.present?
-
-      # Move earnings from pending to available balance and trigger Stripe payout
-      if @order.assigned_skill_master_id.present? && @order.skillmaster_earned.present?
-        skillmaster = User.find(@order.assigned_skill_master_id)
-        contractor = skillmaster.contractor
-
-        if contractor.present?
-          approved_amount = contractor.approve_and_move_to_available(@order.skillmaster_earned)
-          Rails.logger.info "Admin approved payment for order #{@order.id}: $#{approved_amount} moved to available balance for contractor #{contractor.id}"
-        end
+      # NOW trigger payment capture since admin has approved
+      if @order.stripe_payment_intent_id.present?
+        CapturePaymentJob.perform_later(@order.id)
+        Rails.logger.info "Admin approved order #{@order.id} - payment capture job queued"
       end
+
+      # NOTE: Earnings movement from pending to available happens in CapturePaymentJob
+      # after successful payment capture
 
       render json: {
         success: true,
@@ -446,32 +447,51 @@ module Orders
 
       verification_status = params[:verified] # true/false
 
+      # Log parameters for debugging
+      Rails.logger.info "Verify completion - Order #{@order.id}, verified param: #{verification_status.inspect}, all params: #{params.inspect}"
+
+      # Handle missing parameter
+      if verification_status.nil?
+        return render json: {
+          success: false,
+          message: 'Missing required parameter: verified (true/false)'
+        }, status: :bad_request
+      end
+
       if verification_status.to_s == 'true'
         # Customer confirms completion - order stays complete and will move to available balance after 7 days
         @order.update!(customer_verified_at: Time.current)
+        Rails.logger.info "Order #{@order.id} verified by customer at #{Time.current}"
         render json: {
           success: true,
           message: 'Order completion verified by customer.',
           order: @order.as_json(only: %i[id state customer_verified_at])
         }
-      elsif @order.may_mark_in_review?
+      elsif verification_status.to_s == 'false'
         # Customer disputes completion - move to in_review state
-        @order.mark_in_review!
-        @order.update!(customer_verified_at: nil)
+        if @order.may_mark_in_review?
+          @order.mark_in_review!
+          @order.update!(customer_verified_at: nil)
 
-        # TODO: Send notification to admin for investigation
-        Rails.logger.info "Order #{@order.id} moved to in_review - customer disputed completion"
+          # TODO: Send notification to admin for investigation
+          Rails.logger.info "Order #{@order.id} moved to in_review - customer disputed completion"
 
-        render json: {
-          success: true,
-          message: 'Order marked for review. An admin will investigate.',
-          order: @order.as_json(only: %i[id state])
-        }
+          render json: {
+            success: true,
+            message: 'Order marked for review. An admin will investigate.',
+            order: @order.as_json(only: %i[id state])
+          }
+        else
+          render json: {
+            success: false,
+            message: 'Order cannot be marked for review at this time.'
+          }, status: :unprocessable_entity
+        end
       else
         render json: {
           success: false,
-          message: 'Order cannot be marked for review at this time.'
-        }, status: :unprocessable_entity
+          message: 'Invalid verification status. Must be true or false.'
+        }, status: :bad_request
       end
     end
 
@@ -523,6 +543,20 @@ module Orders
       render json: {
         success: true,
         orders: review_orders.map do |order|
+          # Determine review type and status
+          if order.state == 'complete'
+            if order.customer_verified_at.present?
+              review_type = 'payment_approval'
+              status = 'ready_for_admin_approval'
+            else
+              review_type = 'payment_approval'
+              status = 'awaiting_customer_verification'
+            end
+          else
+            review_type = 'dispute_review'
+            status = 'disputed'
+          end
+
           {
             id: order.id,
             internal_id: order.internal_id,
@@ -530,9 +564,11 @@ module Orders
             total_price: order.total_price,
             updated_at: order.updated_at,
             submitted_for_review_at: order.submitted_for_review_at,
+            customer_verified_at: order.customer_verified_at,
             skillmaster_submission_notes: order.skillmaster_submission_notes,
             admin_rejection_notes: order.admin_rejection_notes,
-            review_type: order.state == 'complete' ? 'payment_approval' : 'dispute_review',
+            review_type: review_type,
+            status: status,
             customer: {
               id: order.user.id,
               name: "#{order.user.first_name} #{order.user.last_name}",
@@ -593,6 +629,54 @@ module Orders
       # Send the PDF file as a response
       send_data pdf.render, filename: "invoice_#{@order.internal_id}.pdf", type: 'application/pdf',
                             disposition: 'attachment'
+    end
+
+    # GET /orders/info/customer_unverified
+    # Get completed orders that need customer verification for the current user
+    def customer_unverified
+      unless current_user
+        return render json: { success: false, message: 'Authentication required.' }, status: :unauthorized
+      end
+
+      # Find completed orders for the current user that need verification
+      unverified_orders = Order.where(
+        user_id: current_user.id,
+        state: 'complete',
+        customer_verified_at: nil
+      ).where.not(submitted_for_review_at: nil)
+                               .includes(:user, :assigned_skill_master, :products)
+                               .order(submitted_for_review_at: :desc)
+
+      render json: {
+        success: true,
+        count: unverified_orders.count,
+        orders: unverified_orders.map do |order|
+          {
+            id: order.id,
+            internal_id: order.internal_id,
+            state: order.state,
+            total_price: order.total_price,
+            created_at: order.created_at,
+            submitted_for_review_at: order.submitted_for_review_at,
+            before_image: order.before_image,
+            after_image: order.after_image,
+            skillmaster_submission_notes: order.skillmaster_submission_notes,
+            skillmaster: {
+              id: order.assigned_skill_master&.id,
+              name: order.assigned_skill_master&.first_name,
+              gamer_tag: order.assigned_skill_master&.gamer_tag
+            },
+            products: order.products.map do |product|
+              {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                tax: product.tax
+              }
+            end
+          }
+        end
+      }
     end
 
     private
