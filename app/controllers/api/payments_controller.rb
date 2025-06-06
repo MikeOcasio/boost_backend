@@ -65,8 +65,8 @@ class Api::PaymentsController < ApplicationController
                       status: :unprocessable_entity
       end
 
-      # Extract platform from the first product with support for different data structures
-      platform_id = extract_platform_id_from_products(products)
+      # Extract platform ID from the first product
+      platform_id = products.first&.dig('platform', 'id') || products.first&.dig(:platform, :id)
 
       # Validate and normalize product data
       normalized_products = normalize_product_data(products)
@@ -203,11 +203,29 @@ class Api::PaymentsController < ApplicationController
       order = Order.find_by(stripe_session_id: session_id)
 
       if order.nil?
-        Rails.logger.warn "Order not found for session: #{session_id}, attempting to create order from session metadata"
+        Rails.logger.warn "Order not found for session: #{session_id}, attempting to create order from session"
 
-        # Try to create the order from session metadata if it doesn't exist
+        # Try to create the order if it doesn't exist
         # This handles cases where the frontend calls this endpoint before the webhook creates the order
-        order = create_order_from_session(session)
+        # Extract order data from session metadata as fallback
+        session_metadata = session.metadata
+        if session_metadata['user_id'].to_i == current_user.id
+          platform_id = session_metadata['platform_id']
+          total_price = session_metadata['total_price'].to_f
+          promo_data = session_metadata['promo_data'] ? JSON.parse(session_metadata['promo_data']) : nil
+          order_data = session_metadata['order_data'] ? JSON.parse(session_metadata['order_data']) : nil
+          products = JSON.parse(session_metadata['products'])
+
+          order = create_order(
+            platform_id: platform_id,
+            total_price: total_price,
+            promo_data: promo_data,
+            order_data: order_data,
+            products: products,
+            stripe_session_id: session_id,
+            stripe_payment_intent_id: session.payment_intent
+          )
+        end
 
         if order.nil?
           Rails.logger.error "Failed to create order from session: #{session_id}"
@@ -364,10 +382,49 @@ class Api::PaymentsController < ApplicationController
 
   private
 
+  # =============================================================================
+  # WEBHOOK HANDLERS
+  # =============================================================================
+
   def handle_checkout_completed(session)
-    # Find order by session ID (order should exist now, created in process_stripe_checkout)
+    # Find order by session ID (order should exist now, created in checkout session process)
     order = Order.find_by(stripe_session_id: session[:id])
-    return unless order
+
+    # If order doesn't exist, try to create it using session metadata (fallback for edge cases)
+    if order.nil?
+      Rails.logger.warn "Order not found for session #{session[:id]} in webhook, attempting to create from metadata"
+
+      # For webhook context, we need to retrieve the full session object and extract metadata
+      begin
+        full_session = Stripe::Checkout::Session.retrieve(session[:id])
+        session_metadata = full_session.metadata
+
+        if session_metadata['user_id'].present?
+          user = User.find(session_metadata['user_id'])
+          platform_id = session_metadata['platform_id']
+          total_price = session_metadata['total_price'].to_f
+          promo_data = session_metadata['promo_data'] ? JSON.parse(session_metadata['promo_data']) : nil
+          order_data = session_metadata['order_data'] ? JSON.parse(session_metadata['order_data']) : nil
+          products = JSON.parse(session_metadata['products'])
+
+          order = create_order_for_user(
+            user: user,
+            platform_id: platform_id,
+            total_price: total_price,
+            promo_data: promo_data,
+            order_data: order_data,
+            products: products,
+            stripe_session_id: session[:id],
+            stripe_payment_intent_id: session[:payment_intent]
+          )
+        end
+      rescue Stripe::StripeError => e
+        Rails.logger.error "Failed to retrieve session #{session[:id]} for order creation: #{e.message}"
+        return
+      end
+
+      return unless order
+    end
 
     # Get the payment intent from the session and ensure it's stored
     return unless session[:payment_intent].present? && order.stripe_payment_intent_id.blank?
@@ -395,30 +452,9 @@ class Api::PaymentsController < ApplicationController
     end
   end
 
-  def extract_platform_id_from_products(products)
-    # Try different ways to extract platform ID from product data
-    first_product = products.first
-    return nil if first_product.nil?
-
-    # Handle nested platform object structure
-    if first_product[:platform].is_a?(Hash)
-      first_product[:platform][:id] || first_product[:platform]['id']
-    elsif first_product['platform'].is_a?(Hash)
-      first_product['platform']['id'] || first_product['platform'][:id]
-    # Handle direct platform ID
-    elsif first_product[:platform_id].present?
-      first_product[:platform_id]
-    elsif first_product['platform_id'].present?
-      first_product['platform_id']
-    # Handle string platform reference
-    elsif first_product[:platform].is_a?(String) || first_product[:platform].is_a?(Integer)
-      first_product[:platform]
-    elsif first_product['platform'].is_a?(String) || first_product['platform'].is_a?(Integer)
-      first_product['platform']
-    else
-      nil
-    end
-  end
+  # =============================================================================
+  # PRODUCT DATA PROCESSING
+  # =============================================================================
 
   def normalize_product_data(products)
     products.map do |product|
@@ -448,6 +484,10 @@ class Api::PaymentsController < ApplicationController
     1
   end
 
+  # =============================================================================
+  # STRIPE CUSTOMER MANAGEMENT
+  # =============================================================================
+
   def find_or_create_stripe_customer(user)
     if user.stripe_customer_id.present?
       user.stripe_customer_id
@@ -462,43 +502,73 @@ class Api::PaymentsController < ApplicationController
     end
   end
 
-  # Helper method to create order from Stripe session metadata
-  # This handles cases where the frontend calls order_id_from_session before the webhook creates the order
-  def create_order_from_session(session)
-    metadata = session.metadata
+  # =============================================================================
+  # ORDER CREATION AND MANAGEMENT
+  # =============================================================================
 
-    # Verify session belongs to current user
-    return nil unless metadata['user_id'].to_i == current_user.id
+  # Single order creation method for current_user context
+  # Creates an order from the provided data and optionally validates payment via session_id
+  def create_order(platform_id:, total_price:, products:, promo_data: nil, order_data: nil, stripe_session_id: nil,
+                   stripe_payment_intent_id: nil)
+    create_order_for_user(
+      user: current_user,
+      platform_id: platform_id,
+      total_price: total_price,
+      products: products,
+      promo_data: promo_data,
+      order_data: order_data,
+      stripe_session_id: stripe_session_id,
+      stripe_payment_intent_id: stripe_payment_intent_id
+    )
+  end
 
+  # Core order creation method that works with any user
+  def create_order_for_user(user:, platform_id:, total_price:, products:, promo_data: nil, order_data: nil, stripe_session_id: nil,
+                            stripe_payment_intent_id: nil)
     # Check if order already exists (double-check to avoid race conditions)
-    existing_order = Order.find_by(stripe_session_id: session.id)
-    return existing_order if existing_order.present?
-
-    # Parse metadata
-    platform_id = metadata['platform_id']
-    total_price = metadata['total_price'].to_f
-    promo_data = metadata['promo_data'] ? JSON.parse(metadata['promo_data']) : nil
-    order_data = metadata['order_data'] ? JSON.parse(metadata['order_data']) : nil
-    products = JSON.parse(metadata['products'])
+    if stripe_session_id.present?
+      existing_order = Order.find_by(stripe_session_id: stripe_session_id)
+      return existing_order if existing_order.present?
+    end
 
     # Create the order
     order = Order.create!(
-      user: current_user,
+      user: user,
       total_price: total_price,
       state: 'open',
       platform: platform_id,
       promo_data: promo_data,
       order_data: order_data,
-      stripe_session_id: session.id
+      stripe_session_id: stripe_session_id
     )
 
     # Assign platform credentials if platform is provided
-    if platform_id.present?
-      platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform_id)
-      order.update!(platform_credential: platform_credential) if platform_credential
-    end
+    assign_platform_credential_to_order(order, platform_id, user)
 
-    # Add products to order with proper validation
+    # Add products to order
+    add_products_to_order(order, products)
+
+    # Store the payment intent ID if available
+    order.update!(stripe_payment_intent_id: stripe_payment_intent_id) if stripe_payment_intent_id.present?
+
+    Rails.logger.info "Successfully created order #{order.id}"
+    order
+  rescue StandardError => e
+    Rails.logger.error "Error creating order: #{e.message}"
+    nil
+  end
+
+  # Helper method to assign platform credentials to an order
+  def assign_platform_credential_to_order(order, platform_id, user = nil)
+    return if platform_id.blank?
+
+    target_user = user || current_user
+    platform_credential = PlatformCredential.find_by(user_id: target_user.id, platform_id: platform_id)
+    order.update!(platform_credential: platform_credential) if platform_credential
+  end
+
+  # Helper method to add products to an order
+  def add_products_to_order(order, products)
     products.each do |product_data|
       # Only create order_product if the product exists
       next unless Product.exists?(product_data['id'])
@@ -509,14 +579,5 @@ class Api::PaymentsController < ApplicationController
         price: product_data['price']
       )
     end
-
-    # Store the payment intent ID if available
-    order.update!(stripe_payment_intent_id: session.payment_intent) if session.payment_intent.present?
-
-    Rails.logger.info "Successfully created order #{order.id} from session #{session.id}"
-    order
-  rescue StandardError => e
-    Rails.logger.error "Error creating order from session #{session.id}: #{e.message}"
-    nil
   end
 end

@@ -1,3 +1,18 @@
+# Orders Controller - Simplified for Non-Payment Order Creation
+#
+# This controller now focuses solely on order management functionality.
+# Stripe payment processing and order creation from successful payments
+# has been moved to Api::PaymentsController for better separation of concerns.
+#
+# For payment-based order creation, use:
+# - POST /api/payments/checkout - Create Stripe checkout session
+# - GET /api/payments/order_id_from_session - Get order_id after successful payment
+#
+# This controller only handles:
+# - Direct order creation by devs (for testing/admin purposes)
+# - Order viewing, updating, and state management
+# - Order completion workflows
+
 module Orders
   class OrdersController < ApplicationController
     before_action :authenticate_user!
@@ -74,8 +89,6 @@ module Orders
 
     # POST orders/info
     def create
-      session_id = params[:session_id]
-
       if current_user.role == 'dev'
         @order = Order.new(order_params.merge(state: 'open'))
         @order.platform = params[:platform] if params[:platform].present?
@@ -101,8 +114,6 @@ module Orders
         else
           render json: { success: false, message: 'Invalid platform credential.' }, status: :unprocessable_entity
         end
-      elsif current_user.role.in?(%w[customer skillmaster admin]) && session_id.present?
-        process_stripe_checkout(session_id)
       else
         render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
@@ -521,6 +532,28 @@ module Orders
       skill_master_info = User.find_by(id: @order.assigned_skill_master_id)
       user_info = User.find_by(id: @order.user_id)
 
+      # Find platform safely
+      platform = @order.platform.present? ? Platform.find_by(id: @order.platform) : nil
+
+      # Handle platform credentials safely
+      platform_credentials_data = if @order.platform_credential.present?
+                                    @order.platform_credential.as_json(
+                                      only: %i[id user_id created_at updated_at username password platform_id
+                                               sub_platform_id]
+                                    ).merge(
+                                      platform: {
+                                        id: @order.platform_credential.platform.id,
+                                        name: @order.platform_credential.platform.name
+                                      },
+                                      sub_platform: {
+                                        id: @order.platform_credential.sub_platform&.id,
+                                        name: @order.platform_credential.sub_platform&.name
+                                      }
+                                    )
+                                  else
+                                    nil
+                                  end
+
       render json: {
         order: @order.as_json(
           include: {
@@ -530,10 +563,7 @@ module Orders
           },
           only: %i[id state created_at total_price internal_id promo_data order_data]
         ).merge(
-          platform: {
-            id: @order.platform,
-            name: Platform.find(@order.platform).name
-          },
+          platform: platform ? { id: platform.id, name: platform.name } : nil,
           user: {
             id: user_info&.id,
             first_name: user_info&.first_name,
@@ -542,96 +572,13 @@ module Orders
             role: user_info&.role
           }
         ),
-        platform_credentials: @order.platform_credential.as_json(
-          only: %i[id user_id created_at updated_at username password platform_id sub_platform_id]
-        ).merge(
-          platform: {
-            id: @order.platform_credential.platform.id,
-            name: @order.platform_credential.platform.name
-          },
-          sub_platform: {
-            id: @order.platform_credential.sub_platform&.id,
-            name: @order.platform_credential.sub_platform&.name
-          }
-        ),
+        platform_credentials: platform_credentials_data,
         skill_master: {
           id: skill_master_info&.id,
           gamer_tag: skill_master_info&.gamer_tag,
           first_name: skill_master_info&.first_name
         }
       }
-    end
-
-    def process_stripe_checkout(session_id)
-      Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
-      
-      session = Stripe::Checkout::Session.retrieve(session_id)
-      if session.payment_status == 'paid'
-        # Check if order already exists for this session
-        existing_order = Order.find_by(stripe_session_id: session_id)
-        if existing_order.present?
-          # Order already created, verify ownership and return
-          if existing_order.user_id != current_user.id
-            return render json: { success: false, message: 'Unauthorized access to order.' }, status: :forbidden
-          end
-          return render json: { success: true, order_id: existing_order.id }, status: :ok
-        end
-
-        # Extract order data from session metadata
-        metadata = session.metadata
-        if metadata.blank? || metadata['user_id'].to_i != current_user.id
-          return render json: { success: false, message: 'Invalid session data or user mismatch.' }, status: :unprocessable_entity
-        end
-
-        # Parse stored data
-        platform_id = metadata['platform_id']
-        total_price = metadata['total_price'].to_f
-        promo_data = metadata['promo_data'] ? JSON.parse(metadata['promo_data']) : nil
-        order_data = metadata['order_data'] ? JSON.parse(metadata['order_data']) : nil
-        products = JSON.parse(metadata['products'])
-
-        # Create order after successful payment
-        @order = Order.create!(
-          user: current_user,
-          total_price: total_price,
-          state: 'open',
-          platform: platform_id,
-          promo_data: promo_data,
-          order_data: order_data,
-          stripe_session_id: session_id
-        )
-
-        # Assign platform credentials if platform is provided
-        if platform_id.present?
-          platform_credential = PlatformCredential.find_by(user_id: current_user.id, platform_id: platform_id)
-          @order.update!(platform_credential: platform_credential) if platform_credential
-        end
-
-        # Add products to order with proper validation
-        products.each do |product_data|
-          # Only create order_product if the product exists
-          next unless Product.exists?(product_data['id'])
-
-          @order.order_products.create!(
-            product_id: product_data['id'],
-            quantity: product_data['quantity'],
-            price: product_data['price']
-          )
-        end
-
-        # Get the payment intent from the session and store it
-        if session.payment_intent.present?
-          @order.update!(stripe_payment_intent_id: session.payment_intent)
-        end
-
-        render json: { success: true, order_id: @order.id }, status: :created
-      else
-        render json: { success: false, message: 'Payment not successful.' }, status: :unprocessable_entity
-      end
-    rescue Stripe::InvalidRequestError => e
-      render json: { success: false, message: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: { success: false, message: "Order creation failed: #{e.message}" }, status: :internal_server_error
     end
 
     def render_unauthorized
