@@ -25,12 +25,9 @@ class MovePendingBalancesJob < ApplicationJob
 
       contractor.transaction do
         if contractor.pending_balance >= amount_to_move
-          contractor.update!(
-            pending_balance: contractor.pending_balance - amount_to_move,
-            available_balance: contractor.available_balance + amount_to_move
-          )
-
-          Rails.logger.info "Moved $#{amount_to_move} from pending to available for contractor #{contractor.id} (Order: #{order.id})"
+          # Use the new approval method which updates total_earned and triggers payout
+          approved_amount = contractor.approve_and_move_to_available(amount_to_move)
+          Rails.logger.info "Moved $#{approved_amount} from pending to available for contractor #{contractor.id} (Order: #{order.id}) after 7-day period"
         end
       end
     end

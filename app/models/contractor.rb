@@ -33,6 +33,7 @@ class Contractor < ApplicationRecord
 
   def add_to_pending_balance(amount)
     increment!(:pending_balance, amount)
+    # NOTE: total_earned is only updated when admin approves and moves to available balance
   end
 
   def move_pending_to_available
@@ -42,8 +43,30 @@ class Contractor < ApplicationRecord
     transaction do
       update!(
         available_balance: available_balance + amount,
-        pending_balance: 0
+        pending_balance: 0,
+        total_earned: total_earned + amount
       )
+      # total_earned is incremented here since this represents admin-approved earnings
+    end
+    amount
+  end
+
+  def approve_and_move_to_available(amount)
+    return 0 if pending_balance < amount
+
+    transaction do
+      update!(
+        available_balance: available_balance + amount,
+        pending_balance: pending_balance - amount,
+        total_earned: total_earned + amount
+      )
+
+      # Trigger Stripe payout if contractor account is ready
+      if stripe_account_ready?
+        StripePayoutJob.perform_later(id, amount)
+      else
+        Rails.logger.warn "Contractor #{id} earnings approved but no Stripe account - payout will be processed when account is ready"
+      end
     end
     amount
   end

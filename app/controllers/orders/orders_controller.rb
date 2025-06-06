@@ -317,6 +317,17 @@ module Orders
       # Trigger payment capture since admin has approved
       CapturePaymentJob.perform_later(@order.id) if @order.stripe_payment_intent_id.present?
 
+      # Move earnings from pending to available balance and trigger Stripe payout
+      if @order.assigned_skill_master_id.present? && @order.skillmaster_earned.present?
+        skillmaster = User.find(@order.assigned_skill_master_id)
+        contractor = skillmaster.contractor
+
+        if contractor.present?
+          approved_amount = contractor.approve_and_move_to_available(@order.skillmaster_earned)
+          Rails.logger.info "Admin approved payment for order #{@order.id}: $#{approved_amount} moved to available balance for contractor #{contractor.id}"
+        end
+      end
+
       render json: {
         success: true,
         message: 'Payment approved by admin. Payment will be processed.',

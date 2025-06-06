@@ -323,62 +323,8 @@ class Api::PaymentsController < ApplicationController
     end
   end
 
-  def complete_payment
-    Stripe.api_key = STRIPE_API_KEY
-
-    begin
-      order_id = params[:order_id]
-      order = Order.find(order_id)
-
-      # Verify order is complete and has a payment intent
-      unless order.complete? && order.stripe_payment_intent_id.present?
-        return render json: {
-          success: false,
-          error: 'Order is not complete or has no payment intent'
-        }, status: :unprocessable_entity
-      end
-
-      # Capture the payment
-      payment_intent = Stripe::PaymentIntent.capture(order.stripe_payment_intent_id)
-
-      # Calculate split amounts (75% to skillmaster, 25% to company)
-      total_amount = payment_intent.amount / 100.0 # Convert from cents
-      skillmaster_amount = total_amount * 0.60
-      company_amount = total_amount * 0.40
-
-      # Find skillmaster's contractor record
-      skillmaster = User.find(order.assigned_skill_master_id)
-      contractor = skillmaster.contractor
-
-      if contractor.nil?
-        return render json: {
-          success: false,
-          error: 'Skillmaster has no contractor account'
-        }, status: :unprocessable_entity
-      end
-
-      # Add to skillmaster's pending balance
-      contractor.add_to_pending_balance(skillmaster_amount)
-
-      # Update order with payment completion
-      order.update!(
-        payment_captured_at: Time.current,
-        skillmaster_earned: skillmaster_amount,
-        company_earned: company_amount
-      )
-
-      render json: {
-        success: true,
-        message: 'Payment captured and split successfully',
-        skillmaster_earned: skillmaster_amount,
-        company_earned: company_amount
-      }, status: :ok
-    rescue Stripe::StripeError => e
-      render json: { success: false, error: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
-    end
-  end
+  # NOTE: complete_payment method removed - payment capture is now handled
+  # through admin approval workflow using CapturePaymentJob
 
   private
 
