@@ -124,17 +124,9 @@ module Orders
     # Admins and devs can update any order, while skill masters can only update the order status if applicable.
 
     def update
-      # Debug logging to understand parameter structure
-      Rails.logger.info '=== ORDER UPDATE DEBUG ==='
-      Rails.logger.info "Raw params: #{params.to_unsafe_h}"
-      Rails.logger.info "State param: #{params[:state]}"
-      Rails.logger.info "CompleteStatusData param: #{params[:completeStatusData]}"
-      Rails.logger.info "Order params: #{params[:order]}"
-      Rails.logger.info '=========================='
-
       # Extract parameters from different possible structures
       state_param = extract_state_parameter
-      completion_data_param = extract_completion_data_parameter
+      completion_data_param = extract_completion_data_parameter(params)
 
       if current_user.role == 'admin' || current_user.role == 'dev'
         # Allow admin/dev to update any attribute
@@ -149,16 +141,40 @@ module Orders
                             status: :unprocessable_entity
             end
           when 'complete'
+
             if @order.may_mark_complete?
-              # Handle completion data and images when admin/dev marks as complete
-              completion_updates = process_completion_data(completion_data_param)
+              begin
+                # Handle completion data and images when admin/dev marks as complete
+                completion_updates = process_completion_data(completion_data_param)
 
-              # Update order with completion data before state transition
-              @order.update!(completion_updates) if completion_updates.any?
+                # Update order with completion data before state transition
+                if completion_updates.any?
+                  @order.update!(completion_updates)
+                  Rails.logger.info "Successfully updated completion data: #{completion_updates}"
+                end
 
-              @order.mark_complete!
+                @order.mark_complete!
+                Rails.logger.info 'Order successfully marked as complete'
+
+                # Clear completion_data after successful completion to remove any remaining base64 data
+                @order.update!(completion_data: {})
+                Rails.logger.info 'Completion data cleared after successful completion'
+
+                # Return success response for admin/dev completion
+                return render json: {
+                  success: true,
+                  message: 'Order marked as complete successfully.',
+                  order: @order.as_json(only: %i[id state completion_data before_image after_image
+                                                 skillmaster_submission_notes])
+                }
+              rescue StandardError => e
+                Rails.logger.error "Error during completion process: #{e.message}"
+                Rails.logger.error e.backtrace.join("\n")
+                return render json: { success: false, message: "Error completing order: #{e.message}" },
+                              status: :unprocessable_entity
+              end
             else
-              return render json: { success: false, message: 'Order cannot be marked as complete.' },
+              return render json: { success: false, message: "Order cannot be marked as complete. Current state: #{@order.state}. Available transitions: #{@order.aasm.events(permitted: true)}" },
                             status: :unprocessable_entity
             end
           when 'disputed'
@@ -195,23 +211,38 @@ module Orders
           when 'complete'
             # Skillmaster can mark work as complete - but payment requires admin approval
             if @order.may_mark_complete?
-              # Handle completion data and images when marking as complete
-              completion_updates = process_completion_data(completion_data_param)
+              begin
+                # Handle completion data and images when marking as complete
+                completion_updates = process_completion_data(completion_data_param)
 
-              # Update order with completion data before state transition
-              @order.update!(completion_updates) if completion_updates.any?
+                # Update order with completion data before state transition
+                if completion_updates.any?
+                  @order.update!(completion_updates)
+                  Rails.logger.info "Successfully updated completion data: #{completion_updates}"
+                end
 
-              @order.mark_complete!
-              @order.update!(submitted_for_review_at: Time.current)
+                @order.mark_complete!
+                @order.update!(submitted_for_review_at: Time.current)
+                Rails.logger.info 'Order successfully marked as complete by skillmaster'
 
-              render json: {
-                success: true,
-                message: 'Work completed successfully. Payment pending admin approval.',
-                order: @order.as_json(only: %i[id state submitted_for_review_at completion_data before_image
-                                               after_image skillmaster_submission_notes])
-              }
+                # Clear completion_data after successful completion to remove any remaining base64 data
+                @order.update!(completion_data: {})
+                Rails.logger.info 'Completion data cleared after successful completion'
+
+                render json: {
+                  success: true,
+                  message: 'Work completed successfully. Payment pending admin approval.',
+                  order: @order.as_json(only: %i[id state submitted_for_review_at completion_data before_image
+                                                 after_image skillmaster_submission_notes])
+                }
+              rescue StandardError => e
+                Rails.logger.error "Error during skillmaster completion process: #{e.message}"
+                Rails.logger.error e.backtrace.join("\n")
+                render json: { success: false, message: "Error completing order: #{e.message}" },
+                       status: :unprocessable_entity
+              end
             else
-              render json: { success: false, message: 'Order cannot be marked as complete.' },
+              render json: { success: false, message: "Order cannot be marked as complete. Current state: #{@order.state}. Available transitions: #{@order.aasm.events(permitted: true)}" },
                      status: :unprocessable_entity
             end
           when 'disputed'
@@ -734,17 +765,27 @@ module Orders
     end
 
     # Extract completion data from various possible structures
-    def extract_completion_data_parameter
+    def extract_completion_data_parameter(params)
       completion_data = {}
 
       # Check for completeStatusData parameter
-      if params[:completeStatusData].present? && params[:completeStatusData].is_a?(Hash)
-        completion_data.merge!(params[:completeStatusData])
+      if params[:completeStatusData].present?
+        # Permit common completion data fields
+        permitted_completion_data = params[:completeStatusData].permit(
+          :before_image,
+          :after_image,
+          :skillmaster_submission_notes,
+          :state,
+          completion_data: {}
+        )
+
+        completion_data_hash = permitted_completion_data.to_h
+        completion_data.merge!(completion_data_hash) if completion_data_hash.any?
       end
 
       # Check for completion data in order params
       if params[:order].present? && params[:order][:completion_data].present?
-        completion_data.merge!(params[:order][:completion_data])
+        completion_data.merge!(params[:order][:completion_data].to_unsafe_h)
       end
 
       # Check for individual completion fields
@@ -763,31 +804,36 @@ module Orders
     def process_completion_data(completion_data_param)
       completion_updates = {}
 
-      Rails.logger.info "Processing completion data: #{completion_data_param}"
-
-      # Process before and after images if provided
-      if completion_data_param[:before_image].present?
-        before_image_url = upload_completion_image_to_s3(completion_data_param[:before_image], 'before')
+      # Process before and after images if provided (check both string and symbol keys)
+      before_image = completion_data_param[:before_image] || completion_data_param['before_image']
+      if before_image.present?
+        Rails.logger.info 'Processing before image...'
+        before_image_url = upload_completion_image_to_s3(before_image, 'before')
         completion_updates[:before_image] = before_image_url if before_image_url
+        Rails.logger.info "Before image uploaded: #{before_image_url}"
       end
 
-      if completion_data_param[:after_image].present?
-        after_image_url = upload_completion_image_to_s3(completion_data_param[:after_image], 'after')
+      after_image = completion_data_param[:after_image] || completion_data_param['after_image']
+      if after_image.present?
+        Rails.logger.info 'Processing after image...'
+        after_image_url = upload_completion_image_to_s3(after_image, 'after')
         completion_updates[:after_image] = after_image_url if after_image_url
+        Rails.logger.info "After image uploaded: #{after_image_url}"
       end
 
-      # Handle completion data object
-      if completion_data_param.except(:before_image, :after_image, :skillmaster_submission_notes).any?
-        completion_updates[:completion_data] =
-          completion_data_param.except(:before_image, :after_image, :skillmaster_submission_notes)
-      end
+      # Handle skillmaster submission notes (check both string and symbol keys)
+      submission_notes = completion_data_param[:skillmaster_submission_notes] || completion_data_param['skillmaster_submission_notes']
+      completion_updates[:skillmaster_submission_notes] = submission_notes if submission_notes.present?
 
-      # Handle skillmaster submission notes
-      if completion_data_param[:skillmaster_submission_notes].present?
-        completion_updates[:skillmaster_submission_notes] = completion_data_param[:skillmaster_submission_notes]
-      end
-
+      # Log clean completion updates (no base64 data)
       Rails.logger.info "Completion updates: #{completion_updates}"
+
+      # Debug validation before state change
+      if completion_updates.any?
+        @order.assign_attributes(completion_updates)
+        @order.reload # Reset to original state
+      end
+
       completion_updates
     end
 
