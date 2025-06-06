@@ -52,6 +52,11 @@ class Order < ApplicationRecord
   validates :internal_id, uniqueness: true
   validates :user, presence: true
 
+  # Completion data validations - only required when order is complete
+  validates :before_image, presence: true, if: :completion_images_required?
+  validates :after_image, presence: true, if: :completion_images_required?
+  validates :completion_data, presence: true, if: :completion_data_required?
+
   aasm column: 'state' do
     state :open, initial: true
     state :assigned
@@ -117,6 +122,29 @@ class Order < ApplicationRecord
 
   def skill_master_assigned?
     assigned_skill_master_id.present?
+  end
+
+  def completion_images_required?
+    state == 'complete' && state_changed? && state_was != 'complete'
+  end
+
+  def completion_data_required?
+    state == 'complete' && state_changed? && state_was != 'complete'
+  end
+
+  # Clean up completion images from S3 if order is deleted or images are replaced
+  def cleanup_completion_images
+    [before_image, after_image].compact.each do |image_url|
+      next unless image_url.present? && image_url.match?(%r{^https?://.*\.amazonaws\.com/})
+
+      begin
+        uri = URI.parse(image_url)
+        key = uri.path[1..-1] # Remove the leading '/'
+        Rails.application.config.s3_bucket.object(key).delete
+      rescue StandardError => e
+        Rails.logger.error "Failed to delete completion image from S3: #{e.message}"
+      end
+    end
   end
 
   private

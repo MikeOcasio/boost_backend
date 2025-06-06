@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_05_162730) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -217,6 +217,9 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_05_162730) do
     t.text "skillmaster_submission_notes"
     t.text "admin_approval_notes"
     t.text "admin_rejection_notes"
+    t.json "completion_data"
+    t.text "before_image"
+    t.text "after_image"
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"

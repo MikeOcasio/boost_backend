@@ -122,12 +122,25 @@ module Orders
     # PATCH/PUT /api/orders/:id
     # Update an existing order.
     # Admins and devs can update any order, while skill masters can only update the order status if applicable.
+
     def update
+      # Debug logging to understand parameter structure
+      Rails.logger.info '=== ORDER UPDATE DEBUG ==='
+      Rails.logger.info "Raw params: #{params.to_unsafe_h}"
+      Rails.logger.info "State param: #{params[:state]}"
+      Rails.logger.info "CompleteStatusData param: #{params[:completeStatusData]}"
+      Rails.logger.info "Order params: #{params[:order]}"
+      Rails.logger.info '=========================='
+
+      # Extract parameters from different possible structures
+      state_param = extract_state_parameter
+      completion_data_param = extract_completion_data_parameter
+
       if current_user.role == 'admin' || current_user.role == 'dev'
         # Allow admin/dev to update any attribute
-        if order_params.key?(:state)
+        if state_param.present?
           # Validate and transition the state based on the provided value
-          case order_params[:state]
+          case state_param
           when 'in_progress'
             if @order.may_start_progress?
               @order.start_progress!
@@ -137,6 +150,12 @@ module Orders
             end
           when 'complete'
             if @order.may_mark_complete?
+              # Handle completion data and images when admin/dev marks as complete
+              completion_updates = process_completion_data(completion_data_param)
+
+              # Update order with completion data before state transition
+              @order.update!(completion_updates) if completion_updates.any?
+
               @order.mark_complete!
             else
               return render json: { success: false, message: 'Order cannot be marked as complete.' },
@@ -163,8 +182,8 @@ module Orders
 
       elsif current_user.role == 'skillmaster'
         # Skill masters can update the state and submit completion notes
-        if order_params.key?(:state)
-          case order_params[:state]
+        if state_param.present?
+          case state_param
           when 'in_progress'
             if @order.may_start_progress?
               @order.start_progress!
@@ -176,12 +195,20 @@ module Orders
           when 'complete'
             # Skillmaster can mark work as complete - but payment requires admin approval
             if @order.may_mark_complete?
+              # Handle completion data and images when marking as complete
+              completion_updates = process_completion_data(completion_data_param)
+
+              # Update order with completion data before state transition
+              @order.update!(completion_updates) if completion_updates.any?
+
               @order.mark_complete!
               @order.update!(submitted_for_review_at: Time.current)
+
               render json: {
                 success: true,
                 message: 'Work completed successfully. Payment pending admin approval.',
-                order: @order.as_json(only: %i[id state submitted_for_review_at])
+                order: @order.as_json(only: %i[id state submitted_for_review_at completion_data before_image
+                                               after_image skillmaster_submission_notes])
               }
             else
               render json: { success: false, message: 'Order cannot be marked as complete.' },
@@ -635,7 +662,134 @@ module Orders
       @order = Order.includes(:products, :user).find(params[:id])
     end
 
-    # Strong parameters for order creation and update
+    # Upload completion images to S3 with webp format
+    def upload_completion_image_to_s3(file, image_type)
+      return nil if file.blank?
+
+      # If the file is already a valid S3 URL, return it directly
+      return file if file.is_a?(String) && file.match?(%r{^https?://.*\.amazonaws\.com/})
+
+      if file.is_a?(ActionDispatch::Http::UploadedFile)
+        obj = S3_BUCKET.object("orders/completion/#{image_type}/#{SecureRandom.uuid}.webp")
+        obj.upload_file(file.tempfile, content_type: 'image/webp')
+        obj.public_url
+      elsif file.is_a?(String) && file.start_with?('data:image/')
+        # Extract the base64 part from the data URL
+        base64_data = file.split(',')[1]
+        # Decode the base64 data
+        decoded_data = Base64.decode64(base64_data)
+
+        # Generate a unique filename for completion images
+        filename = "orders/completion/#{image_type}/#{SecureRandom.uuid}.webp"
+
+        # Create a temporary file to upload
+        Tempfile.create(['completion_image', '.webp']) do |temp_file|
+          temp_file.binmode
+          temp_file.write(decoded_data)
+          temp_file.rewind
+
+          # Upload the temporary file to S3
+          obj = S3_BUCKET.object(filename)
+          obj.upload_file(temp_file, content_type: 'image/webp')
+
+          return obj.public_url
+        end
+      else
+        raise ArgumentError,
+              "Expected an instance of ActionDispatch::Http::UploadedFile, a base64 string, or an S3 URL, got #{file.class.name}"
+      end
+    end
+
+    def delete_completion_image_from_s3(image_url)
+      return if image_url.blank?
+      return unless image_url.match?(%r{^https?://.*\.amazonaws\.com/})
+
+      # Extract the key from the S3 URL
+      uri = URI.parse(image_url)
+      key = uri.path[1..-1] # Remove the leading '/'
+
+      begin
+        S3_BUCKET.object(key).delete
+      rescue StandardError => e
+        Rails.logger.error "Failed to delete completion image from S3: #{e.message}"
+      end
+    end
+
+    # Extract state parameter from various possible structures
+    def extract_state_parameter
+      # Check for direct state parameter
+      return params[:state] if params[:state].present? && params[:state].is_a?(String)
+
+      # Check for nested state in order params
+      if params[:order].present? && params[:order][:state].present? && params[:order][:state].is_a?(String)
+        return params[:order][:state]
+      end
+
+      # Check for state in completeStatusData (frontend might send it here)
+      if params[:completeStatusData].present? && params[:completeStatusData][:state].present?
+        return params[:completeStatusData][:state]
+      end
+
+      nil
+    end
+
+    # Extract completion data from various possible structures
+    def extract_completion_data_parameter
+      completion_data = {}
+
+      # Check for completeStatusData parameter
+      if params[:completeStatusData].present? && params[:completeStatusData].is_a?(Hash)
+        completion_data.merge!(params[:completeStatusData])
+      end
+
+      # Check for completion data in order params
+      if params[:order].present? && params[:order][:completion_data].present?
+        completion_data.merge!(params[:order][:completion_data])
+      end
+
+      # Check for individual completion fields
+      %w[before_image after_image skillmaster_submission_notes].each do |field|
+        if params[field].present?
+          completion_data[field] = params[field]
+        elsif params[:order].present? && params[:order][field].present?
+          completion_data[field] = params[:order][field]
+        end
+      end
+
+      completion_data
+    end
+
+    # Process completion data and upload images
+    def process_completion_data(completion_data_param)
+      completion_updates = {}
+
+      Rails.logger.info "Processing completion data: #{completion_data_param}"
+
+      # Process before and after images if provided
+      if completion_data_param[:before_image].present?
+        before_image_url = upload_completion_image_to_s3(completion_data_param[:before_image], 'before')
+        completion_updates[:before_image] = before_image_url if before_image_url
+      end
+
+      if completion_data_param[:after_image].present?
+        after_image_url = upload_completion_image_to_s3(completion_data_param[:after_image], 'after')
+        completion_updates[:after_image] = after_image_url if after_image_url
+      end
+
+      # Handle completion data object
+      if completion_data_param.except(:before_image, :after_image, :skillmaster_submission_notes).any?
+        completion_updates[:completion_data] =
+          completion_data_param.except(:before_image, :after_image, :skillmaster_submission_notes)
+      end
+
+      # Handle skillmaster submission notes
+      if completion_data_param[:skillmaster_submission_notes].present?
+        completion_updates[:skillmaster_submission_notes] = completion_data_param[:skillmaster_submission_notes]
+      end
+
+      Rails.logger.info "Completion updates: #{completion_updates}"
+      completion_updates
+    end
 
     def order_params
       params.require(:order).permit(
@@ -651,7 +805,11 @@ module Orders
         :dynamic_price,
         :start_level,
         :end_level,
-        order_data: []
+        :before_image,
+        :after_image,
+        :skillmaster_submission_notes,
+        order_data: [],
+        completion_data: {}
       )
     end
 
