@@ -40,13 +40,14 @@ class Order < ApplicationRecord
   has_one :promotion
   has_many :reviews, dependent: :destroy
   has_many :chats, dependent: :nullify
+  has_one :payment_approval, dependent: :destroy
 
   before_save :assign_platform_credentials
   before_create :generate_internal_id
-  after_update :create_payment_intent_if_assigned
+  after_update :create_paypal_order_if_assigned
   after_update :add_earnings_to_pending_if_completed
   after_update :close_associated_chats_if_completed
-  after_update :update_payment_intent_contractor_if_reassigned
+  after_update :create_payment_approval_if_completed
 
   validates :state, inclusion: { in: VALID_STATES }
   validates :internal_id, uniqueness: true
@@ -148,7 +149,7 @@ class Order < ApplicationRecord
 
   private
 
-  def create_payment_intent_if_assigned
+  def create_paypal_order_if_assigned
     return unless saved_change_to_state? && state == 'assigned' && assigned_skill_master_id.present?
 
     # Calculate earnings if not already calculated
@@ -164,8 +165,8 @@ class Order < ApplicationRecord
       Rails.logger.info "Order #{id} assigned - calculated earnings: Skillmaster: $#{skillmaster_amount}, Company: $#{company_amount}"
     end
 
-    # Create payment intent when order is assigned to skillmaster (only if none exists)
-    CreatePaymentIntentJob.perform_later(id)
+    # Create PayPal order when order is assigned to skillmaster (only if none exists)
+    CreatePaypalOrderJob.perform_later(id)
   end
 
   def add_earnings_to_pending_if_completed
@@ -191,16 +192,12 @@ class Order < ApplicationRecord
     chats.update_all(status: 'closed')
   end
 
-  # Outlier X: Update payment intent contractor ID when order is reassigned
-  def update_payment_intent_contractor_if_reassigned
-    return unless saved_change_to_assigned_skill_master_id? && stripe_payment_intent_id.present?
+  def create_payment_approval_if_completed
+    return unless saved_change_to_state? && state == 'complete'
+    return if payment_approval.present?
 
-    # Only update if the order has been reassigned to a different skillmaster
-    return unless assigned_skill_master_id.present?
-
-    Rails.logger.info "Order #{id} reassigned from skillmaster #{assigned_skill_master_id_was} to #{assigned_skill_master_id}"
-
-    # Queue job to update payment intent metadata
-    UpdatePaymentIntentJob.perform_later(id, assigned_skill_master_id)
+    # Create payment approval record when order is marked complete
+    create_payment_approval!
+    Rails.logger.info "Order #{id} completed - created payment approval record"
   end
 end

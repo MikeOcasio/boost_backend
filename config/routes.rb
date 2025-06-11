@@ -123,11 +123,9 @@ Rails.application.routes.draw do
     # Payment routes (consolidated)
     resources :payments, only: [] do
       collection do
-        post :create_checkout_session
-        post :create_payment_intent
-        post :complete_payment
-        get :session_status
-        get :order_id_from_session
+        post :create_paypal_order
+        post :capture_paypal_payment
+        get :order_status
         post :webhook
       end
     end
@@ -137,7 +135,8 @@ Rails.application.routes.draw do
         get :show
         post :withdraw
         post :move_pending_to_available
-        post :create_stripe_account
+        post :setup_paypal_account
+        post :submit_tax_form
         get :account_status
         get :supported_countries
         get :balance
@@ -213,6 +212,13 @@ Rails.application.routes.draw do
           get :contractors
           post :force_balance_move
           get :payment_details
+        end
+      end
+
+      resources :payment_approvals, only: %i[index update] do
+        member do
+          post :approve
+          post :reject
         end
       end
     end

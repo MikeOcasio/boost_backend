@@ -1,12 +1,12 @@
 # Orders Controller - Simplified for Non-Payment Order Creation
 #
 # This controller now focuses solely on order management functionality.
-# Stripe payment processing and order creation from successful payments
+# PayPal payment processing and order creation from successful payments
 # has been moved to Api::PaymentsController for better separation of concerns.
 #
 # For payment-based order creation, use:
-# - POST /api/payments/checkout - Create Stripe checkout session
-# - GET /api/payments/order_id_from_session - Get order_id after successful payment
+# - POST /api/payments/create_paypal_order - Create PayPal order
+# - POST /api/payments/capture_paypal_payment - Capture PayPal payment after approval
 #
 # This controller only handles:
 # - Direct order creation by devs (for testing/admin purposes)
@@ -309,7 +309,7 @@ module Orders
     # Assign an order to a skill master. Only accessible by admins, devs, or skill masters.
     # Skill masters can only pick up orders that match their platform.
 
-    # ! contractor gets assigned in stripe to order.
+    # ! contractor gets assigned in PayPal to order.
     def pick_up_order
       # Check user role and determine the skill master ID
       if current_user.role == 'admin' || current_user.role == 'dev'
@@ -379,12 +379,12 @@ module Orders
       )
 
       # NOW trigger payment capture since admin has approved
-      if @order.stripe_payment_intent_id.present?
-        CapturePaymentJob.perform_later(@order.id)
-        Rails.logger.info "Admin approved order #{@order.id} - payment capture job queued"
+      if @order.paypal_order_id.present?
+        CapturePaypalPaymentJob.perform_later(@order.id)
+        Rails.logger.info "Admin approved order #{@order.id} - PayPal payment capture job queued"
       end
 
-      # NOTE: Earnings movement from pending to available happens in CapturePaymentJob
+      # NOTE: Earnings movement from pending to available happens in CapturePaypalPaymentJob
       # after successful payment capture
 
       render json: {

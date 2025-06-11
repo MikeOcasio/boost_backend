@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_08_194510) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -132,11 +132,19 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
     t.datetime "last_payout_requested_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "stripe_account_id"
     t.decimal "available_balance", precision: 10, scale: 2, default: "0.0"
     t.decimal "pending_balance", precision: 10, scale: 2, default: "0.0"
     t.decimal "total_earned", precision: 10, scale: 2, default: "0.0"
     t.datetime "last_withdrawal_at"
+    t.string "trolley_recipient_id"
+    t.string "trolley_account_status", default: "pending"
+    t.string "paypal_payout_email"
+    t.string "tax_form_status", default: "pending"
+    t.string "tax_form_type"
+    t.datetime "tax_form_submitted_at", precision: nil
+    t.datetime "tax_compliance_checked_at", precision: nil
+    t.index ["paypal_payout_email"], name: "index_contractors_on_paypal_payout_email"
+    t.index ["trolley_recipient_id"], name: "index_contractors_on_trolley_recipient_id"
     t.index ["user_id"], name: "index_contractors_on_user_id"
   end
 
@@ -205,7 +213,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
     t.bigint "referral_user_id"
     t.integer "points", default: 0
     t.string "stripe_session_id"
-    t.string "stripe_payment_intent_id"
     t.string "payment_status"
     t.datetime "payment_captured_at"
     t.decimal "skillmaster_earned", precision: 10, scale: 2
@@ -220,12 +227,44 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
     t.json "completion_data"
     t.text "before_image"
     t.text "after_image"
+    t.string "paypal_order_id"
+    t.string "paypal_capture_id"
+    t.string "paypal_payment_status", default: "pending"
     t.index ["assigned_skill_master_id"], name: "index_orders_on_assigned_skill_master_id"
+    t.index ["paypal_capture_id"], name: "index_orders_on_paypal_capture_id"
+    t.index ["paypal_order_id"], name: "index_orders_on_paypal_order_id"
     t.index ["promotion_id"], name: "index_orders_on_promotion_id"
     t.index ["referral_user_id"], name: "index_orders_on_referral_user_id"
-    t.index ["stripe_payment_intent_id"], name: "index_orders_on_stripe_payment_intent_id"
     t.index ["stripe_session_id"], name: "index_orders_on_stripe_session_id"
     t.index ["user_id"], name: "index_orders_on_user_id"
+  end
+
+  create_table "payment_approvals", force: :cascade do |t|
+    t.bigint "order_id", null: false
+    t.bigint "admin_user_id", null: false
+    t.string "status", default: "pending"
+    t.text "notes"
+    t.datetime "approved_at", precision: nil
+    t.datetime "rejected_at", precision: nil
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_user_id"], name: "index_payment_approvals_on_admin_user_id"
+    t.index ["order_id", "status"], name: "index_payment_approvals_on_order_id_and_status"
+    t.index ["order_id"], name: "index_payment_approvals_on_order_id"
+  end
+
+  create_table "paypal_payouts", force: :cascade do |t|
+    t.bigint "contractor_id", null: false
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.string "paypal_payout_batch_id"
+    t.string "paypal_payout_item_id"
+    t.string "status", default: "pending"
+    t.text "failure_reason"
+    t.json "paypal_response"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contractor_id", "status"], name: "index_paypal_payouts_on_contractor_id_and_status"
+    t.index ["contractor_id"], name: "index_paypal_payouts_on_contractor_id"
   end
 
   create_table "platform_credentials", force: :cascade do |t|
@@ -452,8 +491,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
     t.integer "available_referral_points", default: 0
     t.integer "total_completion_points", default: 0
     t.integer "total_referral_points", default: 0
-    t.string "stripe_customer_id"
+    t.string "paypal_customer_id"
+    t.string "paypal_email"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
+    t.index ["paypal_customer_id"], name: "index_users_on_paypal_customer_id"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
     t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
   end
@@ -495,6 +536,9 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_06_044729) do
   add_foreign_key "orders", "users"
   add_foreign_key "orders", "users", column: "assigned_skill_master_id"
   add_foreign_key "orders", "users", column: "referral_user_id"
+  add_foreign_key "payment_approvals", "orders"
+  add_foreign_key "payment_approvals", "users", column: "admin_user_id"
+  add_foreign_key "paypal_payouts", "contractors"
   add_foreign_key "platform_credentials", "platforms"
   add_foreign_key "platform_credentials", "sub_platforms"
   add_foreign_key "platform_credentials", "users"

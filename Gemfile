@@ -32,8 +32,8 @@ gem 'devise'
 gem 'devise-jwt'
 gem 'devise_token_auth'
 gem 'devise-two-factor'
-gem 'rbnacl'
 gem 'kaminari'
+gem 'rbnacl'
 
 gem 'rotp'
 gem 'rqrcode'
@@ -44,8 +44,11 @@ gem 'prawn'
 # Gem for Mailgun email service
 gem 'mailgun-ruby', '~> 1.2'
 
-# Gem for Stripe payments
-gem 'stripe', '~> 13.0.0'
+# Gem for PayPal payments and payouts
+gem 'paypal-checkout-sdk', '~> 1.0'
+
+# Gem for Trolley tax compliance
+gem 'trolley', '~> 1.0'
 
 # Use Active Storage variant
 # gem 'image_processing', '~> 1.2'

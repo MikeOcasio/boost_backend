@@ -49,8 +49,11 @@ class Api::Admin::PaymentsController < ApplicationController
           name: "#{contractor.user.first_name} #{contractor.user.last_name}",
           email: contractor.user.email,
           role: contractor.user.role,
-          stripe_account_id: contractor.stripe_account_id,
-          stripe_account_ready: contractor.stripe_account_ready?,
+          trolley_recipient_id: contractor.trolley_recipient_id,
+          paypal_payout_email: contractor.paypal_payout_email,
+          tax_form_status: contractor.tax_form_status,
+          tax_compliant: contractor.tax_compliant?,
+          can_receive_payouts: contractor.can_receive_payouts?,
           available_balance: contractor.available_balance,
           pending_balance: contractor.pending_balance,
           total_earned: contractor.total_earned,
@@ -81,13 +84,13 @@ class Api::Admin::PaymentsController < ApplicationController
     order_id = params[:order_id]
     order = Order.find(order_id)
 
-    payment_intent = nil
-    if order.stripe_payment_intent_id.present?
-      Stripe.api_key = Rails.application.credentials.stripe[:test_secret]
+    # Get PayPal order details if available
+    paypal_order = nil
+    if order.paypal_order_id.present?
       begin
-        payment_intent = Stripe::PaymentIntent.retrieve(order.stripe_payment_intent_id)
-      rescue Stripe::StripeError => e
-        Rails.logger.error "Error retrieving payment intent: #{e.message}"
+        paypal_order = PaypalService.get_order(order.paypal_order_id)
+      rescue StandardError => e
+        Rails.logger.error "Error retrieving PayPal order: #{e.message}"
       end
     end
 
@@ -98,25 +101,25 @@ class Api::Admin::PaymentsController < ApplicationController
         internal_id: order.internal_id,
         state: order.state,
         total_price: order.total_price,
-        payment_status: order.payment_status,
+        payment_status: order.paypal_payment_status,
         payment_captured_at: order.payment_captured_at,
         skillmaster_earned: order.skillmaster_earned,
         company_earned: order.company_earned,
-        stripe_session_id: order.stripe_session_id,
-        stripe_payment_intent_id: order.stripe_payment_intent_id
+        paypal_order_id: order.paypal_order_id,
+        paypal_capture_id: order.paypal_capture_id
       },
-      stripe_payment_intent: if payment_intent
-                               {
-                                 id: payment_intent.id,
-                                 amount: payment_intent.amount,
-                                 currency: payment_intent.currency,
-                                 status: payment_intent.status,
-                                 capture_method: payment_intent.capture_method,
-                                 created: Time.at(payment_intent.created)
-                               }
-                             else
-                               nil
-                             end
+      paypal_order: if paypal_order
+                      {
+                        id: paypal_order[:id],
+                        status: paypal_order[:status],
+                        intent: paypal_order[:intent],
+                        amount: paypal_order.dig(:purchase_units, 0, :amount, :value),
+                        currency: paypal_order.dig(:purchase_units, 0, :amount, :currency_code),
+                        created_time: paypal_order[:create_time]
+                      }
+                    else
+                      nil
+                    end
     }, status: :ok
   end
 

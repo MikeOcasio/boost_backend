@@ -1,55 +1,49 @@
-require 'stripe'
-require 'yaml'
-
 class Api::WalletController < ApplicationController
   before_action :authenticate_user!
   before_action :ensure_contractor_role
   before_action :ensure_contractor_account
 
-  STRIPE_API_KEY = Rails.application.credentials.stripe[:test_secret]
-
   def show
-    Stripe.api_key = STRIPE_API_KEY
+    contractor = current_user.contractor
 
-    begin
-      contractor = current_user.contractor
+    # Get completed orders for this skillmaster
+    # Exclude orders where the current user is both skillmaster AND customer
+    completed_orders = Order.joins(:user)
+                            .where(assigned_skill_master_id: current_user.id, state: 'complete')
+                            .where.not(user_id: current_user.id)
+                            .includes(:products, :user)
+                            .order(updated_at: :desc)
 
-      # Get completed orders for this skillmaster
-      # Exclude orders where the current user is both skillmaster AND customer
-      completed_orders = Order.joins(:user)
-                              .where(assigned_skill_master_id: current_user.id, state: 'complete')
-                              .where.not(user_id: current_user.id)
-                              .includes(:products, :user)
-                              .order(updated_at: :desc)
-
-      # Calculate earnings summary
-      earnings_data = completed_orders.map do |order|
-        {
-          order_id: order.id,
-          internal_id: order.internal_id,
-          customer_name: "#{order.user.first_name} #{order.user.last_name}",
-          amount_earned: order.skillmaster_earned || 0,
-          completed_at: order.updated_at,
-          products: order.products.map(&:name).join(', ')
-        }
-      end
-
-      render json: {
-        success: true,
-        wallet: {
-          available_balance: contractor.available_balance,
-          pending_balance: contractor.pending_balance,
-          total_earned: contractor.total_earned,
-          can_withdraw: contractor.can_withdraw?,
-          days_until_next_withdrawal: contractor.days_until_next_withdrawal,
-          last_withdrawal_at: contractor.last_withdrawal_at,
-          stripe_account_id: contractor.stripe_account_id
-        },
-        earnings: earnings_data
-      }, status: :ok
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
+    # Calculate earnings summary
+    earnings_data = completed_orders.map do |order|
+      {
+        order_id: order.id,
+        internal_id: order.internal_id,
+        customer_name: "#{order.user.first_name} #{order.user.last_name}",
+        amount_earned: order.skillmaster_earned || 0,
+        completed_at: order.updated_at,
+        products: order.products.map(&:name).join(', ')
+      }
     end
+
+    render json: {
+      success: true,
+      wallet: {
+        available_balance: contractor.available_balance,
+        pending_balance: contractor.pending_balance,
+        total_earned: contractor.total_earned,
+        can_withdraw: contractor.can_withdraw?,
+        days_until_next_withdrawal: contractor.days_until_next_withdrawal,
+        last_withdrawal_at: contractor.last_withdrawal_at,
+        paypal_payout_email: contractor.paypal_payout_email,
+        trolley_account_status: contractor.trolley_account_status,
+        tax_form_status: contractor.tax_form_status,
+        can_receive_payouts: contractor.can_receive_payouts?
+      },
+      earnings: earnings_data
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
   def balance
@@ -71,59 +65,94 @@ class Api::WalletController < ApplicationController
   end
 
   def withdraw
-    Stripe.api_key = STRIPE_API_KEY
+    contractor = current_user.contractor
+    amount = params[:amount].to_f
 
-    begin
-      contractor = current_user.contractor
-      amount = params[:amount].to_f
-
-      # Validate withdrawal
-      unless contractor.can_withdraw?
-        return render json: {
-          success: false,
-          error: "You must wait #{contractor.days_until_next_withdrawal} more days before withdrawing"
-        }, status: :unprocessable_entity
-      end
-
-      if amount <= 0 || amount > contractor.available_balance
-        return render json: {
-          success: false,
-          error: 'Invalid withdrawal amount'
-        }, status: :unprocessable_entity
-      end
-
-      # Create Stripe transfer to skillmaster's account
-      transfer = Stripe::Transfer.create({
-                                           amount: (amount * 100).to_i, # Convert to cents
-                                           currency: 'usd',
-                                           destination: contractor.stripe_account_id,
-                                           metadata: {
-                                             user_id: current_user.id,
-                                             contractor_id: contractor.id,
-                                             withdrawal_date: Time.current.to_s
-                                           }
-                                         })
-
-      # Update contractor balances
-      contractor.transaction do
-        contractor.update!(
-          available_balance: contractor.available_balance - amount,
-          last_withdrawal_at: Time.current
-        )
-      end
-
-      render json: {
-        success: true,
-        message: 'Withdrawal successful',
-        transfer_id: transfer.id,
-        amount: amount,
-        remaining_balance: contractor.available_balance
-      }, status: :ok
-    rescue Stripe::StripeError => e
-      render json: { success: false, error: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
+    # Validate withdrawal
+    unless contractor.can_withdraw?
+      return render json: {
+        success: false,
+        error: "You must wait #{contractor.days_until_next_withdrawal} more days before withdrawing"
+      }, status: :unprocessable_entity
     end
+
+    if amount <= 0 || amount > contractor.available_balance
+      return render json: {
+        success: false,
+        error: 'Invalid withdrawal amount'
+      }, status: :unprocessable_entity
+    end
+
+    # Validate PayPal account and tax compliance
+    unless contractor.can_receive_payouts?
+      return render json: {
+        success: false,
+        error: 'PayPal account not set up or tax compliance not complete'
+      }, status: :unprocessable_entity
+    end
+
+    # Queue PayPal payout job
+    PaypalPayoutJob.perform_later(contractor.id, amount)
+
+    # Update contractor balances
+    render json: {
+      success: true,
+      message: 'Payout initiated successfully',
+      amount: amount,
+      remaining_balance: contractor.reload.available_balance
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
+  end
+
+  def setup_paypal_account
+    contractor = current_user.contractor
+    paypal_email = params[:paypal_email]
+
+    # Validate PayPal email format
+    unless paypal_email.present? && valid_email?(paypal_email)
+      return render json: {
+        success: false,
+        error: 'Valid PayPal email is required'
+      }, status: :unprocessable_entity
+    end
+
+    # Update contractor with PayPal email
+    contractor.update!(paypal_payout_email: paypal_email)
+
+    render json: {
+      success: true,
+      message: 'PayPal account setup successfully',
+      paypal_email: paypal_email
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
+  end
+
+  def submit_tax_form
+    contractor = current_user.contractor
+    form_type = params[:form_type]
+    form_data = params[:form_data] || {}
+
+    # Validate form type
+    unless %w[W-9 W-8BEN].include?(form_type)
+      return render json: {
+        success: false,
+        error: 'Invalid tax form type. Must be W-9 or W-8BEN'
+      }, status: :unprocessable_entity
+    end
+
+    # Submit tax form
+    contractor.submit_tax_form!(form_type, form_data.to_h)
+
+    render json: {
+      success: true,
+      message: 'Tax form submitted for verification',
+      form_type: form_type,
+      status: contractor.tax_form_status
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
   def move_pending_to_available
@@ -141,97 +170,29 @@ class Api::WalletController < ApplicationController
     render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
-  def create_stripe_account
-    Stripe.api_key = STRIPE_API_KEY
-
-    begin
-      # Get country from params, default to US
-      country = params[:country]&.upcase || 'US'
-
-      # Validate country code (basic validation)
-      unless valid_stripe_country?(country)
-        return render json: {
-          success: false,
-          error: "Unsupported country code: #{country}",
-          supported_countries: get_supported_countries
-        }, status: :unprocessable_entity
-      end
-
-      # Create Stripe Connect account for the skillmaster
-      account = Stripe::Account.create({
-                                         type: 'express',
-                                         country: country,
-                                         email: current_user.email,
-                                         capabilities: get_capabilities_for_country(country),
-                                         metadata: {
-                                           user_id: current_user.id,
-                                           country: country
-                                         }
-                                       })
-
-      # Update or create contractor record
-      if current_user.contractor
-        current_user.contractor.update!(stripe_account_id: account.id)
-      else
-        current_user.create_contractor!(stripe_account_id: account.id)
-      end
-
-      # Create account link for onboarding
-      account_link = Stripe::AccountLink.create({
-                                                  account: account.id,
-                                                  refresh_url: get_refresh_url,
-                                                  return_url: get_return_url,
-                                                  type: 'account_onboarding'
-                                                })
-
-      render json: {
-        success: true,
-        account_id: account.id,
-        country: country,
-        onboarding_url: account_link.url
-      }, status: :created
-    rescue Stripe::InvalidRequestError => e
-      if e.message.include?('capability')
-        render json: {
-          success: false,
-          error: 'Account setup error due to capability requirements.',
-          details: e.message,
-          country: country
-        }, status: :unprocessable_entity
-      else
-        render json: { success: false, error: e.message }, status: :unprocessable_entity
-      end
-    rescue Stripe::StripeError => e
-      render json: { success: false, error: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
-    end
+  # This method is no longer needed - PayPal account setup is handled differently
+  # PayPal accounts are created using email addresses rather than separate account creation
+  def create_paypal_account
+    render json: {
+      success: false,
+      error: 'PayPal account creation is no longer needed. Use setup_paypal_account instead.'
+    }, status: :gone
   end
 
+  # This method is no longer needed - PayPal doesn't have the same account status concept
   def account_status
-    Stripe.api_key = STRIPE_API_KEY
+    contractor = current_user.contractor
 
-    begin
-      contractor = current_user.contractor
-
-      # Get account details from Stripe
-      account = Stripe::Account.retrieve(contractor.stripe_account_id)
-
-      render json: {
-        success: true,
-        account: {
-          id: account.id,
-          charges_enabled: account.charges_enabled,
-          payouts_enabled: account.payouts_enabled,
-          details_submitted: account.details_submitted,
-          requirements: account.requirements
-        }
-      }, status: :ok
-    rescue Stripe::StripeError => e
-      render json: { success: false, error: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: { success: false, error: e.message }, status: :internal_server_error
-    end
+    render json: {
+      success: true,
+      account: {
+        paypal_email: contractor.paypal_email,
+        setup_complete: contractor.paypal_email.present?,
+        tax_compliance_status: contractor.tax_form_status || 'not_submitted'
+      }
+    }, status: :ok
+  rescue StandardError => e
+    render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
   def supported_countries
@@ -243,136 +204,6 @@ class Api::WalletController < ApplicationController
     render json: { success: false, error: e.message }, status: :internal_server_error
   end
 
-  def transaction_history
-    Stripe.api_key = STRIPE_API_KEY
-
-    begin
-      # Get all completed orders for this skillmaster with payment information
-      # Exclude orders where the current user is both skillmaster AND customer
-      completed_orders = Order.joins(:user)
-                              .where(assigned_skill_master_id: current_user.id, state: 'complete')
-                              .where.not(user_id: current_user.id)
-                              # .where.not(payment_captured_at: nil)
-                              .includes(:products, :user)
-                              .order(payment_captured_at: :desc)
-                              .limit(50) # Limit to recent 50 transactions
-
-      if completed_orders.empty?
-        return render json: {
-          success: true,
-          message: 'No transaction history found',
-          transactions: []
-        }, status: :ok
-      end
-
-      # Build transaction history with detailed information
-      transactions = completed_orders.map do |order|
-        {
-          transaction_id: order.id,
-          order_id: order.internal_id,
-          type: 'payment_received',
-          customer_name: "#{order.user.first_name} #{order.user.last_name}",
-          customer_email: order.user.email,
-          amount_earned: order.skillmaster_earned || 0,
-          total_order_amount: order.total_price || 0,
-          products: order.products.map { |p| { name: p.name, price: p.price } },
-          order_status: order.state,
-          payment_captured_at: order.payment_captured_at,
-          created_at: order.created_at,
-          stripe_payment_intent_id: order.stripe_payment_intent_id
-        }
-      end
-
-      render json: {
-        success: true,
-        message: "Found #{transactions.count} transactions",
-        transactions: transactions,
-        summary: {
-          total_transactions: transactions.count,
-          total_earned: transactions.sum { |t| t[:amount_earned] },
-          period: {
-            from: transactions.last&.dig(:payment_captured_at),
-            to: transactions.first&.dig(:payment_captured_at)
-          }
-        }
-      }, status: :ok
-    rescue StandardError => e
-      render json: {
-        success: false,
-        error: 'Failed to retrieve transaction history',
-        details: e.message
-      }, status: :internal_server_error
-    end
-  end
-
-  def withdrawal_history
-    Stripe.api_key = STRIPE_API_KEY
-
-    begin
-      contractor = current_user.contractor
-
-      # Get transfer history from Stripe for this contractor's account
-      transfers = Stripe::Transfer.list({
-                                          destination: contractor.stripe_account_id,
-                                          limit: 50 # Limit to recent 50 withdrawals
-                                        })
-
-      if transfers.data.empty?
-        return render json: {
-          success: true,
-          message: 'No withdrawal history found',
-          withdrawals: []
-        }, status: :ok
-      end
-
-      # Build withdrawal history with detailed information
-      withdrawals = transfers.data.map do |transfer|
-        {
-          withdrawal_id: transfer.id,
-          amount: transfer.amount / 100.0, # Convert from cents to dollars
-          currency: transfer.currency.upcase,
-          status: transfer.status || 'completed',
-          created_at: Time.at(transfer.created),
-          description: transfer.description,
-          metadata: transfer.metadata&.to_hash || {},
-          destination_account: transfer.destination,
-          # Additional Stripe transfer details
-          transfer_group: transfer.transfer_group,
-          source_transaction: transfer.source_transaction
-        }
-      end
-
-      # Calculate summary statistics
-      total_withdrawn = withdrawals.sum { |w| w[:amount] }
-      successful_withdrawals = withdrawals.select { |w| w[:status] == 'completed' || w[:status] == 'paid' }
-
-      render json: {
-        success: true,
-        message: "Found #{withdrawals.count} withdrawals",
-        withdrawals: withdrawals,
-        summary: {
-          total_withdrawals: withdrawals.count,
-          successful_withdrawals: successful_withdrawals.count,
-          total_amount_withdrawn: total_withdrawn,
-          last_withdrawal: withdrawals.first&.dig(:created_at),
-          first_withdrawal: withdrawals.last&.dig(:created_at)
-        }
-      }, status: :ok
-    rescue Stripe::StripeError => e
-      render json: {
-        success: false,
-        error: 'Failed to retrieve withdrawal history from Stripe',
-        details: e.message
-      }, status: :unprocessable_entity
-    rescue StandardError => e
-      render json: {
-        success: false,
-        error: 'Failed to retrieve withdrawal history',
-        details: e.message
-      }, status: :internal_server_error
-    end
-  end
-
   private
 
   def ensure_contractor_role
@@ -382,108 +213,48 @@ class Api::WalletController < ApplicationController
   end
 
   def ensure_contractor_account
-    # Skip this check for create_stripe_account, supported_countries, balance, transaction_history, and withdrawal_history actions
-    return if action_name.in?(%w[create_stripe_account supported_countries balance transaction_history
+    # Skip this check for setup_paypal_account, submit_tax_form, supported_countries, balance, transaction_history, and withdrawal_history actions
+    return if action_name.in?(%w[setup_paypal_account submit_tax_form supported_countries balance transaction_history
                                  withdrawal_history])
 
-    return if current_user.contractor&.stripe_account_id.present?
+    return if current_user.contractor&.paypal_email.present?
 
     render json: {
       success: false,
-      error: 'No contractor account found. Please create a Stripe account first.',
-      needs_stripe_account: true
+      error: 'No contractor account found. Please setup your PayPal account first.',
+      needs_paypal_setup: true
     }, status: :unprocessable_entity
   end
 
   def get_supported_countries
-    config_path = Rails.root.join('config/stripe_config.yml')
-    stripe_config = YAML.load_file(config_path)
-    countries = stripe_config['countries'] || {}
-    countries.map { |code, info| { code: code, name: info['name'] } }
-  rescue StandardError => e
-    Rails.logger.error "Error loading supported countries config: #{e.message}"
-    # Fallback list
+    # PayPal supports many more countries than Stripe
     [
       { code: 'US', name: 'United States' },
       { code: 'CA', name: 'Canada' },
       { code: 'GB', name: 'United Kingdom' },
       { code: 'AU', name: 'Australia' },
       { code: 'FR', name: 'France' },
-      { code: 'DE', name: 'Germany' }
+      { code: 'DE', name: 'Germany' },
+      { code: 'IT', name: 'Italy' },
+      { code: 'ES', name: 'Spain' },
+      { code: 'NL', name: 'Netherlands' },
+      { code: 'BE', name: 'Belgium' },
+      { code: 'AT', name: 'Austria' },
+      { code: 'CH', name: 'Switzerland' },
+      { code: 'SE', name: 'Sweden' },
+      { code: 'NO', name: 'Norway' },
+      { code: 'DK', name: 'Denmark' },
+      { code: 'FI', name: 'Finland' },
+      { code: 'IE', name: 'Ireland' },
+      { code: 'PT', name: 'Portugal' },
+      { code: 'LU', name: 'Luxembourg' },
+      { code: 'JP', name: 'Japan' },
+      { code: 'BR', name: 'Brazil' },
+      { code: 'MX', name: 'Mexico' },
+      { code: 'IN', name: 'India' },
+      { code: 'SG', name: 'Singapore' },
+      { code: 'HK', name: 'Hong Kong' },
+      { code: 'NZ', name: 'New Zealand' }
     ]
-  end
-
-  def valid_stripe_country?(country_code)
-    # Load countries from configuration file
-    config_path = Rails.root.join('config/stripe_config.yml')
-    stripe_config = YAML.load_file(config_path)
-    stripe_config['countries']&.key?(country_code)
-  rescue StandardError => e
-    Rails.logger.error "Error loading stripe config: #{e.message}"
-    # Fallback to hardcoded list if config fails
-    supported_countries = %w[
-      US CA GB AU AT BE DK FI FR DE HK IE IT LU NL NZ NO PT ES SE CH
-      BR MX SG MY TH PH IN JP
-    ]
-    supported_countries.include?(country_code)
-  end
-
-  def get_capabilities_for_country(country)
-    begin
-      # Load capabilities from configuration file
-      config_path = Rails.root.join('config/stripe_config.yml')
-      stripe_config = YAML.load_file(config_path)
-      country_config = stripe_config['countries']&.[](country)
-
-      if country_config&.[]('capabilities')
-        capabilities = {}
-        country_config['capabilities'].each do |capability|
-          capabilities[capability.to_sym] = { requested: true }
-        end
-        return capabilities
-      end
-    rescue StandardError => e
-      Rails.logger.error "Error loading stripe capabilities config: #{e.message}"
-    end
-
-    # Fallback to default capabilities if config fails or country not found
-    {
-      card_payments: { requested: true },
-      transfers: { requested: true }
-    }
-  end
-
-  def get_refresh_url
-    config_path = Rails.root.join('config/stripe_config.yml')
-    stripe_config = YAML.load_file(config_path)
-    stripe_config[Rails.env]&.[]('refresh_url')
-  rescue StandardError => e
-    Rails.logger.error "Error loading stripe refresh URL config: #{e.message}"
-    # Fallback URLs
-    case Rails.env
-    when 'production'
-      'https://www.ravenboost.com/wallet/refresh'
-    when 'staging'
-      'https://staging.ravenboost.com/wallet/refresh'
-    else
-      'http://localhost:3000/wallet/refresh'
-    end
-  end
-
-  def get_return_url
-    config_path = Rails.root.join('config/stripe_config.yml')
-    stripe_config = YAML.load_file(config_path)
-    stripe_config[Rails.env]&.[]('return_url')
-  rescue StandardError => e
-    Rails.logger.error "Error loading stripe return URL config: #{e.message}"
-    # Fallback URLs
-    case Rails.env
-    when 'production'
-      'https://www.ravenboost.com/wallet/success'
-    when 'staging'
-      'https://staging.ravenboost.com/wallet/success'
-    else
-      'http://localhost:3000/wallet/success'
-    end
   end
 end

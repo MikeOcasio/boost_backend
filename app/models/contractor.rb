@@ -1,10 +1,15 @@
 class Contractor < ApplicationRecord
   belongs_to :user
+  has_many :paypal_payouts, dependent: :destroy
 
-  validates :stripe_account_id, uniqueness: true, allow_blank: true
+  validates :paypal_payout_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+  validates :trolley_recipient_id, uniqueness: true, allow_blank: true
+  validates :tax_form_status, inclusion: { in: %w[pending submitted approved rejected] }
+  validates :tax_form_type, inclusion: { in: %w[W-9 W-8BEN] }, allow_blank: true
+  validates :trolley_account_status, inclusion: { in: %w[pending active suspended] }
 
-  after_create :process_retroactive_payments_if_stripe_account_added
-  after_update :process_retroactive_payments_if_stripe_account_added
+  after_create :process_retroactive_payments_if_paypal_account_added
+  after_update :process_retroactive_payments_if_paypal_account_added
 
   # Add these new columns in a migration
   # available_balance: decimal, default: 0.0
@@ -61,34 +66,70 @@ class Contractor < ApplicationRecord
         total_earned: total_earned + amount
       )
 
-      # Trigger Stripe payout if contractor account is ready
-      if stripe_account_ready?
-        StripePayoutJob.perform_later(id, amount)
+      # Check tax compliance before processing payout
+      if paypal_account_ready? && tax_compliant?
+        PaypalPayoutJob.perform_later(id, amount)
       else
-        Rails.logger.warn "Contractor #{id} earnings approved but no Stripe account - payout will be processed when account is ready"
+        Rails.logger.warn "Contractor #{id} earnings approved but account not ready - payout will be processed when requirements are met"
       end
     end
     amount
   end
 
-  # Check if contractor has a valid Stripe account
-  def stripe_account_ready?
-    stripe_account_id.present?
-  end # Outlier XX: Process retroactive payments when Stripe account is added
+  # Check if contractor has a valid PayPal account and tax compliance
+  def paypal_account_ready?
+    paypal_payout_email.present? && trolley_account_status == 'active'
+  end
 
-  def process_retroactive_payments_if_stripe_account_added
-    # Handle both create (new contractor with stripe_account_id) and update (adding stripe_account_id to existing contractor)
-    stripe_account_added = if persisted? && saved_changes.key?('stripe_account_id')
-                             # Update case: stripe_account_id was changed
-                             saved_change_to_stripe_account_id? && stripe_account_id.present?
+  def tax_compliant?
+    tax_form_status == 'approved' && tax_form_type.present?
+  end
+
+  def can_receive_payouts?
+    paypal_account_ready? && tax_compliant?
+  end
+
+  def tax_form_required?
+    # US residents need W-9, non-US residents need W-8BEN
+    # This could be determined by user location or other criteria
+    true # For now, assume all contractors need tax forms
+  end
+
+  def submit_tax_form!(form_type, form_data = {})
+    update!(
+      tax_form_type: form_type,
+      tax_form_status: 'submitted',
+      tax_form_submitted_at: Time.current
+    )
+
+    # Queue job to verify tax form with Trolley
+    TrolleyTaxVerificationJob.perform_later(id, form_data)
+  end
+
+  def approve_tax_form!
+    update!(
+      tax_form_status: 'approved',
+      tax_compliance_checked_at: Time.current
+    )
+  end
+
+  def reject_tax_form!
+    update!(tax_form_status: 'rejected')
+  end # Process retroactive payments when PayPal account is added
+
+  def process_retroactive_payments_if_paypal_account_added
+    # Handle both create (new contractor with paypal_payout_email) and update (adding paypal_payout_email to existing contractor)
+    paypal_account_added = if persisted? && saved_changes.key?('paypal_payout_email')
+                             # Update case: paypal_payout_email was changed
+                             saved_change_to_paypal_payout_email? && paypal_payout_email.present?
                            else
-                             # Create case: new record with stripe_account_id
-                             stripe_account_id.present?
+                             # Create case: new record with paypal_payout_email
+                             paypal_payout_email.present?
                            end
 
-    return unless stripe_account_added
+    return unless paypal_account_added
 
-    Rails.logger.info "Stripe account added for contractor #{id} (user: #{user_id}). Processing retroactive payments..."
+    Rails.logger.info "PayPal account added for contractor #{id} (user: #{user_id}). Processing retroactive payments..."
 
     # Queue job to process retroactive payments
     ProcessRetroactivePaymentsJob.perform_later(id)

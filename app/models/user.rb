@@ -42,6 +42,7 @@ class User < ApplicationRecord
   has_many :received_reviews, as: :reviewable, class_name: 'Review'
   has_many :written_reviews, class_name: 'Review'
   has_one :contractor, dependent: :destroy
+  has_many :payment_approvals, foreign_key: 'admin_user_id', dependent: :destroy
 
   before_validation :set_default_role, on: :create
   # ---------------
