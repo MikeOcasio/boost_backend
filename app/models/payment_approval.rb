@@ -1,6 +1,6 @@
 class PaymentApproval < ApplicationRecord
   belongs_to :order
-  belongs_to :admin_user, class_name: 'User'
+  belongs_to :admin_user, class_name: 'User', optional: true
 
   validates :status, inclusion: { in: %w[pending approved rejected] }
   validates :order_id, uniqueness: true

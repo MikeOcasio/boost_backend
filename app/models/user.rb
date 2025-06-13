@@ -44,15 +44,59 @@ class User < ApplicationRecord
   has_one :contractor, dependent: :destroy
   has_many :payment_approvals, foreign_key: 'admin_user_id', dependent: :destroy
 
-  before_validation :set_default_role, on: :create
+  # Constants
   # ---------------
   ROLE_LIST = %w[admin skillmaster customer skillcoach coach dev c_support manager].freeze
+
+  # Country and currency mappings
+  COUNTRY_CURRENCY_MAP = {
+    'US' => 'USD',
+    'CA' => 'CAD',
+    'GB' => 'GBP',
+    'AU' => 'AUD',
+    'DE' => 'EUR',
+    'FR' => 'EUR',
+    'IT' => 'EUR',
+    'ES' => 'EUR',
+    'NL' => 'EUR',
+    'JP' => 'JPY',
+    'KR' => 'KRW',
+    'BR' => 'BRL',
+    'MX' => 'MXN',
+    'IN' => 'INR',
+    'SG' => 'SGD',
+    'HK' => 'HKD'
+  }.freeze
+
+  COUNTRY_REGIONS = {
+    'US' => 'North America',
+    'CA' => 'North America',
+    'MX' => 'North America',
+    'GB' => 'Europe',
+    'DE' => 'Europe',
+    'FR' => 'Europe',
+    'IT' => 'Europe',
+    'ES' => 'Europe',
+    'NL' => 'Europe',
+    'AU' => 'Asia Pacific',
+    'SG' => 'Asia Pacific',
+    'HK' => 'Asia Pacific',
+    'JP' => 'Asia',
+    'KR' => 'Asia',
+    'IN' => 'Asia',
+    'BR' => 'Latin America'
+  }.freeze
 
   # Validations
   # ---------------
   validates :email, presence: true, uniqueness: true
   validates :role, presence: true, inclusion: { in: ROLE_LIST }
+  validates :country, inclusion: { in: COUNTRY_CURRENCY_MAP.keys }, allow_blank: true
   validate :password_complexity
+
+  # Callbacks
+  before_validation :set_default_role, on: :create
+  before_save :set_currency_from_country, if: :country_changed?
 
   scope :active, -> { where(deleted_at: nil) }
   scope :skillmaster, -> { where(role: 'skillmaster') }
@@ -263,5 +307,51 @@ class User < ApplicationRecord
     return if contractor.present?
 
     create_contractor!
+  end
+
+  # Currency and country helper methods
+  def user_currency
+    return currency if currency.present?
+    return COUNTRY_CURRENCY_MAP[country] if country.present?
+
+    'USD' # Default fallback
+  end
+
+  def region_name
+    COUNTRY_REGIONS[country] || 'International'
+  end
+
+  def paypal_locale
+    return 'en-US' unless country.present?
+
+    locale_map = {
+      'US' => 'en-US',
+      'CA' => 'en-CA',
+      'GB' => 'en-GB',
+      'AU' => 'en-AU',
+      'DE' => 'de-DE',
+      'FR' => 'fr-FR',
+      'IT' => 'it-IT',
+      'ES' => 'es-ES',
+      'NL' => 'nl-NL',
+      'JP' => 'ja-JP',
+      'KR' => 'ko-KR',
+      'BR' => 'pt-BR',
+      'MX' => 'es-MX',
+      'IN' => 'en-IN',
+      'SG' => 'en-SG',
+      'HK' => 'en-HK'
+    }
+
+    locale_map[country] || 'en-US'
+  end
+
+  private
+
+  def set_currency_from_country
+    return unless country.present?
+
+    self.currency = COUNTRY_CURRENCY_MAP[country]
+    self.region = COUNTRY_REGIONS[country]
   end
 end

@@ -197,6 +197,7 @@ module Orders
         end
 
       elsif current_user.role == 'skillmaster'
+        byebug
         # Skill masters can update the state and submit completion notes
         if state_param.present?
           case state_param
@@ -351,7 +352,6 @@ module Orders
     # POST /orders/info/:id/admin_approve_completion
     # Admin approves payment release for completed work (NEW WORKFLOW)
     def admin_approve_completion
-      byebug
       unless current_user.role.in?(%w[admin dev])
         return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end

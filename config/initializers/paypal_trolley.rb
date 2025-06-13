@@ -5,25 +5,29 @@
 
 Rails.application.configure do
   # PayPal Configuration
-  config.paypal = config_for(:paypal) rescue {}
+  config.paypal = begin
+    config_for(:paypal)
+  rescue StandardError
+    {}
+  end
 
   # Trolley Configuration
-  config.trolley = config_for(:trolley) rescue {}
+  config.trolley = begin
+    config_for(:trolley)
+  rescue StandardError
+    {}
+  end
 
   # Validate required credentials in production
   if Rails.env.production?
-    required_paypal_keys = [:client_id, :client_secret, :webhook_id]
-    required_trolley_keys = [:api_key, :api_secret]
+    required_paypal_keys = %i[client_id client_secret webhook_id]
+    required_trolley_keys = %i[api_key api_secret]
 
     missing_paypal = required_paypal_keys.reject { |key| Rails.application.credentials.paypal&.key?(key) }
     missing_trolley = required_trolley_keys.reject { |key| Rails.application.credentials.trolley&.key?(key) }
 
-    if missing_paypal.any?
-      Rails.logger.warn "Missing PayPal credentials: #{missing_paypal.join(', ')}"
-    end
+    Rails.logger.warn "Missing PayPal credentials: #{missing_paypal.join(', ')}" if missing_paypal.any?
 
-    if missing_trolley.any?
-      Rails.logger.warn "Missing Trolley credentials: #{missing_trolley.join(', ')}"
-    end
+    Rails.logger.warn "Missing Trolley credentials: #{missing_trolley.join(', ')}" if missing_trolley.any?
   end
 end

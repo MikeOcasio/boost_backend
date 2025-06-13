@@ -125,8 +125,10 @@ Rails.application.routes.draw do
       collection do
         post :create_paypal_order
         post :capture_paypal_payment
+        post :approve_paypal_order
         get :order_status
-        post :webhook
+        post :webhook, to: 'payments#webhook'
+        get :order_id_from_paypal
       end
     end
 

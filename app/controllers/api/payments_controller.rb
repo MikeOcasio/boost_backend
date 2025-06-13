@@ -1,5 +1,5 @@
 class Api::PaymentsController < ApplicationController
-  before_action :authenticate_user!
+  before_action :authenticate_user!, except: [:webhook]
 
   def webhook
     # Handle PayPal webhooks for payment completion
@@ -30,8 +30,16 @@ class Api::PaymentsController < ApplicationController
   end
 
   def create_paypal_order
-    # Extract parameters
-    currency = params[:currency] || 'USD'
+    # Validate user has country set for proper currency/localization
+    if current_user.country.blank?
+      return render json: {
+        success: false,
+        error: 'Please update your profile with your country information before checkout.'
+      }, status: :unprocessable_entity
+    end
+
+    # Extract parameters and normalize currency to uppercase
+    currency = (params[:currency] || current_user.user_currency).upcase
     products = JSON.parse(params[:products] || '[]')
     promotion = params[:promotion]
     promo_data = params[:promo_data]
@@ -52,32 +60,34 @@ class Api::PaymentsController < ApplicationController
     # Calculate total price for the order
     total_price = calculate_total_price(normalized_products, promotion)
 
-    # Create PayPal order
+    # Create PayPal order with user context
     paypal_service = PaypalService.new
     paypal_order = paypal_service.create_order(
       amount: total_price,
       currency: currency,
       reference_id: "order_#{SecureRandom.hex(5)}",
-      description: build_order_description(normalized_products)
+      description: build_order_description(normalized_products),
+      user: current_user
     )
 
     if paypal_order.successful?
-      # Store order data in session for later order creation
-      session[:pending_order_data] = {
+      # Store order data in database instead of session
+      pending_order = PendingOrder.create!(
         user_id: current_user.id,
+        paypal_order_id: paypal_order.id,
         platform_id: platform_id,
         total_price: total_price,
-        promo_data: promo_data,
-        order_data: order_data,
         products: normalized_products.to_json,
-        paypal_order_id: paypal_order.id
-      }
+        promo_data: promo_data.to_json,
+        order_data: order_data.to_json
+      )
 
       render json: {
         success: true,
         order_id: paypal_order.id,
         approval_url: build_paypal_approval_url(paypal_order.id)
       }
+      puts "PayPal order created successfully: #{paypal_order.id}"
     else
       render json: {
         error: 'Failed to create PayPal order',
@@ -91,19 +101,21 @@ class Api::PaymentsController < ApplicationController
   def approve_paypal_order
     order_id = params[:order_id]
 
-    # Create order in our system using session data
-    pending_data = session[:pending_order_data]
+    # Find pending order data from database instead of session
+    pending_order = PendingOrder.find_by(paypal_order_id: order_id, user: current_user)
 
-    if pending_data.nil? || pending_data['paypal_order_id'] != order_id
-      return render json: { error: 'Invalid order session' }, status: :bad_request
+    if pending_order.nil?
+      return render json: {
+        error: 'Invalid order or order not found. Please try creating the order again.'
+      }, status: :bad_request
     end
 
     # Create the order in our database
-    order = create_order_from_session_data(pending_data)
+    order = create_order_from_pending_order(pending_order)
 
     if order
-      # Clear session data
-      session.delete(:pending_order_data)
+      # Delete the pending order record after successful creation
+      pending_order.destroy
 
       render json: {
         success: true,
@@ -136,26 +148,47 @@ class Api::PaymentsController < ApplicationController
     render json: { error: e.message }, status: :internal_server_error
   end
 
+  def order_id_from_paypal
+    paypal_order_id = params[:paypal_order_id]
+
+    return render json: { error: 'PayPal order ID is required' }, status: :bad_request if paypal_order_id.blank?
+
+    # Find the order by PayPal order ID
+    order = Order.find_by(paypal_order_id: paypal_order_id, user: current_user)
+
+    if order
+      render json: {
+        success: true,
+        order_id: order.id,
+        internal_id: order.internal_id,
+        state: order.state,
+        paypal_order_id: order.paypal_order_id
+      }
+    else
+      render json: {
+        success: false,
+        error: 'Order not found or access denied'
+      }, status: :not_found
+    end
+  rescue StandardError => e
+    render json: { error: e.message }, status: :internal_server_error
+  end
+
   private
 
   def verify_paypal_webhook(request)
-    # Implement PayPal webhook signature verification
-    # Get the webhook signature from headers
-    paypal_transmission_id = request.headers['PAYPAL-TRANSMISSION-ID']
-    paypal_transmission_sig = request.headers['PAYPAL-TRANSMISSION-SIG']
+    # Use PaypalService for webhook verification
+    paypal_service = PaypalService.new
 
-    # In production, implement proper webhook verification using PayPal's SDK
-    # For now, check if basic headers are present
-    return true if Rails.env.development? && paypal_transmission_id.present?
+    # Get the request body for verification
+    body = request.body.read
+    request.body.rewind # Reset body stream for later reading
 
-    # TODO: Implement full webhook verification with PayPal's verification API
-    # This should verify the signature using PayPal's public key
-    webhook_id = Rails.application.credentials.paypal&.dig(:webhook_id) || ENV.fetch('PAYPAL_WEBHOOK_ID', nil)
-
-    return false unless webhook_id && paypal_transmission_sig.present?
-
-    # Placeholder for actual verification - should use PayPal SDK
-    true
+    # Verify webhook using PayPal service
+    paypal_service.verify_webhook(request.headers, body)
+  rescue StandardError => e
+    Rails.logger.error "PayPal webhook verification error: #{e.message}"
+    false
   end
 
   def handle_order_approved(resource)
@@ -208,6 +241,34 @@ class Api::PaymentsController < ApplicationController
       promo_data: data['promo_data'],
       order_data: data['order_data'],
       paypal_order_id: data['paypal_order_id'],
+      paypal_payment_status: 'created'
+    )
+
+    # Add products to order
+    products.each do |product_data|
+      next unless Product.exists?(product_data['id'])
+
+      order.order_products.create!(
+        product_id: product_data['id'],
+        quantity: product_data['quantity'],
+        price: product_data['price']
+      )
+    end
+
+    order
+  end
+
+  def create_order_from_pending_order(pending_order)
+    products = pending_order.products_data
+
+    order = Order.create!(
+      user_id: pending_order.user_id,
+      total_price: pending_order.total_price,
+      state: 'open',
+      platform: pending_order.platform_id,
+      promo_data: pending_order.promo_data,
+      order_data: pending_order.order_data,
+      paypal_order_id: pending_order.paypal_order_id,
       paypal_payment_status: 'created'
     )
 

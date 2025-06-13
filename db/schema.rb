@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_08_194510) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_12_061822) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -241,7 +241,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_08_194510) do
 
   create_table "payment_approvals", force: :cascade do |t|
     t.bigint "order_id", null: false
-    t.bigint "admin_user_id", null: false
+    t.bigint "admin_user_id"
     t.string "status", default: "pending"
     t.text "notes"
     t.datetime "approved_at", precision: nil
@@ -265,6 +265,18 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_08_194510) do
     t.datetime "updated_at", null: false
     t.index ["contractor_id", "status"], name: "index_paypal_payouts_on_contractor_id_and_status"
     t.index ["contractor_id"], name: "index_paypal_payouts_on_contractor_id"
+  end
+
+  create_table "pending_orders", force: :cascade do |t|
+    t.string "paypal_order_id"
+    t.integer "user_id"
+    t.integer "platform_id"
+    t.decimal "total_price"
+    t.text "products"
+    t.text "promo_data"
+    t.text "order_data"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "platform_credentials", force: :cascade do |t|
@@ -493,6 +505,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_08_194510) do
     t.integer "total_referral_points", default: 0
     t.string "paypal_customer_id"
     t.string "paypal_email"
+    t.string "country"
+    t.string "region"
+    t.string "currency", default: "USD"
+    t.index ["country"], name: "index_users_on_country"
+    t.index ["currency"], name: "index_users_on_currency"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["paypal_customer_id"], name: "index_users_on_paypal_customer_id"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"

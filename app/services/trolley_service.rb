@@ -1,7 +1,7 @@
 class TrolleyService
   def initialize
-    @api_key = Rails.application.credentials.trolley&.dig(:api_key) || ENV['TROLLEY_API_KEY']
-    @api_secret = Rails.application.credentials.trolley&.dig(:api_secret) || ENV['TROLLEY_API_SECRET']
+    @api_key = Rails.application.credentials.trolley&.dig(:api_key) || ENV.fetch('TROLLEY_API_KEY', nil)
+    @api_secret = Rails.application.credentials.trolley&.dig(:api_secret) || ENV.fetch('TROLLEY_API_SECRET', nil)
     @base_url = Rails.env.production? ? 'https://api.trolley.com' : 'https://api.sandbox.trolley.com'
 
     validate_credentials!
@@ -82,13 +82,10 @@ class TrolleyService
   private
 
   def validate_credentials!
-    unless @api_key && @api_secret
-      if Rails.env.production?
-        raise "Trolley credentials not configured"
-      else
-        Rails.logger.warn "Trolley credentials not configured - using environment variables if available"
-      end
-    end
+    return if @api_key && @api_secret
+    raise 'Trolley credentials not configured' if Rails.env.production?
+
+    Rails.logger.warn 'Trolley credentials not configured - using environment variables if available'
   end
 
   def make_request(method, endpoint, data = nil)
