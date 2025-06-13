@@ -69,7 +69,7 @@ class PaypalService
     order_data[:payer] = build_payer_info(user) if user.present?
 
     # Debug logging for PayPal order creation
-    Rails.logger.info "=== PayPal Order Creation Debug ==="
+    Rails.logger.info '=== PayPal Order Creation Debug ==='
     Rails.logger.info "Final Currency: #{final_currency}"
     Rails.logger.info "Amount: #{amount} -> Formatted: #{format('%.2f', amount)}"
     Rails.logger.info "Locale: #{locale}"
@@ -246,15 +246,13 @@ class PaypalService
   end
 
   def build_payer_info(user)
-    payer_info = {
+    {
       email_address: user.email,
       name: {
         given_name: user.first_name || 'Customer',
         surname: user.last_name || 'User'
       }
     }
-
-    payer_info
   end
 end
 
@@ -309,7 +307,7 @@ class PaypalResponse
       nil
     else
       # Enhanced error logging for debugging
-      Rails.logger.error "=== PayPal API Error Debug ==="
+      Rails.logger.error '=== PayPal API Error Debug ==='
       Rails.logger.error "Response Code: #{@response.code}"
       Rails.logger.error "Response Body: #{@response.body}"
       Rails.logger.error "Parsed Body: #{parsed_body}"
