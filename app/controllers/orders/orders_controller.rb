@@ -18,7 +18,7 @@ module Orders
     before_action :authenticate_user!
     before_action :set_order,
                   only: %i[show update destroy pick_up_order admin_approve_completion admin_reject_completion verify_completion
-                           admin_approve]
+                           admin_approve admin_reject_dispute admin_dispute_denied admin_dispute_upheld]
 
     # GET /orders/info
     # Fetch all orders. Only accessible by admins, devs, or specific roles as determined by other methods.
@@ -197,7 +197,6 @@ module Orders
         end
 
       elsif current_user.role == 'skillmaster'
-        byebug
         # Skill masters can update the state and submit completion notes
         if state_param.present?
           case state_param
@@ -414,11 +413,21 @@ module Orders
       # Send order back to in_progress for rework
       if @order.may_reject_and_rework?
         @order.reject_and_rework!
+        rejection_notes = params[:notes] || 'Work needs improvement before payment approval.'
+
         @order.update!(
           admin_reviewed_at: Time.current,
           admin_reviewer_id: current_user.id,
-          admin_rejection_notes: params[:notes] || 'Work needs improvement before payment approval.',
+          admin_rejection_notes: rejection_notes,
           submitted_for_review_at: nil # Clear submission timestamp
+        )
+
+        # Create rejection record for tracking
+        @order.create_rejection_record!(
+          'payment_rejection',
+          current_user,
+          'Quality/Completion Issues',
+          rejection_notes
         )
 
         render json: {
@@ -495,9 +504,9 @@ module Orders
       end
     end
 
-    # POST /orders/info/:id/admin_approve
-    # Admin approves order after review (moves from in_review back to complete)
-    def admin_approve
+    # POST /orders/info/:id/admin_dispute_denied
+    # Admin approves order after dispute review (moves from in_review back to complete and triggers payment)
+    def admin_dispute_denied
       unless current_user.role.in?(%w[admin dev])
         return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
       end
@@ -506,23 +515,74 @@ module Orders
         return render json: { success: false, message: 'Order is not in review state.' }, status: :unprocessable_entity
       end
 
-      if @order.may_approve_completion?
-        @order.approve_completion!
+      if @order.may_resolve_dispute?
+        @order.resolve_dispute!
         @order.update!(
           admin_reviewed_at: Time.current,
           admin_reviewer_id: current_user.id,
-          customer_verified_at: Time.current # Set this so payment can be processed
+          customer_verified_at: Time.current, # Set this so payment can be processed
+          admin_approval_notes: params[:notes] || 'Dispute resolved in favor of skillmaster'
         )
+
+        # NOW trigger payment capture since admin approved the disputed work
+        if @order.paypal_order_id.present?
+          CapturePaypalPaymentJob.perform_later(@order.id)
+          Rails.logger.info "Admin approved disputed order #{@order.id} - PayPal payment capture job queued"
+        end
 
         render json: {
           success: true,
-          message: 'Order approved by admin.',
+          message: 'Dispute resolved. Order approved and payment will be processed.',
           order: @order.as_json(only: %i[id state admin_reviewed_at customer_verified_at])
         }
       else
         render json: {
           success: false,
           message: 'Order cannot be approved at this time.'
+        }, status: :unprocessable_entity
+      end
+    end
+
+    # POST /orders/info/:id/admin_dispute_upheld
+    # Admin rejects disputed order and sends back to in_progress for rework
+    def admin_dispute_upheld
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      unless @order.in_review?
+        return render json: { success: false, message: 'Order is not in review state.' }, status: :unprocessable_entity
+      end
+
+      if @order.may_reject_and_rework?
+        @order.reject_and_rework!
+        rejection_notes = params[:notes] || 'Customer dispute upheld. Work needs improvement.'
+
+        @order.update!(
+          admin_reviewed_at: Time.current,
+          admin_reviewer_id: current_user.id,
+          admin_rejection_notes: rejection_notes,
+          submitted_for_review_at: nil, # Clear submission timestamp
+          customer_verified_at: nil # Clear customer verification
+        )
+
+        # Create rejection record for tracking
+        @order.create_rejection_record!(
+          'dispute_rejection',
+          current_user,
+          'Customer Dispute Upheld',
+          rejection_notes
+        )
+
+        render json: {
+          success: true,
+          message: 'Customer dispute upheld. Skillmaster has been notified to improve work.',
+          order: @order.as_json(only: %i[id state admin_reviewed_at admin_rejection_notes])
+        }
+      else
+        render json: {
+          success: false,
+          message: 'Order cannot be rejected at this time.'
         }, status: :unprocessable_entity
       end
     end
@@ -568,6 +628,8 @@ module Orders
             skillmaster_submission_notes: order.skillmaster_submission_notes,
             admin_rejection_notes: order.admin_rejection_notes,
             review_type: review_type,
+            before_image: order.before_image,
+            after_image: order.after_image,
             status: status,
             customer: {
               id: order.user.id,
@@ -580,6 +642,122 @@ module Orders
               gamer_tag: order.assigned_skill_master&.gamer_tag
             },
             products: order.products.map { |p| { name: p.name, price: p.price } }
+          }
+        end
+      }
+    end
+
+    # GET /orders/info/reviewed_orders
+    # Get orders that have been reviewed by admin in the last 14 days
+    def reviewed_orders
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      # Get orders reviewed in the last 14 days
+      reviewed_orders = Order.where(
+        'admin_reviewed_at IS NOT NULL AND admin_reviewed_at >= ?',
+        14.days.ago
+      ).includes(:user, :assigned_skill_master, :products)
+                             .order(admin_reviewed_at: :desc)
+
+      render json: {
+        success: true,
+        count: reviewed_orders.count,
+        orders: reviewed_orders.map do |order|
+          # Determine the review outcome
+          if order.paypal_capture_id.present? && order.payment_captured_at.present?
+            review_outcome = 'approved_and_paid'
+            status = 'Payment Captured'
+          elsif order.admin_reviewed_at.present? && order.state == 'in_progress'
+            review_outcome = 'rejected'
+            status = 'Rejected - Rework Required'
+          elsif order.admin_reviewed_at.present? && order.state == 'complete'
+            review_outcome = 'approved_pending_payment'
+            status = 'Approved - Payment Processing'
+          else
+            review_outcome = 'unknown'
+            status = 'Review Status Unknown'
+          end
+
+          {
+            id: order.id,
+            internal_id: order.internal_id,
+            state: order.state,
+            total_price: order.total_price,
+            created_at: order.created_at,
+            submitted_for_review_at: order.submitted_for_review_at,
+            customer_verified_at: order.customer_verified_at,
+            admin_reviewed_at: order.admin_reviewed_at,
+            payment_captured_at: order.payment_captured_at,
+            skillmaster_earned: order.skillmaster_earned,
+            company_earned: order.company_earned,
+            review_outcome: review_outcome,
+            status: status,
+            admin_approval_notes: order.admin_approval_notes,
+            admin_rejection_notes: order.admin_rejection_notes,
+            skillmaster_submission_notes: order.skillmaster_submission_notes,
+            paypal_order_id: order.paypal_order_id,
+            paypal_capture_id: order.paypal_capture_id,
+            customer: {
+              id: order.user.id,
+              name: "#{order.user.first_name} #{order.user.last_name}",
+              email: order.user.email
+            },
+            skillmaster: {
+              id: order.assigned_skill_master&.id,
+              name: order.assigned_skill_master&.first_name,
+              gamer_tag: order.assigned_skill_master&.gamer_tag
+            },
+            admin_reviewer: {
+              id: order.admin_reviewer_id,
+              name: order.admin_reviewer_id ? User.find_by(id: order.admin_reviewer_id)&.first_name : nil
+            },
+            products: order.products.map do |product|
+              {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                tax: product.tax
+              }
+            end
+          }
+        end
+      }
+    end
+
+    # GET /orders/info/rejection_analytics
+    # Get rejection analytics for admin dashboard
+    def rejection_analytics
+      unless current_user.role.in?(%w[admin dev])
+        return render json: { success: false, message: 'Unauthorized action.' }, status: :forbidden
+      end
+
+      days = params[:days]&.to_i || 30
+      analytics = OrderRejection.rejection_analytics(days)
+
+      # Get additional rejection details
+      recent_rejections = OrderRejection.recent(days)
+                                        .includes(:order, :admin_user)
+                                        .order(created_at: :desc)
+                                        .limit(20)
+
+      render json: {
+        success: true,
+        analytics: analytics,
+        recent_rejections: recent_rejections.map do |rejection|
+          {
+            id: rejection.id,
+            order_id: rejection.order.id,
+            order_internal_id: rejection.order.internal_id,
+            rejection_type: rejection.rejection_type,
+            reason: rejection.reason,
+            rejection_notes: rejection.rejection_notes,
+            created_at: rejection.created_at,
+            admin_name: "#{rejection.admin_user.first_name} #{rejection.admin_user.last_name}",
+            order_total: rejection.order.total_price,
+            skillmaster_name: rejection.order.assigned_skill_master&.first_name,
+            customer_name: "#{rejection.order.user.first_name} #{rejection.order.user.last_name}"
           }
         end
       }

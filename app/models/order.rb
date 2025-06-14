@@ -41,6 +41,7 @@ class Order < ApplicationRecord
   has_many :reviews, dependent: :destroy
   has_many :chats, dependent: :nullify
   has_one :payment_approval, dependent: :destroy
+  has_many :order_rejections, dependent: :destroy
 
   before_save :assign_platform_credentials
   before_create :generate_internal_id
@@ -96,7 +97,7 @@ class Order < ApplicationRecord
 
     event :reject_and_rework do
       # Admin rejects completed work and sends back for rework
-      transitions from: :complete, to: :in_progress
+      transitions from: %i[complete in_review], to: :in_progress
     end
 
     event :mark_in_review do
@@ -145,6 +146,18 @@ class Order < ApplicationRecord
         Rails.logger.error "Failed to delete completion image from S3: #{e.message}"
       end
     end
+  end
+
+  # Create a rejection record when order is rejected
+  def create_rejection_record!(rejection_type, admin_user, reason, notes = nil)
+    order_rejections.create!(
+      rejection_type: rejection_type,
+      admin_user: admin_user,
+      reason: reason,
+      rejection_notes: notes
+    )
+
+    Rails.logger.info "Created #{rejection_type} record for Order #{id} by #{admin_user.first_name}"
   end
 
   private

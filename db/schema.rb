@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_12_061822) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_14_025719) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -191,6 +191,20 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_12_061822) do
     t.decimal "price", precision: 10, scale: 2
     t.index ["order_id"], name: "index_order_products_on_order_id"
     t.index ["product_id"], name: "index_order_products_on_product_id"
+  end
+
+  create_table "order_rejections", force: :cascade do |t|
+    t.bigint "order_id", null: false
+    t.bigint "admin_user_id", null: false
+    t.string "rejection_type", null: false
+    t.text "reason"
+    t.text "rejection_notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_user_id"], name: "index_order_rejections_on_admin_user_id"
+    t.index ["order_id", "created_at"], name: "index_order_rejections_on_order_id_and_created_at"
+    t.index ["order_id"], name: "index_order_rejections_on_order_id"
+    t.index ["rejection_type"], name: "index_order_rejections_on_rejection_type"
   end
 
   create_table "orders", force: :cascade do |t|
@@ -548,6 +562,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_12_061822) do
   add_foreign_key "notifications", "users"
   add_foreign_key "order_products", "orders"
   add_foreign_key "order_products", "products"
+  add_foreign_key "order_rejections", "orders"
+  add_foreign_key "order_rejections", "users", column: "admin_user_id"
   add_foreign_key "orders", "platform_credentials"
   add_foreign_key "orders", "promotions"
   add_foreign_key "orders", "users"
