@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_14_025719) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -143,9 +143,35 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_14_025719) do
     t.string "tax_form_type"
     t.datetime "tax_form_submitted_at", precision: nil
     t.datetime "tax_compliance_checked_at", precision: nil
+    t.boolean "paypal_email_verified", default: false, null: false
+    t.datetime "paypal_email_verified_at"
+    t.string "paypal_verification_batch_id"
+    t.integer "paypal_verification_attempts", default: 0, null: false
+    t.datetime "paypal_verification_last_attempt_at"
+    t.string "country_code"
+    t.string "country_name"
+    t.string "tax_id_type"
+    t.decimal "withholding_rate", precision: 5, scale: 4
+    t.string "address_line1"
+    t.string "address_line2"
+    t.string "city"
+    t.string "state_province"
+    t.string "postal_code"
+    t.text "encrypted_tax_id"
+    t.text "encrypted_full_legal_name"
+    t.text "encrypted_date_of_birth"
+    t.text "encrypted_address_line_1"
+    t.text "encrypted_address_line_2"
+    t.text "encrypted_city"
+    t.text "encrypted_state_province"
+    t.text "encrypted_postal_code"
+    t.index ["country_code"], name: "index_contractors_on_country_code"
+    t.index ["paypal_email_verified"], name: "index_contractors_on_paypal_email_verified"
     t.index ["paypal_payout_email"], name: "index_contractors_on_paypal_payout_email"
+    t.index ["paypal_verification_batch_id"], name: "index_contractors_on_paypal_verification_batch_id"
     t.index ["trolley_recipient_id"], name: "index_contractors_on_trolley_recipient_id"
     t.index ["user_id"], name: "index_contractors_on_user_id"
+    t.index ["withholding_rate"], name: "index_contractors_on_withholding_rate"
   end
 
   create_table "graveyards", force: :cascade do |t|

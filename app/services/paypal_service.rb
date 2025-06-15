@@ -171,7 +171,127 @@ class PaypalService
     false
   end
 
+  # Verify if an email address is associated with a valid PayPal account
+  def verify_paypal_email(email)
+    access_token = get_access_token
+    return PaypalEmailVerificationResult.new(false, 'Failed to get access token') unless access_token
+
+    # Use PayPal's test payout approach - most reliable method
+    verification_result = verify_email_with_test_payout(email, access_token)
+
+    if verification_result[:success]
+      PaypalEmailVerificationResult.new(true, 'Email verified successfully', verification_result[:batch_id])
+    else
+      PaypalEmailVerificationResult.new(false, verification_result[:error])
+    end
+  rescue StandardError => e
+    Rails.logger.error "PayPal email verification failed: #{e.message}"
+    PaypalEmailVerificationResult.new(false, "Verification failed: #{e.message}")
+  end
+
   private
+
+  # Verify email by creating a minimal test payout
+  def verify_email_with_test_payout(email, access_token)
+    # Create a test payout with $0.01 - will fail gracefully if email is invalid
+    payout_data = {
+      sender_batch_header: {
+        sender_batch_id: "verify_#{SecureRandom.hex(8)}",
+        email_subject: 'PayPal Email Verification - RavenBoost',
+        email_message: 'This is a verification test for your PayPal email address.'
+      },
+      items: [
+        {
+          recipient_type: 'EMAIL',
+          amount: {
+            value: '0.01',
+            currency: 'USD'
+          },
+          receiver: email,
+          note: 'Email verification test - minimal amount',
+          sender_item_id: "verify_#{SecureRandom.hex(4)}"
+        }
+      ]
+    }
+
+    response = make_request(
+      method: 'POST',
+      endpoint: '/v1/payments/payouts',
+      data: payout_data,
+      access_token: access_token
+    )
+
+    if response.success?
+      parsed_response = response.parsed_body
+      batch_id = parsed_response.dig('batch_header', 'payout_batch_id')
+
+      Rails.logger.info "PayPal email verification payout created: #{batch_id} for #{email}"
+
+      # Check the payout status immediately
+      payout_status = get_payout_status(batch_id, access_token)
+
+      if payout_status[:valid_email]
+        { success: true, batch_id: batch_id, message: 'Email verified successfully' }
+      else
+        { success: false, error: payout_status[:error] || 'Email verification failed' }
+      end
+    else
+      error_details = response.parsed_body
+      error_message = error_details.dig('details', 0, 'description') ||
+                      error_details['message'] ||
+                      'Email verification failed'
+
+      Rails.logger.warn "PayPal email verification failed for #{email}: #{error_message}"
+      { success: false, error: error_message }
+    end
+  end
+
+  # Check the status of a payout to determine if email is valid
+  def get_payout_status(batch_id, access_token)
+    response = make_request(
+      method: 'GET',
+      endpoint: "/v1/payments/payouts/#{batch_id}",
+      access_token: access_token
+    )
+
+    if response.success?
+      payout_details = response.parsed_body
+      batch_status = payout_details.dig('batch_header', 'batch_status')
+
+      # Check individual items for specific errors
+      items = payout_details['items'] || []
+      first_item = items.first
+
+      if first_item
+        item_status = first_item['transaction_status']
+
+        case item_status
+        when 'SUCCESS', 'PENDING', 'UNCLAIMED'
+          # Email is valid - payout was accepted
+          { valid_email: true }
+        when 'FAILED'
+          # Check the failure reason
+          error_code = first_item.dig('errors', 0, 'name')
+          error_message = first_item.dig('errors', 0, 'message')
+
+          if error_code == 'RECEIVER_UNREGISTERED'
+            { valid_email: false, error: 'PayPal account not found for this email address' }
+          else
+            { valid_email: false, error: error_message || 'Email verification failed' }
+          end
+        else
+          { valid_email: false, error: 'Unable to verify email address' }
+        end
+      else
+        { valid_email: false, error: 'No payout items found' }
+      end
+    else
+      { valid_email: false, error: 'Unable to check payout status' }
+    end
+  rescue StandardError => e
+    Rails.logger.error "Error checking payout status: #{e.message}"
+    { valid_email: false, error: 'Status check failed' }
+  end
 
   def get_access_token
     auth_string = Base64.strict_encode64("#{@client_id}:#{@client_secret}")
@@ -257,6 +377,24 @@ class PaypalService
 end
 
 # Result classes
+class PaypalEmailVerificationResult
+  attr_reader :success, :message, :batch_id
+
+  def initialize(success, message, batch_id = nil)
+    @success = success
+    @message = message
+    @batch_id = batch_id
+  end
+
+  def successful?
+    @success
+  end
+
+  def error_message
+    @success ? nil : @message
+  end
+end
+
 class PaypalOrderResult
   attr_reader :success, :id, :error_message
 

@@ -108,6 +108,7 @@ class Api::WalletController < ApplicationController
   def setup_paypal_account
     contractor = current_user.contractor
     paypal_email = params[:paypal_email]
+    verify_email = params[:verify_email] == 'true' || params[:verify_email] == true
 
     # Validate PayPal email format
     unless paypal_email.present? && valid_email?(paypal_email)
@@ -117,13 +118,36 @@ class Api::WalletController < ApplicationController
       }, status: :unprocessable_entity
     end
 
+    # Check if email changed - reset verification if it did
+    if contractor.paypal_payout_email != paypal_email && contractor.paypal_email_verified?
+      contractor.reset_paypal_verification!
+    end
+
     # Update contractor with PayPal email
     contractor.update!(paypal_payout_email: paypal_email)
+
+    # Attempt verification if requested
+    verification_result = nil
+    if verify_email
+      verification_result = contractor.verify_paypal_email!
+
+      unless verification_result[:success]
+        return render json: {
+          success: false,
+          error: verification_result[:error],
+          verification_failed: true,
+          can_retry: contractor.can_attempt_verification?
+        }, status: :unprocessable_entity
+      end
+    end
 
     render json: {
       success: true,
       message: 'PayPal account setup successfully',
-      paypal_email: paypal_email
+      paypal_email: paypal_email,
+      verified: contractor.paypal_email_verified?,
+      verified_at: contractor.paypal_email_verified_at,
+      verification_message: verification_result&.[](:message)
     }, status: :ok
   rescue StandardError => e
     render json: { success: false, error: e.message }, status: :internal_server_error
@@ -131,25 +155,36 @@ class Api::WalletController < ApplicationController
 
   def submit_tax_form
     contractor = current_user.contractor
-    form_type = params[:form_type]
+    country_code = params[:country_code]
     form_data = params[:form_data] || {}
 
-    # Validate form type
-    unless %w[W-9 W-8BEN].include?(form_type)
-      return render json: {
-        success: false,
-        error: 'Invalid tax form type. Must be W-9 or W-8BEN'
-      }, status: :unprocessable_entity
+    # Set country if provided
+    if country_code.present?
+      country_info = Contractor.country_info(country_code)
+      contractor.update!(
+        country_code: country_code.upcase,
+        country_name: country_info[:name],
+        tax_id_type: country_info[:tax_id_label],
+        withholding_rate: country_info[:withholding_rate]
+      )
     end
 
-    # Submit tax form
+    # Auto-detect required form based on country
+    form_type = contractor.required_tax_form_type
+
+    # Validate based on form type and country
+    validate_international_tax_form!(contractor, form_data)
+
     contractor.submit_tax_form!(form_type, form_data.to_h)
 
     render json: {
       success: true,
-      message: 'Tax form submitted for verification',
+      message: "#{form_type} submitted for verification",
       form_type: form_type,
-      status: contractor.tax_form_status
+      status: contractor.tax_form_status,
+      country: contractor.country_name,
+      withholding_info: contractor.calculate_net_payout(100), # Show example with $100
+      tax_id_label: contractor.tax_id_label
     }, status: :ok
   rescue StandardError => e
     render json: { success: false, error: e.message }, status: :internal_server_error
@@ -229,7 +264,7 @@ class Api::WalletController < ApplicationController
         id: "order_#{order.id}",
         type: 'earning',
         description: "Order ##{order.internal_id} - #{order.products.map(&:name).join(', ')}",
-        amount: (order.skillmaster_earned || 0).to_f,
+        amount: order.skillmaster_earned || 0,
         status: 'completed',
         date: order.updated_at,
         customer: "#{order.user.first_name} #{order.user.last_name}",
@@ -259,9 +294,9 @@ class Api::WalletController < ApplicationController
       success: true,
       transactions: transactions,
       summary: {
-        total_earnings: (completed_orders.sum(:skillmaster_earned) || 0).to_f,
-        total_withdrawals: (payouts.successful.sum(:amount) || 0).to_f,
-        pending_withdrawals: (payouts.where(status: ['pending', 'processing']).sum(:amount) || 0).to_f
+        total_earnings: completed_orders.sum(:skillmaster_earned) || 0,
+        total_withdrawals: payouts.successful.sum(:amount) || 0,
+        pending_withdrawals: payouts.where(status: ['pending', 'processing']).sum(:amount) || 0
       }
     }, status: :ok
   rescue StandardError => e
@@ -292,9 +327,9 @@ class Api::WalletController < ApplicationController
       success: true,
       withdrawals: withdrawal_data,
       summary: {
-        total_successful: (payouts.successful.sum(:amount) || 0).to_f,
+        total_successful: payouts.successful.sum(:amount) || 0,
         total_failed: payouts.failed.count,
-        total_pending: (payouts.where(status: ['pending', 'processing']).sum(:amount) || 0).to_f
+        total_pending: payouts.where(status: ['pending', 'processing']).sum(:amount) || 0
       }
     }, status: :ok
   rescue StandardError => e
@@ -324,34 +359,65 @@ class Api::WalletController < ApplicationController
   end
 
   def get_supported_countries
-    # PayPal supports many more countries than Stripe
-    [
-      { code: 'US', name: 'United States' },
-      { code: 'CA', name: 'Canada' },
-      { code: 'GB', name: 'United Kingdom' },
-      { code: 'AU', name: 'Australia' },
-      { code: 'FR', name: 'France' },
-      { code: 'DE', name: 'Germany' },
-      { code: 'IT', name: 'Italy' },
-      { code: 'ES', name: 'Spain' },
-      { code: 'NL', name: 'Netherlands' },
-      { code: 'BE', name: 'Belgium' },
-      { code: 'AT', name: 'Austria' },
-      { code: 'CH', name: 'Switzerland' },
-      { code: 'SE', name: 'Sweden' },
-      { code: 'NO', name: 'Norway' },
-      { code: 'DK', name: 'Denmark' },
-      { code: 'FI', name: 'Finland' },
-      { code: 'IE', name: 'Ireland' },
-      { code: 'PT', name: 'Portugal' },
-      { code: 'LU', name: 'Luxembourg' },
-      { code: 'JP', name: 'Japan' },
-      { code: 'BR', name: 'Brazil' },
-      { code: 'MX', name: 'Mexico' },
-      { code: 'IN', name: 'India' },
-      { code: 'SG', name: 'Singapore' },
-      { code: 'HK', name: 'Hong Kong' },
-      { code: 'NZ', name: 'New Zealand' }
-    ]
+    # Return countries with their tax requirements
+    Contractor::COUNTRY_TAX_INFO.map do |country|
+      {
+        code: country[:code],
+        name: country[:name],
+        tax_form: country[:tax_form],
+        tax_id_label: country[:tax_id_label],
+        withholding_rate: country[:withholding_rate],
+        requires_date_of_birth: country[:requires_date_of_birth]
+      }
+    end
+  end
+
+  def validate_international_tax_form!(contractor, form_data)
+    country_info = contractor.country_info
+
+    # Map form field names to encrypted model attributes
+    field_mapping = {
+      'full_name' => 'full_legal_name',
+      'tax_id_number' => 'tax_id',
+      'address_line1' => 'address_line_1',
+      'address_line2' => 'address_line_2',
+      'city' => 'city',
+      'state_province' => 'state_province',
+      'postal_code' => 'postal_code',
+      'date_of_birth' => 'date_of_birth'
+    }
+
+    # Common required fields for all contractors
+    required_fields = %w[full_name tax_id_number address_line1 city postal_code]
+
+    # Add date of birth for non-US contractors
+    required_fields << 'date_of_birth' if contractor.requires_date_of_birth?
+
+    required_fields.each do |field|
+      next if form_data[field].present?
+
+      human_field = field.humanize
+      human_field = contractor.tax_id_label if field == 'tax_id_number'
+      raise "#{human_field} is required for #{country_info[:name]} contractors"
+    end
+
+    # Validate tax ID format if we have a pattern for this country
+    tax_id = form_data['tax_id_number']
+    unless contractor.validate_tax_id_format(tax_id)
+      raise "Please enter a valid #{contractor.tax_id_label} for #{contractor.country_name}"
+    end
+
+    # Store encrypted contractor information using the encrypted setters
+    update_attrs = {}
+    field_mapping.each do |form_field, model_attr|
+      update_attrs[model_attr] = form_data[form_field] if form_data[form_field].present?
+    end
+
+    contractor.update!(update_attrs)
+  end
+  end
+
+  def valid_email?(email)
+    email =~ URI::MailTo::EMAIL_REGEXP
   end
 end

@@ -40,6 +40,7 @@ gem 'rqrcode'
 
 gem 'listen', '~> 3.7'
 gem 'prawn'
+gem 'rbnacl-libsodium', '~> 1.0'
 
 # Gem for Mailgun email service
 gem 'mailgun-ruby', '~> 1.2'

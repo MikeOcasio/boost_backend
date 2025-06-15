@@ -628,8 +628,6 @@ module Orders
             skillmaster_submission_notes: order.skillmaster_submission_notes,
             admin_rejection_notes: order.admin_rejection_notes,
             review_type: review_type,
-            before_image: order.before_image,
-            after_image: order.after_image,
             status: status,
             customer: {
               id: order.user.id,
