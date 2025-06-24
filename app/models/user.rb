@@ -37,6 +37,7 @@ class User < ApplicationRecord
   has_many :users_categories, dependent: :nullify
   has_many :categories, through: :users_categories, dependent: :nullify
   has_many :user_rewards, dependent: :destroy
+  has_many :reward_payouts, dependent: :destroy
   has_many :referrals, class_name: 'Order', foreign_key: 'referral_user_id'
   has_many :reviews, dependent: :destroy
   has_many :received_reviews, as: :reviewable, class_name: 'Review'
@@ -344,6 +345,57 @@ class User < ApplicationRecord
     }
 
     locale_map[country] || 'en-US'
+  end
+
+  # Customer PayPal Methods
+  # ---------------
+
+  def customer_paypal_configured?
+    cust_paypal_email.present? && cust_paypal_email_verified?
+  end
+
+  def customer_paypal_email_verified?
+    cust_paypal_email_verified == true && cust_paypal_email_verified_at.present?
+  end
+
+  def update_customer_paypal_email(email)
+    self.cust_paypal_email = email
+    self.cust_paypal_email_verified = false
+    self.cust_paypal_email_verified_at = nil
+    save!
+  end
+
+  def verify_customer_paypal_email!
+    self.cust_paypal_email_verified = true
+    self.cust_paypal_email_verified_at = Time.current
+    save!
+  end
+
+  def customer_paypal_setup_status
+    return 'not_configured' unless cust_paypal_email.present?
+    return 'pending_verification' unless cust_paypal_email_verified?
+
+    'verified'
+  end
+
+  # Get the appropriate PayPal email based on user role
+  def payout_paypal_email
+    if role == 'skillmaster' && contractor&.paypal_payout_email.present?
+      contractor.paypal_payout_email
+    elsif cust_paypal_email.present?
+      cust_paypal_email
+    else
+      nil
+    end
+  end
+
+  # Check if user can receive PayPal payouts
+  def can_receive_paypal_payouts?
+    if role == 'skillmaster'
+      contractor&.paypal_payout_email.present? && contractor&.paypal_email_verified?
+    else
+      customer_paypal_configured?
+    end
   end
 
   private

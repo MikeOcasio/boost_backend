@@ -52,26 +52,12 @@ class Api::Admin::PaymentApprovalsController < ApplicationController
         @payment_approval.update!(
           status: 'approved',
           approved_at: Time.current,
-          approved_by: current_user,
-          admin_notes: params[:notes]
+          admin_user: current_user,
+          notes: params[:notes]
         )
 
-        # Move earnings from pending to available balance
-        contractor = @payment_approval.skillmaster.contractor
-        contractor.increment!(:available_balance, @payment_approval.skillmaster_earnings)
-        contractor.decrement!(:pending_balance, @payment_approval.skillmaster_earnings)
-
-        # Update order status
-        @payment_approval.order.update!(
-          payment_approval_status: 'approved',
-          payment_approved_at: Time.current,
-          payment_approved_by: current_user
-        )
-
-        # Queue payout job if contractor is ready for payouts
-        if contractor.can_receive_payouts?
-          PaypalPayoutJob.perform_later(contractor.id, @payment_approval.skillmaster_earnings)
-        end
+        # Trigger PayPal payment capture which will handle contractor payout
+        CapturePaypalPaymentJob.perform_later(@payment_approval.order.id)
       end
 
       render json: {
@@ -101,16 +87,11 @@ class Api::Admin::PaymentApprovalsController < ApplicationController
       @payment_approval.update!(
         status: 'rejected',
         rejected_at: Time.current,
-        rejected_by: current_user,
-        admin_notes: params[:notes] || 'Payment rejected by admin'
+        admin_user: current_user,
+        notes: params[:notes] || 'Payment rejected by admin'
       )
 
-      # Update order status
-      @payment_approval.order.update!(
-        payment_approval_status: 'rejected',
-        payment_rejected_at: Time.current,
-        payment_rejected_by: current_user
-      )
+      # Update order status - no specific fields needed, payment_approval relationship handles this
 
       render json: {
         success: true,
@@ -122,6 +103,77 @@ class Api::Admin::PaymentApprovalsController < ApplicationController
       render json: {
         success: false,
         error: 'Failed to reject payment'
+      }, status: :internal_server_error
+    end
+  end
+
+  # POST /api/admin/payment_approvals/bulk_approve
+  def bulk_approve
+    payment_approval_ids = params[:payment_approval_ids]
+    admin_notes = params[:notes]
+
+    if payment_approval_ids.blank? || !payment_approval_ids.is_a?(Array)
+      return render json: {
+        success: false,
+        error: 'payment_approval_ids must be provided as an array'
+      }, status: :bad_request
+    end
+
+    approved_count = 0
+    failed_approvals = []
+
+    begin
+      ActiveRecord::Base.transaction do
+        payment_approval_ids.each do |approval_id|
+          payment_approval = PaymentApproval.find(approval_id)
+
+          # Skip if already processed
+          if payment_approval.status != 'pending'
+            failed_approvals << {
+              id: approval_id,
+              error: "Payment approval is already #{payment_approval.status}"
+            }
+            next
+          end
+
+          # Update payment approval
+          payment_approval.update!(
+            status: 'approved',
+            approved_at: Time.current,
+            admin_user: current_user,
+            notes: admin_notes
+          )
+
+          # Trigger PayPal payment capture which will handle contractor payout
+          CapturePaypalPaymentJob.perform_later(payment_approval.order.id)
+
+          approved_count += 1
+        rescue ActiveRecord::RecordNotFound
+          failed_approvals << {
+            id: approval_id,
+            error: 'Payment approval not found'
+          }
+        rescue StandardError => e
+          Rails.logger.error "Error bulk approving payment #{approval_id}: #{e.message}"
+          failed_approvals << {
+            id: approval_id,
+            error: 'Failed to approve payment'
+          }
+        end
+      end
+
+      render json: {
+        success: true,
+        message: "Successfully approved #{approved_count} payment(s)",
+        approved_count: approved_count,
+        failed_approvals: failed_approvals,
+        total_requested: payment_approval_ids.length
+      }, status: :ok
+    rescue StandardError => e
+      Rails.logger.error "Error in bulk approval transaction: #{e.message}"
+      render json: {
+        success: false,
+        error: 'Failed to process bulk approval'
       }, status: :internal_server_error
     end
   end

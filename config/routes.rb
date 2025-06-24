@@ -127,7 +127,7 @@ Rails.application.routes.draw do
     resources :payments, only: [] do
       collection do
         post :create_paypal_order
-        post :capture_paypal_payment
+        post :capture_payment
         post :approve_paypal_order
         get :order_status
         post :webhook, to: 'payments#webhook'
@@ -141,12 +141,21 @@ Rails.application.routes.draw do
         post :withdraw
         post :move_pending_to_available
         post :setup_paypal_account
-        post :submit_tax_form
         get :account_status
-        get :supported_countries
         get :balance
         get :transaction_history
         get :withdrawal_history
+      end
+    end
+
+    # Customer wallet routes for reward payouts
+    resources :customer_wallet, only: [] do
+      collection do
+        get :show
+        post :setup_paypal
+        post :verify_paypal
+        post :request_payout
+        get :payout_history
       end
     end
 
@@ -221,9 +230,28 @@ Rails.application.routes.draw do
       end
 
       resources :payment_approvals, only: %i[index update] do
+        collection do
+          post :bulk_approve
+        end
         member do
           post :approve
           post :reject
+        end
+      end
+
+      resources :payouts, only: %i[index show] do
+        collection do
+          get :status_check
+          post :sync_with_paypal
+          get :combined_payouts
+        end
+      end
+
+      resources :reward_payouts, only: %i[index show] do
+        collection do
+          post :create_payouts
+          post :process_payouts
+          get :status_check
         end
       end
     end

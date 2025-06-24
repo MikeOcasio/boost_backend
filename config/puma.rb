@@ -10,7 +10,7 @@ threads min_threads_count, max_threads_count
 bind "tcp://0.0.0.0:3000"
 
 # Specifies the environment. Ensure this is set to `production` in a production environment.
-environment ENV.fetch("RAILS_ENV") { "production" }
+workers ENV.fetch("WEB_CONCURRENCY") { Rails.env.production? ? 2 : 0 }
 
 # Specifies the PID file Puma will use.
 pidfile ENV.fetch("PIDFILE") { "tmp/pids/server.pid" }
@@ -23,7 +23,7 @@ workers ENV.fetch("WEB_CONCURRENCY") { 2 }
 preload_app!
 
 # Daemonize mode: Puma runs in the background.
-daemonize ENV.fetch("PUMA_DAEMONIZE") { true }
+daemonize ENV.fetch("PUMA_DAEMONIZE") { false }
 
 # Allow Puma to be restarted by `rails restart` command.
 plugin :tmp_restart
@@ -38,5 +38,5 @@ on_worker_boot do
   ActiveRecord::Base.establish_connection if defined?(ActiveRecord)
 end
 
-# Specifies log output for Puma.
-stdout_redirect 'log/puma.stdout.log', 'log/puma.stderr.log', true
+# # Specifies log output for Puma.
+# stdout_redirect 'log/puma.stdout.log', 'log/puma.stderr.log', true

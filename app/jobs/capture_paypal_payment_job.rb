@@ -27,9 +27,21 @@ class CapturePaypalPaymentJob < ApplicationJob
           paypal_payment_status: 'captured'
         )
 
-        # Move skillmaster earnings from pending to available
+        # Move skillmaster earnings from pending to available and trigger payout
         if order.assigned_skill_master&.contractor
-          order.assigned_skill_master.contractor.approve_and_move_to_available(order.skillmaster_earned)
+          contractor = order.assigned_skill_master.contractor
+
+          # Move earnings to available balance
+          contractor.increment!(:available_balance, order.skillmaster_earned)
+          contractor.increment!(:total_earned, order.skillmaster_earned)
+
+          # Trigger immediate PayPal payout if contractor is ready
+          if contractor.can_receive_payouts?
+            PaypalPayoutJob.perform_later(contractor.id, order.skillmaster_earned)
+            Rails.logger.info "PayPal payout queued for contractor #{contractor.id}: $#{order.skillmaster_earned}"
+          else
+            Rails.logger.warn "Contractor #{contractor.id} earnings captured but PayPal account not ready for payout"
+          end
         end
 
         Rails.logger.info "PayPal payment captured for Order #{order.id}: #{capture_result.capture_id}"

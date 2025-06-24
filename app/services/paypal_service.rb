@@ -189,6 +189,149 @@ class PaypalService
     PaypalEmailVerificationResult.new(false, "Verification failed: #{e.message}")
   end
 
+  # Create a payout to send money to contractors
+  def create_payout(recipient_email:, amount:, currency: 'USD', note: 'Payment from RavenBoost', sender_item_id: nil)
+    access_token = get_access_token
+    return PaypalPayoutResult.new(false, nil, nil, 'Failed to get access token') unless access_token
+
+    payout_data = {
+      sender_batch_header: {
+        sender_batch_id: sender_item_id || "batch_#{SecureRandom.hex(8)}",
+        email_subject: 'You have a payment from RavenBoost',
+        email_message: 'Thank you for your work with RavenBoost. Your payment has been processed.'
+      },
+      items: [
+        {
+          recipient_type: 'EMAIL',
+          amount: {
+            value: format('%.2f', amount),
+            currency: currency.upcase
+          },
+          receiver: recipient_email,
+          note: note,
+          sender_item_id: sender_item_id || "item_#{SecureRandom.hex(6)}"
+        }
+      ]
+    }
+
+    Rails.logger.info "Creating PayPal payout: #{amount} #{currency} to #{recipient_email}"
+
+    response = make_request(
+      method: 'POST',
+      endpoint: '/v1/payments/payouts',
+      data: payout_data,
+      access_token: access_token
+    )
+
+    if response.success?
+      parsed_response = response.parsed_body
+      batch_id = parsed_response.dig('batch_header', 'payout_batch_id')
+      item_id = parsed_response.dig('items', 0, 'payout_item_id')
+
+      Rails.logger.info "PayPal payout created successfully: Batch #{batch_id}, Item #{item_id}"
+      PaypalPayoutResult.new(true, batch_id, item_id, nil)
+    else
+      error_message = response.error_message
+      Rails.logger.error "PayPal payout failed: #{error_message}"
+      PaypalPayoutResult.new(false, nil, nil, error_message)
+    end
+  rescue StandardError => e
+    Rails.logger.error "PayPal payout creation failed: #{e.message}"
+    PaypalPayoutResult.new(false, nil, nil, "Payout creation failed: #{e.message}")
+  end
+
+  # Get payout status (class method for admin use)
+  def self.get_payout_status(batch_id, item_id = nil)
+    service = new
+    service.get_payout_status_details(batch_id, item_id)
+  end
+
+  # Get detailed payout status information
+  def get_payout_status_details(batch_id, item_id = nil)
+    access_token = get_access_token
+    return { success: false, error: 'Failed to get access token' } unless access_token
+
+    url = if item_id.present?
+      "/v1/payments/payouts-item/#{item_id}"
+    else
+      "/v1/payments/payouts/#{batch_id}"
+    end
+
+    response = make_request(
+      method: 'GET',
+      endpoint: url,
+      access_token: access_token
+    )
+
+    if response.success?
+      result = response.parsed_body
+
+      status = if item_id.present?
+        result['transaction_status']&.downcase
+      else
+        result.dig('batch_header', 'batch_status')&.downcase
+      end
+
+      {
+        success: true,
+        status: status,
+        response: result,
+        batch_id: batch_id,
+        item_id: item_id
+      }
+    else
+      {
+        success: false,
+        error: response.error_message,
+        batch_id: batch_id,
+        item_id: item_id
+      }
+    end
+  rescue StandardError => e
+    Rails.logger.error "PayPal status check failed: #{e.message}"
+    {
+      success: false,
+      error: e.message,
+      batch_id: batch_id,
+      item_id: item_id
+    }
+  end
+
+  # Get detailed payout information including all items
+  def self.get_payout_details(batch_id)
+    service = new
+    service.get_payout_batch_details(batch_id)
+  end
+
+  def get_payout_batch_details(batch_id)
+    access_token = get_access_token
+    return { success: false, error: 'Failed to get access token' } unless access_token
+
+    response = make_request(
+      method: 'GET',
+      endpoint: "/v1/payments/payouts/#{batch_id}",
+      access_token: access_token
+    )
+
+    if response.success?
+      result = response.parsed_body
+
+      {
+        success: true,
+        batch_header: result['batch_header'],
+        items: result['items'] || []
+      }
+    else
+      {
+        success: false,
+        error: response.error_message
+      }
+    end
+  rescue StandardError => e
+    Rails.logger.error "PayPal payout details failed: #{e.message}"
+    { success: false, error: e.message }
+  end
+
   private
 
   # Verify email by creating a minimal test payout
@@ -256,7 +399,6 @@ class PaypalService
 
     if response.success?
       payout_details = response.parsed_body
-      batch_status = payout_details.dig('batch_header', 'batch_status')
 
       # Check individual items for specific errors
       items = payout_details['items'] || []
@@ -420,6 +562,25 @@ class PaypalCaptureResult
 
   def successful?
     @success
+  end
+end
+
+class PaypalPayoutResult
+  attr_reader :success, :batch_id, :item_id, :error_message
+
+  def initialize(success, batch_id, item_id, error_message)
+    @success = success
+    @batch_id = batch_id
+    @item_id = item_id
+    @error_message = error_message
+  end
+
+  def successful?
+    @success
+  end
+
+  def error_message
+    @success ? nil : @error_message
   end
 end
 

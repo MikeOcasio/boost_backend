@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
+ActiveRecord::Schema[7.0].define(version: 2025_06_24_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -136,42 +136,16 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
     t.decimal "pending_balance", precision: 10, scale: 2, default: "0.0"
     t.decimal "total_earned", precision: 10, scale: 2, default: "0.0"
     t.datetime "last_withdrawal_at"
-    t.string "trolley_recipient_id"
-    t.string "trolley_account_status", default: "pending"
     t.string "paypal_payout_email"
-    t.string "tax_form_status", default: "pending"
-    t.string "tax_form_type"
-    t.datetime "tax_form_submitted_at", precision: nil
-    t.datetime "tax_compliance_checked_at", precision: nil
     t.boolean "paypal_email_verified", default: false, null: false
     t.datetime "paypal_email_verified_at"
     t.string "paypal_verification_batch_id"
     t.integer "paypal_verification_attempts", default: 0, null: false
     t.datetime "paypal_verification_last_attempt_at"
-    t.string "country_code"
-    t.string "country_name"
-    t.string "tax_id_type"
-    t.decimal "withholding_rate", precision: 5, scale: 4
-    t.string "address_line1"
-    t.string "address_line2"
-    t.string "city"
-    t.string "state_province"
-    t.string "postal_code"
-    t.text "encrypted_tax_id"
-    t.text "encrypted_full_legal_name"
-    t.text "encrypted_date_of_birth"
-    t.text "encrypted_address_line_1"
-    t.text "encrypted_address_line_2"
-    t.text "encrypted_city"
-    t.text "encrypted_state_province"
-    t.text "encrypted_postal_code"
-    t.index ["country_code"], name: "index_contractors_on_country_code"
     t.index ["paypal_email_verified"], name: "index_contractors_on_paypal_email_verified"
     t.index ["paypal_payout_email"], name: "index_contractors_on_paypal_payout_email"
     t.index ["paypal_verification_batch_id"], name: "index_contractors_on_paypal_verification_batch_id"
-    t.index ["trolley_recipient_id"], name: "index_contractors_on_trolley_recipient_id"
     t.index ["user_id"], name: "index_contractors_on_user_id"
-    t.index ["withholding_rate"], name: "index_contractors_on_withholding_rate"
   end
 
   create_table "graveyards", force: :cascade do |t|
@@ -396,6 +370,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
     t.text "description"
     t.decimal "price"
     t.string "image"
+    t.bigint "category_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "is_priority", default: false
@@ -407,12 +382,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
     t.string "primary_color"
     t.string "secondary_color"
     t.string "features", default: [], array: true
-    t.bigint "category_id"
     t.boolean "is_dropdown", default: false
     t.jsonb "dropdown_options", default: []
     t.boolean "is_slider", default: false
     t.jsonb "slider_range", default: []
     t.bigint "parent_id"
+    t.index ["category_id"], name: "index_products_on_category_id"
     t.index ["parent_id"], name: "index_products_on_parent_id"
   end
 
@@ -443,6 +418,28 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
     t.index ["user_id"], name: "index_reviews_on_user_id"
   end
 
+  create_table "reward_payouts", force: :cascade do |t|
+    t.bigint "user_reward_id", null: false
+    t.bigint "user_id", null: false
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.string "status", default: "pending", null: false
+    t.string "payout_type", null: false
+    t.string "paypal_payout_batch_id"
+    t.string "paypal_payout_item_id"
+    t.text "failure_reason"
+    t.json "paypal_response"
+    t.string "recipient_email"
+    t.datetime "processed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "title"
+    t.index ["payout_type"], name: "index_reward_payouts_on_payout_type"
+    t.index ["paypal_payout_batch_id"], name: "index_reward_payouts_on_paypal_payout_batch_id"
+    t.index ["status"], name: "index_reward_payouts_on_status"
+    t.index ["user_id"], name: "index_reward_payouts_on_user_id"
+    t.index ["user_reward_id"], name: "index_reward_payouts_on_user_reward_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.string "session_id", null: false
     t.text "data"
@@ -471,10 +468,11 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
   end
 
   create_table "sub_platforms", force: :cascade do |t|
-    t.string "name", null: false
     t.bigint "platform_id", null: false
+    t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["platform_id", "name"], name: "index_sub_platforms_on_platform_id_and_name", unique: true
     t.index ["platform_id"], name: "index_sub_platforms_on_platform_id"
   end
 
@@ -543,15 +541,17 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
     t.integer "available_referral_points", default: 0
     t.integer "total_completion_points", default: 0
     t.integer "total_referral_points", default: 0
-    t.string "paypal_customer_id"
-    t.string "paypal_email"
     t.string "country"
     t.string "region"
     t.string "currency", default: "USD"
+    t.string "cust_paypal_email"
+    t.boolean "cust_paypal_email_verified", default: false
+    t.datetime "cust_paypal_email_verified_at"
     t.index ["country"], name: "index_users_on_country"
     t.index ["currency"], name: "index_users_on_currency"
+    t.index ["cust_paypal_email"], name: "index_users_on_cust_paypal_email"
+    t.index ["cust_paypal_email_verified"], name: "index_users_on_cust_paypal_email_verified"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
-    t.index ["paypal_customer_id"], name: "index_users_on_paypal_customer_id"
     t.index ["preferred_skill_master_ids"], name: "index_users_on_preferred_skill_master_ids"
     t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'skillmaster'::character varying, 'customer'::character varying, 'skillcoach'::character varying, 'coach'::character varying, 'dev'::character varying, 'c_support'::character varying, 'manager'::character varying]::text[])", name: "check_valid_role"
   end
@@ -607,9 +607,12 @@ ActiveRecord::Schema[7.0].define(version: 2025_06_15_052048) do
   add_foreign_key "product_categories", "products"
   add_foreign_key "product_platforms", "platforms"
   add_foreign_key "product_platforms", "products"
+  add_foreign_key "products", "categories"
   add_foreign_key "products", "products", column: "parent_id"
   add_foreign_key "reviews", "orders"
   add_foreign_key "reviews", "users"
+  add_foreign_key "reward_payouts", "user_rewards"
+  add_foreign_key "reward_payouts", "users"
   add_foreign_key "skillmaster_applications", "users"
   add_foreign_key "skillmaster_applications", "users", column: "reviewer_id"
   add_foreign_key "sub_platforms", "platforms"
